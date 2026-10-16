@@ -3,205 +3,343 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Tesla Navi — In-Car Browser Navigation</title>
+  <title>Tesla Navi — In-Car Navigation Cockpit</title>
 
-  <!-- Leaflet CSS Fallback -->
+  <!-- Google Fonts: Inter + Noto Sans Armenian (Fixes tofu boxes in Tesla Chromium) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600;700&family=Noto+Sans+Armenian:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+  <!-- MapLibre GL 4.7.1 Vector Engine (Hardware-Accelerated 3D) -->
+  <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" />
+  <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+
+  <!-- Fallbacks: Leaflet & Yandex Maps -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-
-  <!-- Tesla Cockpit CSS (DESIGN.md Compliant) -->
-  <link rel="stylesheet" href="css/tesla-display.css">
-
-  <!-- Yandex Maps JS API (2.1) -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="https://api-maps.yandex.ru/2.1/?lang=ru_RU&amp;coordorder=latlong" type="text/javascript"></script>
 
-  <!-- Leaflet JS Fallback -->
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-
-  <!-- Supabase JS Client for Realtime Broadcast -->
+  <!-- Supabase JS Client for Realtime Phone GPS Streaming -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+  <!-- Tesla Cockpit CSS -->
+  <link rel="stylesheet" href="css/tesla-display.css">
 </head>
 <body>
 
-  <!-- Fullscreen Interactive Map -->
+  <!-- Fullscreen Map Viewport -->
   <div id="map-container"></div>
 
-  <!-- Top Floating Search Bar & Route Launcher (Like tmap.ge) -->
-  <div id="search-route-container" class="search-route-container">
-    <div class="search-input-card">
-      <div class="search-icon">
-        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.5">
+  <!-- 1. Floating Left Action Toolbar (Mapsev Architecture) -->
+  <nav class="floating-toolbar" aria-label="Toolbar">
+    <!-- Search Button -->
+    <button id="btn-open-search" class="tool-btn" title="Поиск (Search)">
+      <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.5">
+        <circle cx="11" cy="11" r="8"></circle>
+        <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+      </svg>
+    </button>
+
+    <!-- YouTube Music Button -->
+    <button id="btn-open-music" class="tool-btn" title="Музыка YouTube">
+      <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor">
+        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 14.5v-9l6 4.5-6 4.5z"/>
+      </svg>
+    </button>
+
+    <!-- EV Chargers Button -->
+    <button id="btn-toggle-chargers" class="tool-btn" title="Зарядки EV">
+      <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.5">
+        <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+      </svg>
+    </button>
+
+    <!-- Weather Button -->
+    <button id="btn-open-weather" class="tool-btn" title="Погода в Ереване">
+      <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.5">
+        <path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/>
+      </svg>
+    </button>
+
+    <!-- Phone Pairing & Telemetry Button -->
+    <button id="btn-open-pairing" class="tool-btn" title="Телефон / GPS">
+      <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.5">
+        <rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect>
+        <line x1="12" y1="18" x2="12.01" y2="18"></line>
+      </svg>
+      <span id="tool-phone-dot" class="tool-badge-dot"></span>
+    </button>
+
+    <!-- Language Toggle Button: RU | HY | EN -->
+    <button id="btn-lang-toggle" class="tool-btn" title="Сменить язык (RU / HY / EN)">
+      <span id="lang-indicator" class="tool-lang-badge">RU</span>
+    </button>
+
+    <!-- Compass / 3D Heading-Up Toggle Button -->
+    <button id="btn-compass" class="tool-btn" title="Компас (3D поворот по движению)">
+      <div id="compass-needle" class="compass-arrow-wrap">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="none">
+          <polygon points="12,2 17,12 12,9" fill="#ef4444"/>
+          <polygon points="12,2 7,12 12,9" fill="#dc2626"/>
+          <polygon points="12,22 17,12 12,15" fill="#ffffff"/>
+          <polygon points="12,22 7,12 12,15" fill="#e2e8f0"/>
+        </svg>
+      </div>
+    </button>
+  </nav>
+
+  <!-- 2. Sliding Search Drawer (Left Drawer, Sleek & Fully Closable) -->
+  <aside id="search-drawer" class="search-drawer hidden">
+    <div class="drawer-header">
+      <div class="drawer-search-wrap">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.5">
           <circle cx="11" cy="11" r="8"></circle>
           <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
         </svg>
+        <input id="drawer-search-input" class="drawer-search-input" type="text" placeholder="Поиск мест и адресов..." autocomplete="off" />
       </div>
-      <input id="search-input" class="search-input-field" type="text" placeholder="Поиск улицы, места или адреса..." autocomplete="off" data-i18n-placeholder="searchPlaceholder" />
-      <button id="btn-start-route" class="btn-go-action">
-        <span data-i18n="btnGo">В путь</span>
-        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.5">
-          <polygon points="5 3 19 12 5 21 5 3"></polygon>
-        </svg>
-      </button>
-
-      <!-- Auto-suggestions Dropdown -->
-      <div id="search-suggestions" class="search-suggestions-dropdown"></div>
+      <button id="btn-close-search" class="drawer-close-btn" title="Закрыть">✕</button>
     </div>
 
-    <!-- Category Pills Underneath Search -->
-    <div class="search-categories-row">
-      <div class="category-pill" data-type="charging">
-        <span>⚡</span>
-        <span data-i18n="charging">Зарядка</span>
-      </div>
-      <div class="category-pill" data-type="fuel">
-        <span>⛽</span>
-        <span data-i18n="fuel">Топливо</span>
-      </div>
-      <div class="category-pill" data-type="food">
-        <span>🍽️</span>
-        <span data-i18n="food">Еда</span>
-      </div>
-      <div class="category-pill" data-type="coffee">
-        <span>☕</span>
-        <span data-i18n="coffee">Кофе</span>
-      </div>
-      <div class="category-pill" data-type="parking">
-        <span>🅿️</span>
-        <span data-i18n="parking">Парковка</span>
-      </div>
-    </div>
-  </div>
-
-  <!-- Top Floating Turn-by-Turn HUD Banner -->
-  <div id="hud-banner" class="hud-banner hidden">
-    <div class="hud-arrow-icon">
-      <!-- Straight / Turn Arrow SVG -->
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-        <line x1="12" y1="19" x2="12" y2="5"></line>
-        <polyline points="5 12 12 5 19 12"></polyline>
-      </svg>
-    </div>
-    <div class="hud-content">
-      <div class="hud-distance-street">
-        <div id="hud-distance" class="hud-distance">450 м</div>
-        <div id="hud-street" class="hud-street">ул. Кирк Керкорян</div>
-      </div>
-      <div id="hud-eta" class="hud-telemetry">14 мин · ETA 11:15 · 3.9 км</div>
-    </div>
-    <button id="btn-end-route" class="btn-end-route" data-i18n="endRoute">Завершить</button>
-  </div>
-
-  <!-- Left Floating Cockpit Panel -->
-  <aside class="cockpit-sidebar">
-    <!-- Header & Language Switcher -->
-    <div class="brand-header">
-      <div class="brand-title-wrap">
-        <div class="brand-logo-icon">⚡</div>
-        <div>
-          <div class="brand-text">Tesla Navi</div>
-          <div class="brand-region-badge">Armenia · Caucasus</div>
+    <div class="drawer-body">
+      <!-- Quick Categories Row -->
+      <div class="drawer-chips-row">
+        <div class="drawer-chip" data-type="charging">
+          <span>⚡</span>
+          <span data-i18n="charging">Зарядки</span>
+        </div>
+        <div class="drawer-chip" data-type="parking">
+          <span>🅿️</span>
+          <span data-i18n="parking">Парковка</span>
+        </div>
+        <div class="drawer-chip" data-type="carwash">
+          <span>🚗</span>
+          <span data-i18n="carWash">Мойки</span>
+        </div>
+        <div class="drawer-chip" data-type="food">
+          <span>🍴</span>
+          <span data-i18n="food">Еда</span>
+        </div>
+        <div class="drawer-chip" data-type="coffee">
+          <span>☕</span>
+          <span data-i18n="coffee">Кофе</span>
         </div>
       </div>
 
-      <!-- Language selector: RU, HY, EN -->
-      <div class="lang-selector">
-        <button class="lang-btn active" data-lang="ru">RU</button>
-        <button class="lang-btn" data-lang="hy">ՀԱՅ</button>
-        <button class="lang-btn" data-lang="en">EN</button>
-      </div>
-    </div>
-
-    <!-- Quick Commute Grid: Home / Work -->
-    <div class="commute-grid">
-      <div id="tile-home" class="commute-tile">
-        <div class="commute-icon">🏠</div>
-        <div>
-          <div class="commute-label" data-i18n="home">Дом</div>
-          <div class="commute-sub">Кирк Керкорян</div>
-        </div>
-      </div>
-      <div id="tile-work" class="commute-tile">
-        <div class="commute-icon">💼</div>
-        <div>
-          <div class="commute-label" data-i18n="work">Работа</div>
-          <div class="commute-sub">Центр</div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Phone GPS Pairing Card -->
-    <div class="pairing-card">
-      <div class="pairing-header">
-        <div class="pairing-title" data-i18n="devicePairing">Сопряжение с телефоном</div>
-        <div id="pairing-status-chip" class="pairing-status-chip waiting">
-          <span class="pairing-status-dot"></span>
-          <span id="pairing-status-text" data-i18n="waitingPhone">Ожидание телефона...</span>
-        </div>
-      </div>
-
-      <div class="pairing-body">
-        <div class="qr-wrapper">
-          <img id="qr-image" alt="QR Code to pair phone" src="" />
-        </div>
-        <div class="pairing-details">
-          <div class="pairing-code-label">Код подключения:</div>
-          <div id="pairing-code-display" class="pairing-code">------</div>
-          <div style="font-size: 11px; color: var(--text-low);" data-i18n="shareGpsPrompt">
-            Отсканируйте камерой смартфона для точного GPS
+      <!-- History / Suggestions Section -->
+      <div>
+        <div id="drawer-section-title" class="drawer-section-title" data-i18n="history">История</div>
+        <div id="search-results-list" class="drawer-list">
+          <!-- Default Yerevan History entries like Mapsev IMG_3654 -->
+          <div class="drawer-list-item" data-lat="40.189551" data-lng="44.468663" data-name="Kirk Kerkorian Street, 29/14">
+            <div class="item-left">
+              <div class="item-icon">📍</div>
+              <div>
+                <div class="item-title">Kirk Kerkorian Street, 29/14</div>
+                <div class="item-subtitle">Yerevan, Armenia</div>
+              </div>
+            </div>
+            <div class="item-dist">460 м</div>
           </div>
-        </div>
-      </div>
-
-      <!-- Live GPS Telemetry Table -->
-      <div class="telemetry-grid">
-        <div class="telemetry-cell">
-          <div class="telemetry-label" data-i18n="latitude">Широта</div>
-          <div id="tel-lat" class="telemetry-val">40.189551</div>
-        </div>
-        <div class="telemetry-cell">
-          <div class="telemetry-label" data-i18n="longitude">Долгота</div>
-          <div id="tel-lng" class="telemetry-val">44.468663</div>
-        </div>
-        <div class="telemetry-cell">
-          <div class="telemetry-label" data-i18n="accuracy">Точность</div>
-          <div id="tel-accuracy" class="telemetry-val">±8 м</div>
-        </div>
-        <div class="telemetry-cell">
-          <div class="telemetry-label" data-i18n="age">Пинг</div>
-          <div id="tel-age" class="telemetry-val">-- мс</div>
+          <div class="drawer-list-item" data-lat="40.188200" data-lng="44.471500" data-name="Kirk Kerkorian Street, Yerevan">
+            <div class="item-left">
+              <div class="item-icon">📍</div>
+              <div>
+                <div class="item-title">Kirk Kerkorian Street</div>
+                <div class="item-subtitle">Yerevan, Armenia</div>
+              </div>
+            </div>
+            <div class="item-dist">570 м</div>
+          </div>
+          <div class="drawer-list-item" data-lat="40.198213" data-lng="44.492887" data-name="Hakob Hakobyan Street">
+            <div class="item-left">
+              <div class="item-icon">📍</div>
+              <div>
+                <div class="item-title">Hakob Hakobyan Street</div>
+                <div class="item-subtitle">Arabkir, Yerevan</div>
+              </div>
+            </div>
+            <div class="item-dist">2.3 км</div>
+          </div>
         </div>
       </div>
     </div>
   </aside>
 
-  <!-- Right Floating Action Column -->
-  <div class="actions-bar">
-    <button id="btn-traffic" class="action-btn active" title="Пробки">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
-      </svg>
-    </button>
-    <button id="btn-provider" class="action-btn active" title="Сменить карту: Яндекс / OSM">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"></polygon>
-        <line x1="8" y1="2" x2="8" y2="18"></line>
-        <line x1="16" y1="6" x2="16" y2="22"></line>
-      </svg>
-    </button>
-    <button id="btn-recenter" class="action-btn" title="Мое местоположение">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <circle cx="12" cy="12" r="10"></circle>
-        <line x1="22" y1="12" x2="18" y2="12"></line>
-        <line x1="6" y1="12" x2="2" y2="12"></line>
-        <line x1="12" y1="6" x2="12" y2="2"></line>
-        <line x1="12" y1="22" x2="12" y2="18"></line>
-      </svg>
-    </button>
+  <!-- 3. Top Maneuver HUD Card (Road floating turn card IMG_3659) -->
+  <div id="hud-maneuver-card" class="hud-maneuver-card hidden">
+    <div id="maneuver-arrow-box" class="maneuver-arrow-box">↰</div>
+    <div class="maneuver-info">
+      <div class="maneuver-dist-row">
+        <span id="maneuver-dist" class="maneuver-dist-val">120 м</span>
+      </div>
+      <span id="maneuver-street" class="maneuver-street-name">ул. Мецаренца</span>
+    </div>
   </div>
 
-  <!-- Bottom Speedometer Overlay -->
-  <div class="bottom-telemetry-hud">
-    <div id="speedometer-val" class="speed-value">0</div>
-    <div class="speed-unit" data-i18n="kmh">км/ч</div>
+  <!-- Lane Guidance Pill on Road (IMG_3650 / IMG_3652) -->
+  <div id="lane-guidance-pill" class="lane-guidance-pill hidden">
+    <span class="lane-arrow active">↑</span>
+    <span class="lane-arrow active">↑</span>
+    <span class="lane-arrow">↱</span>
+  </div>
+
+  <!-- 4. Speedometer & Speed Limit HUD (Top Right Cluster IMG_3650 / IMG_3652) -->
+  <div class="speed-limit-hud">
+    <div class="speed-cluster-badge">
+      <div class="current-speed-wrap">
+        <span id="speed-current" class="current-speed-val">0</span>
+        <span class="current-speed-unit">км/ч</span>
+      </div>
+      <div class="speed-limit-circle">60</div>
+    </div>
+
+    <!-- Traffic Camera / Signal Alert (Counting down distance) -->
+    <div id="camera-alert-badge" class="camera-alert-badge">
+      <div class="camera-alert-icon">📷</div>
+      <span id="camera-alert-dist" class="camera-alert-dist">370 м</span>
+    </div>
+  </div>
+
+  <!-- 5. Bottom Navigation Status Bar (IMG_3650 / IMG_3658) -->
+  <div id="bottom-nav-bar" class="bottom-nav-bar hidden">
+    <div class="nav-metrics">
+      <span id="nav-duration" class="nav-metric-duration">4 мин</span>
+      <span id="nav-distance">1.8 км</span>
+      <span id="nav-eta">15:50</span>
+      <span class="nav-battery-badge">🔋 80%</span>
+    </div>
+    <button id="btn-cancel-nav" class="nav-cancel-btn" title="Отменить маршрут">✕</button>
+  </div>
+
+  <!-- 6. Compact Modals -->
+
+  <!-- Arrival Modal (IMG_3661) -->
+  <div id="arrival-modal" class="modal-overlay hidden">
+    <div class="compact-card" style="text-align: center; align-items: center;">
+      <div style="font-size: 38px;">◎</div>
+      <div class="card-title" data-i18n="youArrived">Вы прибыли</div>
+      <div id="arrival-dest-name" style="font-size: 15px; color: var(--text-secondary);">Kirk Kerkorian Street, 29/14</div>
+      <button id="btn-arrival-done" class="btn-primary-action" data-i18n="done">Готово</button>
+    </div>
+  </div>
+
+  <!-- Weather Modal (IMG_3662) -->
+  <div id="weather-modal" class="modal-overlay hidden">
+    <div class="compact-card">
+      <div class="card-top-row">
+        <div>
+          <div class="card-title">Yerevan, AM</div>
+          <div id="weather-desc" style="font-size: 13px; color: var(--text-secondary);">Облачно · 15°C</div>
+        </div>
+        <button id="btn-close-weather-x" class="card-close-btn">✕</button>
+      </div>
+
+      <!-- Real Forecast Hourly Row -->
+      <div id="weather-hourly-row" class="weather-forecast-row">
+        <div class="weather-hour-col">
+          <span>09:00</span>
+          <span>☀️</span>
+          <span class="weather-hour-temp">14°</span>
+        </div>
+        <div class="weather-hour-col">
+          <span>12:00</span>
+          <span>⛅</span>
+          <span class="weather-hour-temp">17°</span>
+        </div>
+        <div class="weather-hour-col">
+          <span>15:00</span>
+          <span>☁️</span>
+          <span class="weather-hour-temp">16°</span>
+        </div>
+        <div class="weather-hour-col">
+          <span>18:00</span>
+          <span>🌙</span>
+          <span class="weather-hour-temp">13°</span>
+        </div>
+        <div class="weather-hour-col">
+          <span>21:00</span>
+          <span>✨</span>
+          <span class="weather-hour-temp">11°</span>
+        </div>
+      </div>
+
+      <div style="display: flex; justify-content: space-between; font-size: 13px; color: var(--text-secondary);">
+        <span>Влажность: <b id="weather-humidity" style="color: #fff;">45%</b></span>
+        <span>Ветер: <b id="weather-wind" style="color: #fff;">8 км/ч</b></span>
+        <span>UV: <b style="color: #fff;">2</b></span>
+      </div>
+
+      <button id="btn-weather-done" class="btn-primary-action" data-i18n="done">Готово</button>
+    </div>
+  </div>
+
+  <!-- YouTube Floating Music PIP Player (IMG_3655 / IMG_3658) -->
+  <div id="music-floating-pip" class="music-floating-pip hidden">
+    <div class="music-pip-header">
+      <div class="music-title-wrap">
+        <span style="color: #ef4444; font-size: 16px;">▶</span>
+        <span id="music-track-title" class="music-track-title">BRUNETTE - ANHETANAM</span>
+      </div>
+      <button id="btn-close-music" class="card-close-btn" style="width: 26px; height: 26px; font-size: 12px;">✕</button>
+    </div>
+
+    <!-- Hidden audio/video iframe -->
+    <div style="height: 0; overflow: hidden;">
+      <iframe id="yt-player-iframe" width="200" height="150" src="" frameborder="0" allow="autoplay; encrypted-media"></iframe>
+    </div>
+
+    <div class="music-controls-row">
+      <button id="btn-music-prev" class="music-ctrl-btn">⏮</button>
+      <button id="btn-music-play" class="music-ctrl-btn music-play-circle">▶</button>
+      <button id="btn-music-next" class="music-ctrl-btn">⏭</button>
+    </div>
+  </div>
+
+  <!-- Phone QR Pairing Modal (Clean, Compact, Fully Closable) -->
+  <div id="pairing-modal" class="modal-overlay hidden">
+    <div class="compact-card">
+      <div class="card-top-row">
+        <div class="card-title" data-i18n="devicePairing">Сопряжение с телефоном</div>
+        <button id="btn-close-pairing-x" class="card-close-btn">✕</button>
+      </div>
+
+      <div style="display: flex; gap: 16px; align-items: center;">
+        <div style="width: 140px; height: 140px; border-radius: 16px; overflow: hidden; background: #fff; padding: 4px; flex: none;">
+          <img id="qr-image" alt="QR Code" style="width: 100%; height: 100%; object-fit: contain;" />
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 6px;">
+          <div style="font-size: 12px; color: var(--text-muted);">Код сопряжения:</div>
+          <div id="pairing-code-display" style="font-size: 24px; font-weight: 800; color: var(--accent-cyan); font-family: var(--font-mono);">FXRLUP</div>
+          <div id="pairing-status-text" style="font-size: 13px; font-weight: 600; color: var(--accent-amber);" data-i18n="waitingPhone">Ожидание телефона...</div>
+          <div style="font-size: 11px; color: var(--text-muted); line-height: 1.3;" data-i18n="shareGpsPrompt">
+            Отсканируйте камерой смартфона для точного GPS
+          </div>
+        </div>
+      </div>
+
+      <!-- Telemetry row -->
+      <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; background: rgba(0,0,0,0.25); border-radius: 14px; padding: 10px; text-align: center; font-family: var(--font-mono);">
+        <div>
+          <div style="font-size: 10px; color: var(--text-muted);" data-i18n="latitude">ШИРОТА</div>
+          <div id="tel-lat" style="font-size: 11px; font-weight: 700;">40.1895</div>
+        </div>
+        <div>
+          <div style="font-size: 10px; color: var(--text-muted);" data-i18n="longitude">ДОЛГОТА</div>
+          <div id="tel-lng" style="font-size: 11px; font-weight: 700;">44.4686</div>
+        </div>
+        <div>
+          <div style="font-size: 10px; color: var(--text-muted);" data-i18n="accuracy">ТОЧНОСТЬ</div>
+          <div id="tel-accuracy" style="font-size: 11px; font-weight: 700;">±3 м</div>
+        </div>
+        <div>
+          <div style="font-size: 10px; color: var(--text-muted);" data-i18n="age">ПИНГ</div>
+          <div id="tel-age" style="font-size: 11px; font-weight: 700;">12 мс</div>
+        </div>
+      </div>
+
+      <button id="btn-pairing-done" class="btn-primary-action" data-i18n="done">Готово</button>
+    </div>
   </div>
 
   <!-- Scripts -->

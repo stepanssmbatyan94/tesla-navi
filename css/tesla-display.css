@@ -1,26 +1,27 @@
-/* Tesla In-Car Display Stylesheet (DESIGN.md Compliant) */
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap');
+/* Tesla Navi Automotive Cockpit Stylesheet (Mapsev & Yandex Navigator Architecture) */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600;700&family=Noto+Sans+Armenian:wght@400;500;600;700;800&display=swap');
 
 :root {
-  --bg-cockpit: #0b0f17;
-  --bg-surface: rgba(18, 22, 32, 0.92);
-  --bg-surface-elevated: #1e2433;
-  --border-subtle: rgba(255, 255, 255, 0.10);
-  --border-focus: rgba(0, 102, 255, 0.6);
-  
-  --primary-cyan: #00f0ff;
-  --primary-blue: #0066ff;
+  --bg-dark: #0b0f17;
+  --bg-surface: rgba(18, 24, 38, 0.94);
+  --bg-surface-elevated: #1a2233;
+  --bg-card: rgba(22, 28, 44, 0.96);
+  --border-subtle: rgba(255, 255, 255, 0.12);
+  --border-active: rgba(0, 122, 255, 0.7);
+
+  --accent-blue: #007aff;
+  --accent-cyan: #00f0ff;
   --accent-green: #10b981;
   --accent-amber: #f59e0b;
   --accent-red: #ef4444;
+  --accent-burgundy: #880022;
 
-  --text-high: #ffffff;
-  --text-med: rgba(255, 255, 255, 0.75);
-  --text-low: rgba(255, 255, 255, 0.45);
+  --text-primary: #ffffff;
+  --text-secondary: rgba(255, 255, 255, 0.72);
+  --text-muted: rgba(255, 255, 255, 0.45);
 
-  --font-display: 'Space Grotesk', -apple-system, sans-serif;
-  --font-telemetry: 'JetBrains Mono', monospace;
-  --font-body: 'Inter', sans-serif;
+  --font-main: 'Inter', 'Noto Sans Armenian', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
 }
 
 * {
@@ -29,643 +30,802 @@
   padding: 0;
   -webkit-tap-highlight-color: transparent;
   user-select: none;
+  font-family: var(--font-main);
 }
 
 html, body {
   width: 100%;
   height: 100%;
   overflow: hidden;
-  background-color: var(--bg-cockpit);
-  color: var(--text-high);
-  font-family: var(--font-body);
+  background-color: var(--bg-dark);
+  color: var(--text-primary);
 }
 
-/* Full-bleed Map Viewport */
+/* 1. Fullscreen Map Viewport */
 #map-container {
   position: absolute;
-  top: 0;
-  left: 0;
+  inset: 0;
   width: 100vw;
   height: 100vh;
   z-index: 1;
 }
 
-/* Top Floating Search & Route Launcher (Like tmap.ge) */
-.search-route-container {
+/* 2. Floating Action Toolbar (Bottom-Left Vertical Dock like Mapsev) */
+.floating-toolbar {
   position: absolute;
-  top: 20px;
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 60;
-  width: 600px;
-  max-width: 90vw;
+  left: 20px;
+  bottom: 24px;
+  z-index: 50;
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-.search-route-container.hidden {
-  opacity: 0;
-  pointer-events: none;
-  transform: translate(-50%, -20px);
-}
-
-.search-input-card {
-  position: relative;
-  display: flex;
-  align-items: center;
+  gap: 12px;
   background: var(--bg-surface);
   border: 1px solid var(--border-subtle);
   border-radius: 20px;
-  padding: 6px 10px 6px 18px;
-  backdrop-filter: blur(24px);
-  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.5);
+  padding: 8px 6px;
+  backdrop-filter: blur(20px);
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.55);
+}
+
+.tool-btn {
+  position: relative;
+  width: 46px;
+  height: 46px;
+  border-radius: 14px;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.tool-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #ffffff;
+  transform: scale(1.06);
+}
+
+.tool-btn:active {
+  transform: scale(0.94);
+}
+
+.tool-btn.active {
+  background: var(--accent-blue);
+  color: #ffffff;
+  box-shadow: 0 4px 14px rgba(0, 122, 255, 0.4);
+}
+
+.tool-badge-dot {
+  position: absolute;
+  top: 7px;
+  right: 7px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent-amber);
+  border: 1.5px solid var(--bg-dark);
+}
+
+.tool-badge-dot.connected {
+  background: var(--accent-green);
+  box-shadow: 0 0 8px var(--accent-green);
+}
+
+.tool-lang-badge {
+  font-size: 13px;
+  font-weight: 700;
+  color: #ffffff;
+  letter-spacing: 0.5px;
+}
+
+.compass-arrow-wrap {
+  width: 24px;
+  height: 24px;
+  display: grid;
+  place-items: center;
+  transition: transform 0.2s ease;
+}
+
+/* 3. Sliding Search Drawer (Left Drawer, Sleek & Fully Closable) */
+.search-drawer {
+  position: absolute;
+  top: 16px;
+  left: 16px;
+  width: 440px;
+  max-width: 92vw;
+  max-height: calc(100vh - 32px);
+  z-index: 70;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: 24px;
+  backdrop-filter: blur(28px);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.7);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  transition: transform 0.32s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.24s ease;
+  transform: translateX(0);
+  opacity: 1;
+}
+
+.search-drawer.hidden {
+  transform: translateX(-120%);
+  opacity: 0;
+  pointer-events: none;
+}
+
+.drawer-header {
+  display: flex;
+  align-items: center;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--border-subtle);
   gap: 12px;
 }
 
-.search-icon {
-  color: var(--text-med);
-  display: grid;
-  place-items: center;
+.drawer-search-wrap {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--border-subtle);
+  border-radius: 16px;
+  padding: 8px 14px;
+  gap: 10px;
 }
 
-.search-input-field {
+.drawer-search-wrap:focus-within {
+  border-color: var(--accent-blue);
+  box-shadow: 0 0 0 2px rgba(0, 122, 255, 0.25);
+}
+
+.drawer-search-input {
   flex: 1;
   background: transparent;
   border: none;
+  outline: none;
   color: #ffffff;
-  font-family: var(--font-body);
   font-size: 16px;
   font-weight: 500;
-  padding: 12px 0;
-  outline: none;
 }
 
-.search-input-field::placeholder {
-  color: var(--text-low);
+.drawer-search-input::placeholder {
+  color: var(--text-muted);
 }
 
-.btn-go-action {
-  background: var(--primary-blue);
-  color: #ffffff;
+.drawer-close-btn {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
   border: none;
-  border-radius: 14px;
-  padding: 12px 24px;
-  font-family: var(--font-display);
-  font-size: 16px;
-  font-weight: 700;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  box-shadow: 0 4px 16px rgba(0, 102, 255, 0.4);
-  transition: all 0.2s;
-}
-
-.btn-go-action:active {
-  transform: scale(0.96);
-  background: #0052cc;
-}
-
-/* Auto-suggestions Dropdown */
-.search-suggestions-dropdown {
-  position: absolute;
-  top: 74px;
-  left: 0;
-  right: 0;
-  background: #141923; /* Solid opaque high-contrast background */
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  border-radius: 20px;
-  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.92);
-  overflow-y: auto;
-  max-height: 380px;
-  display: none;
-  flex-direction: column;
-  z-index: 1000;
-}
-
-.suggestion-item {
-  padding: 14px 18px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-  cursor: pointer;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  transition: background 0.15s;
-}
-
-.suggestion-item:last-child {
-  border-bottom: none;
-}
-
-.suggestion-item:hover {
   background: rgba(255, 255, 255, 0.08);
+  color: var(--text-secondary);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  font-size: 16px;
+  transition: all 0.2s ease;
 }
 
-.suggestion-title {
-  font-size: 15px;
-  font-weight: 600;
-  color: #ffffff;
+.drawer-close-btn:hover {
+  background: rgba(255, 255, 255, 0.18);
+  color: #fff;
 }
 
-.suggestion-sub {
-  font-size: 12px;
-  color: var(--text-low);
+.drawer-body {
+  padding: 16px 18px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
 }
 
-/* Quick Category Chips Underneath Search */
-.search-categories-row {
+/* Chips Row */
+.drawer-chips-row {
   display: flex;
   gap: 8px;
-  justify-content: center;
+  overflow-x: auto;
+  padding-bottom: 4px;
+  scrollbar-width: none;
 }
+.drawer-chips-row::-webkit-scrollbar { display: none; }
 
-.category-pill {
-  background: var(--bg-surface);
-  border: 1px solid var(--border-subtle);
-  border-radius: 24px;
-  padding: 8px 16px;
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--text-high);
-  cursor: pointer;
-  backdrop-filter: blur(16px);
+.drawer-chip {
+  flex: none;
   display: flex;
   align-items: center;
   gap: 6px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
-  transition: all 0.2s;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--border-subtle);
+  border-radius: 20px;
+  padding: 8px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: all 0.2s ease;
 }
 
-.category-pill:hover {
-  background: rgba(255, 255, 255, 0.15);
-  border-color: rgba(255, 255, 255, 0.25);
+.drawer-chip:hover {
+  background: rgba(255, 255, 255, 0.14);
+  border-color: var(--accent-blue);
 }
 
-/* Top Floating Turn-by-Turn HUD Banner */
-.hud-banner {
-  position: absolute;
-  top: 20px;
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 70;
+/* History / Results section */
+.drawer-section-title {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  color: var(--text-muted);
+  margin-bottom: 6px;
+}
+
+.drawer-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.drawer-list-item {
   display: flex;
   align-items: center;
-  gap: 20px;
-  background: linear-gradient(135deg, #005ce6 0%, #0066ff 100%);
-  border: 2px solid rgba(255, 255, 255, 0.35);
-  box-shadow: 0 16px 40px -10px rgba(0, 102, 255, 0.6);
-  border-radius: 24px;
-  padding: 16px 28px;
-  min-width: 540px;
-  max-width: 90vw;
-  backdrop-filter: blur(20px);
-  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  justify-content: space-between;
+  padding: 12px 14px;
+  border-radius: 14px;
+  cursor: pointer;
+  transition: background 0.18s ease;
 }
 
-.hud-banner.hidden {
-  opacity: 0;
-  pointer-events: none;
-  transform: translate(-50%, -30px);
+.drawer-list-item:hover {
+  background: rgba(255, 255, 255, 0.08);
 }
 
-.hud-arrow-icon {
-  width: 56px;
-  height: 56px;
+.item-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  overflow: hidden;
+}
+
+.item-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.07);
   display: grid;
   place-items: center;
-  background: rgba(255, 255, 255, 0.2);
-  border-radius: 18px;
-  color: #ffffff;
+  color: var(--accent-blue);
+  flex: none;
 }
 
-.hud-arrow-icon svg {
-  width: 36px;
-  height: 36px;
-}
-
-.hud-content {
-  flex: 1;
-}
-
-.hud-distance-street {
-  display: flex;
-  align-items: baseline;
-  gap: 12px;
-}
-
-.hud-distance {
-  font-family: var(--font-display);
-  font-size: 38px;
-  font-weight: 700;
-  letter-spacing: -0.02em;
-  color: #ffffff;
-}
-
-.hud-street {
-  font-family: var(--font-display);
-  font-size: 22px;
+.item-title {
+  font-size: 15px;
   font-weight: 600;
   color: #ffffff;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  max-width: 280px;
 }
 
-.hud-telemetry {
-  display: flex;
-  gap: 16px;
-  margin-top: 4px;
-  font-size: 14px;
-  color: rgba(255, 255, 255, 0.9);
-  font-weight: 500;
+.item-subtitle {
+  font-size: 12px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-.btn-end-route {
-  background: rgba(239, 68, 68, 0.95);
-  color: #ffffff;
-  border: none;
-  border-radius: 14px;
-  padding: 12px 20px;
-  font-family: var(--font-display);
-  font-size: 15px;
-  font-weight: 700;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.btn-end-route:active {
-  transform: scale(0.96);
-  background: #dc2626;
-}
-
-/* Floating Cockpit Sidebar (Left) */
-.cockpit-sidebar {
-  position: absolute;
-  top: 20px;
-  left: 20px;
-  bottom: 20px;
-  width: 390px;
-  z-index: 50;
-  background: var(--bg-surface);
-  border: 1px solid var(--border-subtle);
-  backdrop-filter: blur(24px);
-  border-radius: 28px;
-  padding: 24px;
-  display: flex;
-  flex-direction: column;
-  gap: 18px;
-  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.6);
-  overflow-y: auto;
-}
-
-/* Header & Brand */
-.brand-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.brand-title-wrap {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.brand-logo-icon {
-  width: 36px;
-  height: 36px;
-  background: linear-gradient(135deg, var(--primary-cyan) 0%, var(--primary-blue) 100%);
-  border-radius: 10px;
-  display: grid;
-  place-items: center;
-  color: #000;
-  font-weight: 900;
-  font-size: 18px;
-}
-
-.brand-text {
-  font-family: var(--font-display);
-  font-size: 20px;
-  font-weight: 700;
-  letter-spacing: -0.01em;
-}
-
-.brand-region-badge {
-  font-size: 11px;
-  font-weight: 600;
-  padding: 2px 8px;
-  background: rgba(255, 255, 255, 0.08);
-  border-radius: 6px;
-  color: var(--primary-cyan);
-}
-
-/* Language Selector */
-.lang-selector {
-  display: flex;
-  background: rgba(255, 255, 255, 0.06);
-  border-radius: 10px;
-  padding: 3px;
-  gap: 2px;
-}
-
-.lang-btn {
-  background: transparent;
-  border: none;
-  color: var(--text-med);
-  font-family: var(--font-telemetry);
-  font-size: 11px;
-  font-weight: 600;
-  padding: 5px 8px;
-  border-radius: 7px;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.lang-btn.active {
-  background: #ffffff;
-  color: #000000;
-}
-
-/* Commute Tiles (Home / Work) */
-.commute-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 12px;
-}
-
-.commute-tile {
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid var(--border-subtle);
-  border-radius: 16px;
-  padding: 14px;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.commute-tile:hover {
-  background: rgba(255, 255, 255, 0.08);
-  border-color: rgba(255, 255, 255, 0.15);
-}
-
-.commute-icon {
-  font-size: 20px;
-}
-
-.commute-label {
+.item-dist {
   font-size: 13px;
   font-weight: 600;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  flex: none;
+  margin-left: 10px;
 }
 
-.commute-sub {
-  font-size: 11px;
-  color: var(--text-low);
-}
-
-/* Phone Pairing Card */
-.pairing-card {
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid var(--border-subtle);
-  border-radius: 20px;
-  padding: 18px;
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-}
-
-.pairing-header {
+/* 4. Top Maneuver HUD Card (Road floating turn card IMG_3659 / IMG_3660) */
+.hud-maneuver-card {
+  position: absolute;
+  top: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 60;
+  background: var(--accent-blue);
+  border-radius: 22px;
+  padding: 12px 24px;
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  gap: 18px;
+  box-shadow: 0 16px 40px rgba(0, 102, 255, 0.45);
+  max-width: 90vw;
+  animation: slideDown 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: all 0.3s ease;
 }
 
-.pairing-title {
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0.05em;
-  color: var(--text-med);
-  text-transform: uppercase;
+@keyframes slideDown {
+  from { transform: translate(-50%, -30px); opacity: 0; }
+  to { transform: translate(-50%, 0); opacity: 1; }
 }
 
-.pairing-body {
-  display: flex;
-  gap: 16px;
-  align-items: center;
+.hud-maneuver-card.hidden {
+  opacity: 0;
+  pointer-events: none;
+  transform: translate(-50%, -20px);
 }
 
-.qr-wrapper {
-  background: #ffffff;
-  padding: 8px;
+.maneuver-arrow-box {
+  width: 48px;
+  height: 48px;
+  background: rgba(255, 255, 255, 0.2);
   border-radius: 14px;
-  width: 104px;
-  height: 104px;
   display: grid;
   place-items: center;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
-}
-
-.qr-wrapper img {
-  width: 88px;
-  height: 88px;
-  display: block;
-}
-
-.pairing-details {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.pairing-code-label {
-  font-size: 11px;
-  color: var(--text-low);
-}
-
-.pairing-code {
-  font-family: var(--font-telemetry);
-  font-size: 28px;
-  font-weight: 700;
-  letter-spacing: 0.05em;
-  color: var(--primary-cyan);
-}
-
-.pairing-status-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 12px;
-  font-weight: 600;
-  padding: 4px 10px;
-  border-radius: 20px;
-  width: fit-content;
-}
-
-.pairing-status-chip.waiting {
-  background: rgba(245, 158, 11, 0.15);
-  color: var(--accent-amber);
-}
-
-.pairing-status-chip.connected {
-  background: rgba(16, 185, 129, 0.15);
-  color: var(--accent-green);
-}
-
-.pairing-status-chip.disconnected {
-  background: rgba(239, 68, 68, 0.15);
-  color: var(--accent-red);
-}
-
-.pairing-status-dot {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: currentColor;
-  animation: pulseDot 2s infinite;
-}
-
-@keyframes pulseDot {
-  0%, 100% { opacity: 1; transform: scale(1); }
-  50% { opacity: 0.4; transform: scale(0.8); }
-}
-
-/* Telemetry Grid */
-.telemetry-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
-  padding-top: 10px;
-  border-top: 1px solid var(--border-subtle);
-}
-
-.telemetry-cell {
-  background: rgba(255, 255, 255, 0.02);
-  padding: 8px 10px;
-  border-radius: 10px;
-}
-
-.telemetry-label {
-  font-family: var(--font-telemetry);
-  font-size: 10px;
-  color: var(--text-low);
-  text-transform: uppercase;
-}
-
-.telemetry-val {
-  font-family: var(--font-telemetry);
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--text-high);
-  margin-top: 2px;
-}
-
-/* Right Quick Actions Bar */
-.actions-bar {
-  position: absolute;
-  top: 50%;
-  right: 20px;
-  transform: translateY(-50%);
-  z-index: 50;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.action-btn {
-  width: 54px;
-  height: 54px;
-  background: var(--bg-surface);
-  border: 1px solid var(--border-subtle);
-  border-radius: 18px;
-  color: var(--text-high);
-  display: grid;
-  place-items: center;
-  cursor: pointer;
-  backdrop-filter: blur(20px);
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
-  transition: all 0.2s;
-}
-
-.action-btn:hover {
-  background: rgba(255, 255, 255, 0.12);
-  border-color: rgba(255, 255, 255, 0.2);
-}
-
-.action-btn.active {
-  background: var(--primary-blue);
   color: #ffffff;
-  border-color: #3b82f6;
+  font-size: 26px;
+  font-weight: 800;
+  flex: none;
 }
 
-.action-btn svg {
-  width: 24px;
-  height: 24px;
+.maneuver-info {
+  display: flex;
+  flex-direction: column;
 }
 
-/* Bottom Speedometer Overlay */
-.bottom-telemetry-hud {
-  position: absolute;
-  bottom: 24px;
-  right: 24px;
-  z-index: 50;
-  background: var(--bg-surface);
-  border: 1px solid var(--border-subtle);
-  border-radius: 24px;
-  padding: 16px 24px;
-  backdrop-filter: blur(20px);
+.maneuver-dist-row {
   display: flex;
   align-items: baseline;
   gap: 8px;
-  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.5);
 }
 
-.speed-value {
-  font-family: var(--font-display);
-  font-size: 64px;
+.maneuver-dist-val {
+  font-size: 28px;
+  font-weight: 800;
+  letter-spacing: -0.5px;
+}
+
+.maneuver-street-name {
+  font-size: 16px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.95);
+  max-width: 360px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Lane Guidance Pill (Floating on road ahead of junction) */
+.lane-guidance-pill {
+  position: absolute;
+  top: 92px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 59;
+  background: rgba(0, 102, 255, 0.92);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 14px;
+  padding: 6px 16px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  backdrop-filter: blur(16px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+}
+
+.lane-arrow {
+  font-size: 18px;
+  font-weight: 800;
+  color: #ffffff;
+  opacity: 0.5;
+}
+
+.lane-arrow.active {
+  opacity: 1.0;
+  color: #ffffff;
+  filter: drop-shadow(0 0 6px #ffffff);
+}
+
+/* 5. Speedometer & Speed Limit HUD (Top Right Cluster IMG_3650 / IMG_3652) */
+.speed-limit-hud {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+}
+
+.speed-cluster-badge {
+  display: flex;
+  align-items: center;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: 20px;
+  padding: 6px 14px 6px 16px;
+  backdrop-filter: blur(20px);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.5);
+  gap: 14px;
+}
+
+.current-speed-wrap {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+}
+
+.current-speed-val {
+  font-size: 32px;
+  font-weight: 800;
+  color: #ffffff;
+  font-family: var(--font-mono);
+  letter-spacing: -1px;
+}
+
+.current-speed-unit {
+  font-size: 11px;
   font-weight: 700;
-  line-height: 1;
-  letter-spacing: -0.04em;
+  color: var(--text-muted);
+}
+
+/* Circular Speed Limit Sign (Red ring) */
+.speed-limit-circle {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: #ffffff;
+  border: 4px solid #ef4444;
+  display: grid;
+  place-items: center;
+  color: #0b0f17;
+  font-size: 17px;
+  font-weight: 800;
+  font-family: var(--font-mono);
+  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.35);
+}
+
+/* Speed Camera / Traffic Light Alert Badge (IMG_3650) */
+.camera-alert-badge {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: 16px;
+  padding: 6px 12px;
+  backdrop-filter: blur(16px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+}
+
+.camera-alert-icon {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #ef4444;
+  display: grid;
+  place-items: center;
+  color: #fff;
+  font-size: 10px;
+}
+
+.camera-alert-dist {
+  font-size: 14px;
+  font-weight: 700;
+  color: #ffffff;
+  font-family: var(--font-mono);
+}
+
+/* 6. Bottom Navigation Status Bar (IMG_3650 / IMG_3658) */
+.bottom-nav-bar {
+  position: absolute;
+  bottom: 24px;
+  right: 20px;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: 20px;
+  padding: 10px 18px;
+  gap: 16px;
+  backdrop-filter: blur(24px);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.55);
+  transition: all 0.3s ease;
+}
+
+.bottom-nav-bar.hidden {
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(20px);
+}
+
+.nav-metrics {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 15px;
+  font-weight: 600;
   color: #ffffff;
 }
 
-.speed-unit {
-  font-family: var(--font-display);
+.nav-metric-duration {
   font-size: 18px;
-  font-weight: 600;
-  color: var(--text-low);
+  font-weight: 800;
+  color: var(--accent-green);
 }
 
-/* Custom Navigation Chevron / Vehicle Marker (Vivid Royal Blue & White Outline like tmap.ge) */
-.tesla-car-marker {
-  position: relative;
-  width: 48px;
+.nav-battery-badge {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--accent-green);
+  background: rgba(16, 185, 129, 0.15);
+  border-radius: 12px;
+  padding: 2px 8px;
+}
+
+.nav-cancel-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(239, 68, 68, 0.2);
+  color: #ef4444;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 800;
+  transition: all 0.2s ease;
+}
+
+.nav-cancel-btn:hover {
+  background: #ef4444;
+  color: #ffffff;
+}
+
+/* 7. Compact Modals (Arrival, Weather, YouTube Music, Phone Pairing) */
+.modal-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 100;
+  background: rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(8px);
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  transition: opacity 0.25s ease;
+}
+
+.modal-overlay.hidden {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.compact-card {
+  width: 400px;
+  max-width: 90vw;
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: 26px;
+  padding: 24px;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.7);
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  animation: popIn 0.28s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes popIn {
+  from { transform: scale(0.92); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+
+.card-top-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.card-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: #ffffff;
+}
+
+.card-close-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text-secondary);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  font-size: 14px;
+  transition: all 0.2s ease;
+}
+
+.card-close-btn:hover {
+  background: rgba(255, 255, 255, 0.16);
+  color: #fff;
+}
+
+.btn-primary-action {
+  width: 100%;
   height: 48px;
-  transition: transform 0.25s linear;
+  background: var(--accent-blue);
+  border: none;
+  border-radius: 16px;
+  color: #ffffff;
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-primary-action:hover {
+  background: #0066ee;
+  transform: translateY(-1px);
+}
+
+/* Weather Hourly Forecast Row (IMG_3662) */
+.weather-forecast-row {
+  display: flex;
+  justify-content: space-between;
+  border-top: 1px solid var(--border-subtle);
+  border-bottom: 1px solid var(--border-subtle);
+  padding: 12px 0;
+}
+
+.weather-hour-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.weather-hour-temp {
+  font-size: 15px;
+  font-weight: 700;
+  color: #ffffff;
+}
+
+/* YouTube Music Floating Card & PIP (IMG_3655 / IMG_3658) */
+.music-floating-pip {
+  position: absolute;
+  left: 80px;
+  bottom: 24px;
+  z-index: 65;
+  width: 340px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: 20px;
+  padding: 14px;
+  backdrop-filter: blur(24px);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.6);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.music-floating-pip.hidden {
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(20px);
+}
+
+.music-pip-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.music-title-wrap {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  overflow: hidden;
+}
+
+.music-track-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #ffffff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 220px;
+}
+
+.music-controls-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+}
+
+.music-ctrl-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-primary);
+  font-size: 20px;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  transition: transform 0.15s ease;
+}
+
+.music-ctrl-btn:hover {
+  transform: scale(1.15);
+}
+
+.music-play-circle {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: #ef4444;
+  color: #ffffff;
+  display: grid;
+  place-items: center;
+  font-size: 18px;
+  box-shadow: 0 4px 14px rgba(239, 68, 68, 0.4);
+}
+
+/* 8. Vehicle & Destination 3D Map Markers */
+.tesla-3d-car-marker {
+  position: relative;
+  width: 54px;
+  height: 54px;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
 }
 
 .tesla-car-pulse {
   position: absolute;
-  top: 0;
-  left: 0;
-  width: 48px;
-  height: 48px;
+  width: 44px;
+  height: 44px;
   border-radius: 50%;
-  background: rgba(0, 102, 255, 0.35);
-  animation: radarPulse 2s infinite ease-out;
+  background: rgba(239, 68, 68, 0.25);
+  animation: carPulse 2s infinite ease-out;
 }
 
-@keyframes radarPulse {
+@keyframes carPulse {
   0% { transform: scale(0.6); opacity: 0.9; }
-  100% { transform: scale(2.4); opacity: 0; }
+  100% { transform: scale(1.8); opacity: 0; }
 }
 
-.tesla-car-body {
+.tesla-car-arrow {
   position: relative;
   z-index: 2;
-  filter: drop-shadow(0 4px 14px rgba(0, 102, 255, 0.8));
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.tesla-dest-pin {
+  position: relative;
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+}
+
+.dest-pin-pulse {
+  position: absolute;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: rgba(239, 68, 68, 0.3);
+  animation: carPulse 1.6s infinite ease-out;
 }

@@ -1,34 +1,157 @@
-// Tesla Cockpit Controller
+// Tesla Navi Cockpit Controller (Mapsev & Yandex Navigator Architecture)
 
-let currentLang = 'ru';
-let realtimeClient = null;
 let mapEngine = null;
+let realtimeClient = null;
 let currentCode = '';
 let selectedDestination = null;
-let debounceTimer = null;
+let currentLang = 'ru';
+let activeChargersMarkers = [];
+let chargersVisible = false;
+
+// YouTube Music Playlist
+const PLAYLIST = [
+  { title: 'BRUNETTE - ANHETANAM', id: 'm-V84sU0Y3I' },
+  { title: 'K/ES - yellowheart. feat Misho', id: 'aM5Wv12xPqQ' },
+  { title: 'Arkadi Dumikyan - Im Hreshtak', id: 'kJQP7kiw5Fk' },
+  { title: 'Artur Arakelyan - Kyanqis Hamar', id: '2Vv-BfVoq4g' }
+];
+let currentTrackIndex = 0;
+let isMusicPlaying = false;
+
+// Yerevan EV Supercharging Stations (CPS, Flash, PlugShare)
+const EV_CHARGERS = [
+  { name: 'Tesla Supercharger Yerevan (Flash)', lat: 40.192000, lng: 44.475000, power: '150 kW' },
+  { name: 'EV Motors Fast Charger (Kievyan St)', lat: 40.198500, lng: 44.493000, power: '120 kW' },
+  { name: 'CPS Electric Charging Hub (Halabyan)', lat: 40.187000, lng: 44.471000, power: '60 kW' },
+  { name: 'SAS Foodland EV Charger (Baghramyan)', lat: 40.191200, lng: 44.501500, power: '50 kW' },
+  { name: 'Dalma Garden Mall Supercharger', lat: 40.180200, lng: 44.482000, power: '120 kW' }
+];
 
 document.addEventListener('DOMContentLoaded', async () => {
-  initPairingCode();
+  console.log('🚗 Initializing Tesla Navi Automotive Cockpit...');
+
+  // 1. Language Setup
   initLanguage();
+
+  // 2. Direct In-Car Tesla Geolocation
+  initTeslaCarGps();
+
+  // 3. Realtime Phone Pairing (Supabase Broadcast)
+  initPairing();
+
+  // 4. Map Engine Initialization (MapLibre GL 3D Primary)
   await initMap();
-  initRealtime();
-  initSearchBar();
-  initControls();
+
+  // 5. Toolbar & Drawer UI Handlers
+  initToolbarHandlers();
+
+  // 6. Search & Autocomplete Handlers
+  initSearchHandlers();
+
+  // 7. Weather & Music Handlers
+  initWeatherAndMusic();
 });
 
-// 1. Setup Pairing Code and QR Generator
-function initPairingCode() {
+// 1. Language Management (RU, HY, EN)
+function initLanguage() {
+  currentLang = localStorage.getItem('tesla_navi_lang') || 'ru';
+  window.CURRENT_LANG = currentLang;
+  applyLanguage(currentLang);
+
+  const langBtn = document.getElementById('btn-lang-toggle');
+  langBtn.addEventListener('click', () => {
+    if (currentLang === 'ru') currentLang = 'hy';
+    else if (currentLang === 'hy') currentLang = 'en';
+    else currentLang = 'ru';
+
+    localStorage.setItem('tesla_navi_lang', currentLang);
+    window.CURRENT_LANG = currentLang;
+    applyLanguage(currentLang);
+  });
+}
+
+function applyLanguage(lang) {
+  const dict = I18N[lang] || I18N.ru;
+  document.getElementById('lang-indicator').textContent = lang.toUpperCase();
+
+  document.querySelectorAll('[data-i18n]').forEach(el => {
+    const key = el.dataset.i18n;
+    if (dict[key]) el.textContent = dict[key];
+  });
+
+  const searchInput = document.getElementById('drawer-search-input');
+  if (searchInput && dict.searchPlaceholder) {
+    searchInput.placeholder = dict.searchPlaceholder;
+  }
+}
+
+// 2. Direct In-Car Tesla Browser Geolocation
+function initTeslaCarGps() {
+  if (!('geolocation' in navigator)) {
+    console.warn('Geolocation not supported in this browser');
+    return;
+  }
+
+  navigator.geolocation.watchPosition(
+    (pos) => {
+      const coords = pos.coords;
+      const speedKmh = coords.speed ? Math.round(coords.speed * 3.6) : 0;
+      const heading = coords.heading || 0;
+
+      // Update cluster speedometer
+      document.getElementById('speed-current').textContent = speedKmh;
+
+      // Update telemetry
+      document.getElementById('tel-lat').textContent = Number(coords.latitude).toFixed(4);
+      document.getElementById('tel-lng').textContent = Number(coords.longitude).toFixed(4);
+      document.getElementById('tel-accuracy').textContent = `±${Math.round(coords.accuracy || 3)} м`;
+      document.getElementById('tel-age').textContent = `4 мс`;
+
+      // Pass directly to Map Engine
+      if (mapEngine) {
+        mapEngine.updateCarPosition(coords.latitude, coords.longitude, heading, speedKmh);
+      }
+    },
+    (err) => {
+      console.log('[In-Car GPS] Geolocation status:', err.message);
+    },
+    {
+      enableHighAccuracy: true,
+      maximumAge: 0,
+      timeout: 10000
+    }
+  );
+}
+
+// 3. Realtime Phone Remote Pairing (Supabase Broadcast)
+function initPairing() {
   const urlParams = new URLSearchParams(window.location.search);
   currentCode = (urlParams.get('code') || generateCode()).toUpperCase();
 
   document.getElementById('pairing-code-display').textContent = currentCode;
 
-  // Generate QR Code pointing to Phone Remote
-  const phoneUrl = `${window.location.origin}/phone?code=${currentCode}`;
+  // Build QR code URL pointing to phone remote
+  const basePath = window.location.pathname.replace(/\/index\.html$/, '').replace(/\/$/, '');
+  const phoneUrl = `${window.location.origin}${basePath}/phone.html?code=${currentCode}`;
+
   const qrImg = document.getElementById('qr-image');
   qrImg.src = `https://api.qrserver.com/v1/create-qr-code/?size=180x180&margin=0&color=0b0f17&bgcolor=ffffff&data=${encodeURIComponent(phoneUrl)}`;
 
-  console.log('⚡ Tesla Display initialized with code:', currentCode);
+  realtimeClient = new TeslaRealtime({
+    code: currentCode,
+    role: 'display',
+    onGpsUpdate: (gps) => {
+      handleIncomingGps(gps);
+    },
+    onDestinationSet: (destination) => {
+      handleIncomingDestination(destination);
+    },
+    onStatusChange: (connected) => {
+      updatePairingStatus(connected);
+    }
+  });
+
+  realtimeClient.init();
 }
 
 function generateCode() {
@@ -40,333 +163,400 @@ function generateCode() {
   return res;
 }
 
-// 2. Initialize Unified Map Engine
-async function initMap() {
-  mapEngine = new TeslaMapEngine('map-container', {
-    provider: CONFIG.defaultProvider,
-    center: CONFIG.defaultCenter,
-    onRouteCalculated: (routeInfo) => {
-      selectedDestination = routeInfo.destination;
-      showHudBanner(routeInfo);
-    }
-  });
-
-  await mapEngine.init();
-}
-
-// 3. Initialize Realtime WebSocket / Supabase Broadcast
-function initRealtime() {
-  realtimeClient = new TeslaRealtime({
-    code: currentCode,
-    role: 'display',
-    onGpsUpdate: (gps) => {
-      handleIncomingGps(gps);
-    },
-    onDestinationSet: (destination) => {
-      handleIncomingDestination(destination);
-    },
-    onStatusChange: (connected) => {
-      updateConnectionStatus(connected);
-    }
-  });
-
-  realtimeClient.init();
-}
-
-// Handle GPS packet from Phone
 function handleIncomingGps(gps) {
-  document.getElementById('tel-lat').textContent = Number(gps.lat).toFixed(6);
-  document.getElementById('tel-lng').textContent = Number(gps.lng).toFixed(6);
-  document.getElementById('tel-accuracy').textContent = `±${Math.round(gps.accuracy || 8)} м`;
-  document.getElementById('tel-age').textContent = `12 мс`;
-
   const speedKmh = Math.round((gps.speed || 0) * 3.6);
-  document.getElementById('speedometer-val').textContent = speedKmh;
+  document.getElementById('speed-current').textContent = speedKmh;
+
+  document.getElementById('tel-lat').textContent = Number(gps.lat).toFixed(4);
+  document.getElementById('tel-lng').textContent = Number(gps.lng).toFixed(4);
+  document.getElementById('tel-accuracy').textContent = `±${Math.round(gps.accuracy || 3)} м`;
+  document.getElementById('tel-age').textContent = `12 мс`;
 
   if (mapEngine) {
     mapEngine.updateCarPosition(gps.lat, gps.lng, gps.heading || 0, speedKmh);
   }
 }
 
-// Handle Destination packet from Phone
-function handleIncomingDestination(destination) {
-  console.log('📍 New destination received from phone:', destination);
-  selectedDestination = destination;
-
-  const searchInput = document.getElementById('search-input');
-  if (searchInput) {
-    searchInput.value = destination.name || 'Точка назначения';
-  }
-
-  if (mapEngine) {
-    mapEngine.buildRouteTo(destination);
-    // Start navigation automatically
-    startActiveNavigation();
-  }
-}
-
-function startActiveNavigation() {
-  document.getElementById('search-route-container').classList.add('hidden');
-  document.getElementById('hud-banner').classList.remove('hidden');
-  if (mapEngine) {
-    mapEngine.startNavigation();
-  }
-}
-
-// Update connection badge (Waiting -> Connected -> Connection Lost)
-function updateConnectionStatus(connected) {
-  const chip = document.getElementById('pairing-status-chip');
-  const text = document.getElementById('pairing-status-text');
-  const t = I18N[currentLang];
+function updatePairingStatus(connected) {
+  const dot = document.getElementById('tool-phone-dot');
+  const statusText = document.getElementById('pairing-status-text');
+  const dict = I18N[currentLang] || I18N.ru;
 
   if (connected) {
-    chip.className = 'pairing-status-chip connected';
-    text.textContent = t.connectedPhone;
+    dot.classList.add('connected');
+    statusText.textContent = dict.connectedPhone;
+    statusText.style.color = 'var(--accent-green)';
+    // Auto-minimize pairing modal if connected
+    setTimeout(() => {
+      document.getElementById('pairing-modal').classList.add('hidden');
+    }, 1200);
   } else {
-    chip.className = 'pairing-status-chip disconnected';
-    text.textContent = t.disconnectedPhone;
+    dot.classList.remove('connected');
+    statusText.textContent = dict.waitingPhone;
+    statusText.style.color = 'var(--accent-amber)';
   }
 }
 
-// Top Search Bar & Suggestions
-function initSearchBar() {
-  const searchInput = document.getElementById('search-input');
-  const suggestionsBox = document.getElementById('search-suggestions');
-  const btnStartRoute = document.getElementById('btn-start-route');
+// 4. Map Engine Initialization
+async function initMap() {
+  mapEngine = new TeslaMapEngine('map-container', {
+    provider: 'maplibre',
+    center: CONFIG.defaultCenter,
+    onRouteCalculated: (route) => {
+      showNavigationHud(route);
+    },
+    onManeuverUpdate: (maneuver) => {
+      updateManeuverHud(maneuver);
+    },
+    onArrival: (destination) => {
+      showArrivalModal(destination);
+    }
+  });
 
-  // Input debounced autocomplete
+  await mapEngine.init();
+}
+
+// 5. Toolbar & Drawer UI Handlers
+function initToolbarHandlers() {
+  const searchDrawer = document.getElementById('search-drawer');
+  const btnOpenSearch = document.getElementById('btn-open-search');
+  const btnCloseSearch = document.getElementById('btn-close-search');
+
+  // Search Drawer Toggle
+  btnOpenSearch.addEventListener('click', () => {
+    searchDrawer.classList.toggle('hidden');
+    if (!searchDrawer.classList.contains('hidden')) {
+      document.getElementById('drawer-search-input').focus();
+    }
+  });
+
+  btnCloseSearch.addEventListener('click', () => {
+    searchDrawer.classList.add('hidden');
+  });
+
+  // Phone Pairing Modal
+  const btnOpenPairing = document.getElementById('btn-open-pairing');
+  const pairingModal = document.getElementById('pairing-modal');
+  const btnClosePairingX = document.getElementById('btn-close-pairing-x');
+  const btnPairingDone = document.getElementById('btn-pairing-done');
+
+  btnOpenPairing.addEventListener('click', () => {
+    pairingModal.classList.remove('hidden');
+  });
+  [btnClosePairingX, btnPairingDone].forEach(btn => {
+    btn.addEventListener('click', () => pairingModal.classList.add('hidden'));
+  });
+
+  // Compass Toggle (Heading-Up vs North-Up)
+  const btnCompass = document.getElementById('btn-compass');
+  btnCompass.addEventListener('click', () => {
+    if (mapEngine) {
+      const isHeadingUp = mapEngine.toggleHeadingUp();
+      btnCompass.classList.toggle('active', isHeadingUp);
+    }
+  });
+
+  // EV Chargers Toggle
+  const btnChargers = document.getElementById('btn-toggle-chargers');
+  btnChargers.addEventListener('click', () => {
+    chargersVisible = !chargersVisible;
+    btnChargers.classList.toggle('active', chargersVisible);
+    toggleEvChargers(chargersVisible);
+  });
+
+  // Bottom Nav Cancel button
+  document.getElementById('btn-cancel-nav').addEventListener('click', () => {
+    cancelActiveNavigation();
+  });
+
+  // Arrival Done button
+  document.getElementById('btn-arrival-done').addEventListener('click', () => {
+    document.getElementById('arrival-modal').classList.add('hidden');
+  });
+}
+
+// 6. Search & Autocomplete Handlers
+function initSearchHandlers() {
+  const searchInput = document.getElementById('drawer-search-input');
+  const resultsList = document.getElementById('search-results-list');
+  const searchDrawer = document.getElementById('search-drawer');
+  let debounceTimer = null;
+
+  // Autocomplete typing with Photon geocoder
   searchInput.addEventListener('input', () => {
     clearTimeout(debounceTimer);
     const query = searchInput.value.trim();
 
-    if (query.length < 2) {
-      suggestionsBox.style.display = 'none';
-      const catRow = document.querySelector('.search-categories-row');
-      if (catRow) catRow.style.display = 'flex';
-      return;
-    }
+    if (query.length < 2) return;
 
     debounceTimer = setTimeout(async () => {
       try {
-        const res = await fetch(`/api/geocode?q=${encodeURIComponent(query)}`);
-        const items = await res.json();
+        const photonUrl = `https://photon.komoot.io/api/?q=${encodeURIComponent(query)}&lat=40.18&lon=44.49&limit=6`;
+        const res = await fetch(photonUrl);
+        const data = await res.json();
 
-        const catRow = document.querySelector('.search-categories-row');
+        resultsList.innerHTML = '';
 
-        if (items && items.length > 0) {
-          suggestionsBox.innerHTML = '';
-          items.forEach(item => {
-            const div = document.createElement('div');
-            div.className = 'suggestion-item';
-            div.innerHTML = `
-              <div class="suggestion-title">${item.title}</div>
-              <div class="suggestion-sub">${item.subtitle || ''}</div>
+        if (data.features && data.features.length > 0) {
+          data.features.forEach(f => {
+            const p = f.properties;
+            const title = [p.housenumber, p.name || p.street].filter(Boolean).join(' ') || query;
+            const subtitle = [p.district || p.city, p.country || 'Armenia'].filter(Boolean).join(', ');
+            const lat = f.geometry.coordinates[1];
+            const lng = f.geometry.coordinates[0];
+
+            // Calculate distance
+            const distMeters = mapEngine ? mapEngine.calculateDistance(mapEngine.currentPosition.lat, mapEngine.currentPosition.lng, lat, lng) : 1000;
+            const distStr = distMeters >= 1000 ? `${(distMeters / 1000).toFixed(1)} км` : `${Math.round(distMeters)} м`;
+
+            const item = document.createElement('div');
+            item.className = 'drawer-list-item';
+            item.innerHTML = `
+              <div class="item-left">
+                <div class="item-icon">📍</div>
+                <div>
+                  <div class="item-title">${title}</div>
+                  <div class="item-subtitle">${subtitle}</div>
+                </div>
+              </div>
+              <div class="item-dist">${distStr}</div>
             `;
-            div.addEventListener('click', () => {
-              searchInput.value = item.title;
-              suggestionsBox.style.display = 'none';
-              if (catRow) catRow.style.display = 'flex';
-              selectedDestination = { name: item.title, lat: item.lat, lng: item.lng };
-              mapEngine.buildRouteTo(selectedDestination);
-              startActiveNavigation();
+
+            item.addEventListener('click', () => {
+              searchDrawer.classList.add('hidden');
+              startNavigationTo({ name: title, lat, lng });
             });
-            suggestionsBox.appendChild(div);
+
+            resultsList.appendChild(item);
           });
-          suggestionsBox.style.display = 'flex';
-          if (catRow) catRow.style.display = 'none'; // Hide category row so it doesn't get in the way
-        } else {
-          suggestionsBox.style.display = 'none';
-          if (catRow) catRow.style.display = 'flex';
         }
       } catch (e) {
-        console.warn('Autocomplete error:', e);
+        console.warn('Search geocode error:', e);
       }
-    }, 250);
+    }, 200);
   });
 
-  // Enter key press
-  searchInput.addEventListener('keydown', async (e) => {
-    if (e.key === 'Enter') {
-      const q = searchInput.value.trim();
-      if (!q) return;
-      suggestionsBox.style.display = 'none';
-      const catRow = document.querySelector('.search-categories-row');
-      if (catRow) catRow.style.display = 'flex';
-      await resolveAndNavigate(q);
-    }
+  // Click on default history items
+  document.querySelectorAll('.drawer-list-item').forEach(item => {
+    item.addEventListener('click', () => {
+      const lat = parseFloat(item.dataset.lat);
+      const lng = parseFloat(item.dataset.lng);
+      const name = item.dataset.name;
+      if (lat && lng) {
+        searchDrawer.classList.add('hidden');
+        startNavigationTo({ name, lat, lng });
+      }
+    });
   });
 
-  // "В путь" button click
-  btnStartRoute.addEventListener('click', async () => {
-    const q = searchInput.value.trim();
-    suggestionsBox.style.display = 'none';
-    const catRow = document.querySelector('.search-categories-row');
-    if (catRow) catRow.style.display = 'flex';
-
-    if (selectedDestination) {
-      startActiveNavigation();
-    } else if (q) {
-      await resolveAndNavigate(q);
-    } else {
-      searchInput.focus();
-    }
-  });
-
-  // Close suggestions when clicking outside
-  document.addEventListener('click', (e) => {
-    if (!e.target.closest('.search-input-card')) {
-      suggestionsBox.style.display = 'none';
-      const catRow = document.querySelector('.search-categories-row');
-      if (catRow) catRow.style.display = 'flex';
-    }
-  });
-
-  // Category pills
-  document.querySelectorAll('.category-pill').forEach(pill => {
-    pill.addEventListener('click', () => {
-      const type = pill.dataset.type;
+  // Category chips
+  document.querySelectorAll('.drawer-chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+      const type = chip.dataset.type;
       let target = null;
-      if (type === 'charging') {
-        target = { name: 'Tesla Supercharger 250 kW', lat: 40.192000, lng: 44.475000 };
-      } else if (type === 'fuel') {
-        target = { name: 'CPS / Flash Fuel Station', lat: 40.187000, lng: 44.471000 };
-      } else if (type === 'food') {
-        target = { name: 'Ресторан / Food & Dining', lat: 40.184000, lng: 44.480000 };
-      } else if (type === 'coffee') {
-        target = { name: 'Coffee House', lat: 40.185500, lng: 44.485000 };
-      } else if (type === 'parking') {
-        target = { name: 'Парковка / Parking', lat: 40.186500, lng: 44.473000 };
-      }
+      if (type === 'charging') target = { name: 'Tesla Supercharger Yerevan (Flash)', lat: 40.192000, lng: 44.475000 };
+      else if (type === 'parking') target = { name: 'Парковка / Parking Center', lat: 40.186500, lng: 44.473000 };
+      else if (type === 'carwash') target = { name: 'Premium Car Wash Yerevan', lat: 40.184500, lng: 44.478000 };
+      else if (type === 'food') target = { name: 'Ресторан / Dining Yerevan', lat: 40.184000, lng: 44.480000 };
+      else if (type === 'coffee') target = { name: 'Coffee House Yerevan', lat: 40.185500, lng: 44.485000 };
 
       if (target) {
-        searchInput.value = target.name;
-        selectedDestination = target;
-        mapEngine.buildRouteTo(target);
-        startActiveNavigation();
+        searchDrawer.classList.add('hidden');
+        startNavigationTo(target);
       }
     });
   });
 }
 
-async function resolveAndNavigate(query) {
-  try {
-    const res = await fetch(`/api/resolve-location?q=${encodeURIComponent(query)}`);
-    const data = await res.json();
-    if (data && data.success) {
-      selectedDestination = { name: data.name, lat: data.lat, lng: data.lng };
-      mapEngine.buildRouteTo(selectedDestination);
-      startActiveNavigation();
-    } else {
-      alert('Местоположение не найдено, попробуйте уточнить запрос');
+// Start Navigation to Target
+async function startNavigationTo(destination) {
+  selectedDestination = destination;
+  if (mapEngine) {
+    const route = await mapEngine.buildRouteTo(destination);
+    if (route) {
+      showNavigationHud(route);
     }
-  } catch (e) {
-    alert('Ошибка при поиске: ' + e.message);
   }
 }
 
-// Show Top Turn-by-Turn HUD Banner
-function showHudBanner(route) {
-  const banner = document.getElementById('hud-banner');
-  banner.classList.remove('hidden');
-
-  document.getElementById('hud-distance').textContent = route.distance;
-  document.getElementById('hud-street').textContent = route.name || 'Маршрут';
-  document.getElementById('hud-eta').textContent = `${route.duration} · ETA ${route.eta}`;
+function handleIncomingDestination(destination) {
+  console.log('📍 Destination received from Phone:', destination);
+  startNavigationTo(destination);
 }
 
-function hideHudBanner() {
-  document.getElementById('hud-banner').classList.add('hidden');
-  document.getElementById('search-route-container').classList.remove('hidden');
+// 7. Navigation HUD Displays
+function showNavigationHud(route) {
+  document.getElementById('hud-maneuver-card').classList.remove('hidden');
+  document.getElementById('bottom-nav-bar').classList.remove('hidden');
+  document.getElementById('lane-guidance-pill').classList.remove('hidden');
+
+  document.getElementById('maneuver-dist').textContent = route.distance;
+  document.getElementById('maneuver-street').textContent = route.name;
+
+  document.getElementById('nav-duration').textContent = route.duration;
+  document.getElementById('nav-distance').textContent = route.distance;
+  document.getElementById('nav-eta').textContent = route.eta;
+}
+
+function updateManeuverHud(m) {
+  document.getElementById('maneuver-dist').textContent = m.distance;
+  if (m.instruction) {
+    document.getElementById('maneuver-street').textContent = m.instruction;
+  }
+
+  // Arrow symbol
+  const arrowBox = document.getElementById('maneuver-arrow-box');
+  if (m.modifier && m.modifier.includes('left')) arrowBox.textContent = '↰';
+  else if (m.modifier && m.modifier.includes('right')) arrowBox.textContent = '↱';
+  else if (m.modifier && m.modifier.includes('uturn')) arrowBox.textContent = '↺';
+  else arrowBox.textContent = '↑';
+
+  // Distance countdown for camera alert badge
+  const camDist = Math.max(80, (m.distanceMeters || 370) - 40);
+  document.getElementById('camera-alert-dist').textContent = `${camDist} м`;
+}
+
+function cancelActiveNavigation() {
+  document.getElementById('hud-maneuver-card').classList.add('hidden');
+  document.getElementById('bottom-nav-bar').classList.add('hidden');
+  document.getElementById('lane-guidance-pill').classList.add('hidden');
   selectedDestination = null;
   if (mapEngine) {
     mapEngine.cancelRoute();
   }
 }
 
-// 4. UI Controls & Event Listeners
-function initControls() {
-  // End route button
-  document.getElementById('btn-end-route').addEventListener('click', () => {
-    hideHudBanner();
-  });
+function showArrivalModal(dest) {
+  document.getElementById('hud-maneuver-card').classList.add('hidden');
+  document.getElementById('bottom-nav-bar').classList.add('hidden');
+  document.getElementById('lane-guidance-pill').classList.add('hidden');
+  document.getElementById('arrival-dest-name').textContent = dest.name || 'Пункт назначения';
+  document.getElementById('arrival-modal').classList.remove('hidden');
+}
 
-  // Language buttons
-  document.querySelectorAll('.lang-btn').forEach(btn => {
-    btn.addEventListener('click', (e) => {
-      document.querySelectorAll('.lang-btn').forEach(b => b.classList.remove('active'));
-      e.target.classList.add('active');
-      setLanguage(e.target.dataset.lang);
+// 8. EV Supercharger Pins on Map
+function toggleEvChargers(show) {
+  if (!mapEngine || !mapEngine.map) return;
+
+  if (!show) {
+    activeChargersMarkers.forEach(m => m.remove());
+    activeChargersMarkers = [];
+    return;
+  }
+
+  EV_CHARGERS.forEach(charger => {
+    const el = document.createElement('div');
+    el.className = 'tesla-dest-pin';
+    el.innerHTML = `
+      <div style="width: 32px; height: 32px; border-radius: 50%; background: #10b981; border: 2.5px solid #fff; display: grid; place-items: center; color: #fff; font-size: 14px; font-weight: 800; box-shadow: 0 4px 12px rgba(16,185,129,0.5);">
+        ⚡
+      </div>
+    `;
+
+    el.addEventListener('click', () => {
+      startNavigationTo({ name: charger.name, lat: charger.lat, lng: charger.lng });
     });
-  });
 
-  // Traffic Toggle Button
-  const btnTraffic = document.getElementById('btn-traffic');
-  btnTraffic.addEventListener('click', () => {
-    const isTraffic = mapEngine.toggleTraffic();
-    btnTraffic.classList.toggle('active', isTraffic);
-  });
+    const marker = new window.maplibregl.Marker({ element: el })
+      .setLngLat([charger.lng, charger.lat])
+      .addTo(mapEngine.map);
 
-  // Provider Switch Button (Yandex <-> OSM)
-  const btnProvider = document.getElementById('btn-provider');
-  btnProvider.addEventListener('click', async () => {
-    const nextProvider = mapEngine.provider === 'yandex' ? 'osm' : 'yandex';
-    await mapEngine.switchProvider(nextProvider);
-    btnProvider.classList.toggle('active', nextProvider === 'yandex');
-  });
-
-  // Recenter FAB
-  document.getElementById('btn-recenter').addEventListener('click', () => {
-    if (mapEngine) mapEngine.recenter();
-  });
-
-  // Commute tiles (Home / Work demo routes)
-  document.getElementById('tile-home').addEventListener('click', () => {
-    const home = {
-      name: currentLang === 'hy' ? 'Տուն (Կիևյան փողոց)' : 'Дом (ул. Киевян)',
-      lat: 40.195262,
-      lng: 44.486342
-    };
-    document.getElementById('search-input').value = home.name;
-    selectedDestination = home;
-    mapEngine.buildRouteTo(home);
-    startActiveNavigation();
-  });
-
-  document.getElementById('tile-work').addEventListener('click', () => {
-    const work = {
-      name: currentLang === 'hy' ? 'Աշխատանք (Հանրապետության հրապարակ)' : 'Работа (Площадь Республики)',
-      lat: 40.177700,
-      lng: 44.512600
-    };
-    document.getElementById('search-input').value = work.name;
-    selectedDestination = work;
-    mapEngine.buildRouteTo(work);
-    startActiveNavigation();
+    activeChargersMarkers.push(marker);
   });
 }
 
-// Apply localization
-function initLanguage() {
-  setLanguage('ru');
+// 9. Weather (Open-Meteo Real Forecast for Yerevan) & YouTube Music
+function initWeatherAndMusic() {
+  // Weather
+  const btnWeather = document.getElementById('btn-open-weather');
+  const weatherModal = document.getElementById('weather-modal');
+  const btnWeatherX = document.getElementById('btn-close-weather-x');
+  const btnWeatherDone = document.getElementById('btn-weather-done');
+
+  btnWeather.addEventListener('click', async () => {
+    weatherModal.classList.remove('hidden');
+    loadLiveYerevanWeather();
+  });
+  [btnWeatherX, btnWeatherDone].forEach(btn => {
+    btn.addEventListener('click', () => weatherModal.classList.add('hidden'));
+  });
+
+  // YouTube Music
+  const btnMusic = document.getElementById('btn-open-music');
+  const musicPip = document.getElementById('music-floating-pip');
+  const btnCloseMusic = document.getElementById('btn-close-music');
+  const btnMusicPlay = document.getElementById('btn-music-play');
+  const btnMusicPrev = document.getElementById('btn-music-prev');
+  const btnMusicNext = document.getElementById('btn-music-next');
+  const trackTitle = document.getElementById('music-track-title');
+  const ytIframe = document.getElementById('yt-player-iframe');
+
+  btnMusic.addEventListener('click', () => {
+    musicPip.classList.toggle('hidden');
+    btnMusic.classList.toggle('active', !musicPip.classList.contains('hidden'));
+  });
+
+  btnCloseMusic.addEventListener('click', () => {
+    musicPip.classList.add('hidden');
+    btnMusic.classList.remove('active');
+  });
+
+  function updateTrack() {
+    const track = PLAYLIST[currentTrackIndex];
+    trackTitle.textContent = track.title;
+    if (isMusicPlaying) {
+      ytIframe.src = `https://www.youtube-nocookie.com/embed/${track.id}?autoplay=1&enablejsapi=1`;
+    }
+  }
+
+  btnMusicPlay.addEventListener('click', () => {
+    isMusicPlaying = !isMusicPlaying;
+    btnMusicPlay.textContent = isMusicPlaying ? '⏸' : '▶';
+    updateTrack();
+  });
+
+  btnMusicNext.addEventListener('click', () => {
+    currentTrackIndex = (currentTrackIndex + 1) % PLAYLIST.length;
+    updateTrack();
+  });
+
+  btnMusicPrev.addEventListener('click', () => {
+    currentTrackIndex = (currentTrackIndex - 1 + PLAYLIST.length) % PLAYLIST.length;
+    updateTrack();
+  });
+
+  updateTrack();
 }
 
-function setLanguage(lang) {
-  currentLang = lang;
-  const t = I18N[lang];
+async function loadLiveYerevanWeather() {
+  try {
+    const res = await fetch('https://api.open-meteo.com/v1/forecast?latitude=40.18&longitude=44.51&current=temperature_2m,relative_humidity_2m,weather_code,wind_speed_10m&hourly=temperature_2m,weather_code&timezone=auto');
+    const data = await res.json();
 
-  document.querySelectorAll('[data-i18n]').forEach(el => {
-    const key = el.getAttribute('data-i18n');
-    if (t[key]) {
-      el.textContent = t[key];
+    if (data.current) {
+      const temp = Math.round(data.current.temperature_2m);
+      document.getElementById('weather-desc').textContent = `Облачно · ${temp}°C`;
+      document.getElementById('weather-humidity').textContent = `${data.current.relative_humidity_2m}%`;
+      document.getElementById('weather-wind').textContent = `${Math.round(data.current.wind_speed_10m)} км/ч`;
     }
-  });
 
-  document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
-    const key = el.getAttribute('data-i18n-placeholder');
-    if (t[key]) {
-      el.setAttribute('placeholder', t[key]);
+    if (data.hourly && data.hourly.time) {
+      const row = document.getElementById('weather-hourly-row');
+      row.innerHTML = '';
+      const times = [9, 12, 15, 18, 21];
+      times.forEach(hour => {
+        const temp = Math.round(data.hourly.temperature_2m[hour] || 15);
+        const col = document.createElement('div');
+        col.className = 'weather-hour-col';
+        col.innerHTML = `
+          <span>${String(hour).padStart(2, '0')}:00</span>
+          <span>${hour < 18 ? '☀️' : '🌙'}</span>
+          <span class="weather-hour-temp">${temp}°</span>
+        `;
+        row.appendChild(col);
+      });
     }
-  });
-
-  updateConnectionStatus(realtimeClient ? realtimeClient.isConnected : false);
+  } catch (e) {
+    console.warn('Weather fetch error:', e);
+  }
 }

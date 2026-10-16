@@ -10,7 +10,7 @@ const CONFIG = {
   defaultCenter: {
     lat: 40.189551, // Kirk Kerkorian St, Yerevan
     lng: 44.468663,
-    zoom: 16.5     // Optimal street navigation zoom (like tmap.ge)
+    zoom: 16.5     // Optimal street navigation zoom
   },
   
   // Regional presets
@@ -21,8 +21,10 @@ const CONFIG = {
   },
 
   // Map settings
-  defaultProvider: 'yandex', // 'yandex' | 'osm'
-  navigationZoom: 16.5
+  defaultProvider: 'maplibre', // 'maplibre' | 'yandex' | 'osm'
+  maplibreStyle: 'https://tiles.openfreemap.org/styles/liberty',
+  navigationZoom: 16.5,
+  navigationPitch: 55 // 3D Driving Perspective Tilt
 };
 
 // Dictionaries for RU, HY, EN
@@ -30,16 +32,18 @@ const I18N = {
   ru: {
     title: 'Tesla Navi',
     subtitle: 'Браузерная навигация',
-    searchPlaceholder: 'Поиск улицы, места или адреса...',
+    searchPlaceholder: 'Поиск мест и адресов...',
     btnGo: 'В путь',
     btnRoute: 'Маршрут',
     home: 'Дом',
     work: 'Работа',
-    charging: 'Зарядка',
+    charging: 'Зарядки',
     fuel: 'Топливо',
     food: 'Еда',
     coffee: 'Кофе',
     parking: 'Парковка',
+    carWash: 'Мойки',
+    history: 'История',
     recentPlaces: 'Недавние поездки',
     devicePairing: 'Сопряжение с телефоном',
     waitingPhone: 'Ожидание телефона...',
@@ -63,17 +67,33 @@ const I18N = {
     arrival: 'прибытие',
     kmh: 'км/ч',
     sec: 'сек',
+    min: 'мин',
+    km: 'км',
+    m: 'м',
     trafficOn: 'Пробки включены',
     trafficOff: 'Пробки выключены',
     mode2D: '2D режим',
     mode3D: '3D перспектива',
+    mapLibre: '3D Векторная карта',
     mapYandex: 'Яндекс Карты',
-    mapOSM: 'OpenStreetMap'
+    mapOSM: 'OpenStreetMap',
+    youArrived: 'Вы прибыли',
+    done: 'Готово',
+    dismiss: 'Закрыть',
+    weather: 'Погода',
+    youtube: 'Музыка YouTube',
+    speedLimit: 'Ограничение',
+    cameraAhead: 'Камера / Светофор',
+    recenter: 'В центр',
+    voiceTurnLeft: 'Поверните налево',
+    voiceTurnRight: 'Поверните направо',
+    voiceStraight: 'Двигайтесь прямо',
+    voiceArrived: 'Вы прибыли в пункт назначения'
   },
   hy: {
     title: 'Tesla Navi',
     subtitle: 'Բրաուզերային նավիգացիա',
-    searchPlaceholder: 'Որոնեք փողոց, վայր կամ հասցե...',
+    searchPlaceholder: 'Որոնել վայրեր և հասցեներ...',
     btnGo: 'В путь',
     btnRoute: 'Երթուղի',
     home: 'Տուն',
@@ -83,6 +103,8 @@ const I18N = {
     food: 'Սնունդ',
     coffee: 'Սուրճ',
     parking: 'Կայանատեղի',
+    carWash: 'Լվացում',
+    history: 'Պատմություն',
     recentPlaces: 'Վերջին վայրեր',
     devicePairing: 'Սարքի միացում',
     waitingPhone: 'Սպասում ենք հեռախոսին...',
@@ -106,17 +128,33 @@ const I18N = {
     arrival: 'ժամանում',
     kmh: 'կմ/ժ',
     sec: 'վ',
+    min: 'ր',
+    km: 'կմ',
+    m: 'մ',
     trafficOn: 'Երթևեկությունը միացված է',
     trafficOff: 'Երթևեկությունը անջատված է',
     mode2D: '2D ռեժիմ',
     mode3D: '3D տեսք',
+    mapLibre: '3D Վեկտորային քարտեզ',
     mapYandex: 'Yandex Maps',
-    mapOSM: 'OpenStreetMap'
+    mapOSM: 'OpenStreetMap',
+    youArrived: 'Դուք տեղ հասաք',
+    done: 'Պատրաստ է',
+    dismiss: 'Փակել',
+    weather: 'Եղանակ',
+    youtube: 'YouTube Երաժշտություն',
+    speedLimit: 'Սահմանափակում',
+    cameraAhead: 'Տեսախցիկ / Լուսացույց',
+    recenter: 'Կենտրոն',
+    voiceTurnLeft: 'Թեքվեք ձախ',
+    voiceTurnRight: 'Թեքվեք աջ',
+    voiceStraight: 'Շարունակեք ուղիղ',
+    voiceArrived: 'Դուք հասել եք նշանակետին'
   },
   en: {
     title: 'Tesla Navi',
     subtitle: 'In-Car Browser Navigation',
-    searchPlaceholder: 'Search street, place or address...',
+    searchPlaceholder: 'Search places and addresses...',
     btnGo: 'Go',
     btnRoute: 'Route',
     home: 'Home',
@@ -126,12 +164,14 @@ const I18N = {
     food: 'Food',
     coffee: 'Coffee',
     parking: 'Parking',
+    carWash: 'Car wash',
+    history: 'History',
     recentPlaces: 'Recent Places',
-    devicePairing: 'Device Pairing',
+    devicePairing: 'Phone Pairing',
     waitingPhone: 'Waiting for phone...',
     connectedPhone: 'Connected to Phone',
     disconnectedPhone: 'Connection Lost',
-    shareGpsPrompt: 'Scan QR code with phone camera to share high-precision GPS',
+    shareGpsPrompt: 'Scan QR code with phone camera to share GPS',
     disconnect: 'Disconnect',
     gpsAccuracy: 'GPS Accuracy',
     good: 'Good',
@@ -149,11 +189,27 @@ const I18N = {
     arrival: 'arrival',
     kmh: 'km/h',
     sec: 's',
-    trafficOn: 'Traffic layer ON',
-    trafficOff: 'Traffic layer OFF',
+    min: 'min',
+    km: 'km',
+    m: 'm',
+    trafficOn: 'Traffic ON',
+    trafficOff: 'Traffic OFF',
     mode2D: '2D Mode',
     mode3D: '3D Tilt',
+    mapLibre: '3D Vector Map',
     mapYandex: 'Yandex Maps',
-    mapOSM: 'OpenStreetMap'
+    mapOSM: 'OpenStreetMap',
+    youArrived: "You've arrived",
+    done: 'Done',
+    dismiss: 'Dismiss',
+    weather: 'Weather',
+    youtube: 'YouTube Music',
+    speedLimit: 'Speed Limit',
+    cameraAhead: 'Speed Camera / Signal',
+    recenter: 'Recenter',
+    voiceTurnLeft: 'Turn left',
+    voiceTurnRight: 'Turn right',
+    voiceStraight: 'Continue straight',
+    voiceArrived: 'You have arrived at your destination'
   }
 };
