@@ -274,8 +274,11 @@ async function updateLiveTrafficBadge() {
 
 // 4. Map Engine Initialization
 async function initMap() {
+  const urlParams = new URLSearchParams(window.location.search);
+  const activeProvider = urlParams.get('provider') || localStorage.getItem('tesla_map_provider') || 'maplibre';
+
   mapEngine = new TeslaMapEngine('map-container', {
-    provider: 'maplibre',
+    provider: activeProvider,
     center: CONFIG.defaultCenter,
     onRouteCalculated: (route) => {
       showRouteAlternativesDrawer(route);
@@ -438,6 +441,28 @@ function initToolbarHandlers() {
   [btnClosePairingX, btnPairingDone].forEach(btn => {
     btn.addEventListener('click', () => pairingModal.classList.add('hidden'));
   });
+
+  // Map Engine Switcher: 3D Vector (MapLibre) vs Yandex Live Traffic (Яндекс)
+  const btnToggleProvider = document.getElementById('btn-toggle-provider');
+  const providerIndicator = document.getElementById('provider-indicator');
+  const activeProv = new URLSearchParams(window.location.search).get('provider') || localStorage.getItem('tesla_map_provider') || 'maplibre';
+  if (providerIndicator) {
+    providerIndicator.textContent = activeProv === 'yandex' ? 'ЯН' : '3D';
+    providerIndicator.style.color = activeProv === 'yandex' ? '#ef4444' : '#38bdf8';
+  }
+  if (btnToggleProvider) {
+    btnToggleProvider.title = activeProv === 'yandex'
+      ? 'Карта: Яндекс (живой слой пробок). Нажмите для 3D Vector'
+      : 'Карта: 3D Vector. Нажмите для Яндекс.Пробок';
+
+    btnToggleProvider.addEventListener('click', () => {
+      const nextProv = (localStorage.getItem('tesla_map_provider') || 'maplibre') === 'yandex' ? 'maplibre' : 'yandex';
+      localStorage.setItem('tesla_map_provider', nextProv);
+      const url = new URL(window.location.href);
+      url.searchParams.set('provider', nextProv);
+      window.location.href = url.toString();
+    });
+  }
 
   // Compass Toggle (Heading-Up vs North-Up)
   const btnCompass = document.getElementById('btn-compass');

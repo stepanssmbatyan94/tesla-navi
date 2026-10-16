@@ -211,7 +211,14 @@ class TeslaMapEngine {
             state: { providerKey: 'traffic#actual', trafficShown: true }
           });
           this.map.controls.add(this.trafficLayer);
+          this.trafficLayer.showTraffic();
         } catch (e) {}
+
+        this.map.events.add('actionbegin', () => {
+          this.isAutoFollow = false;
+          if (this.onUserPan) this.onUserPan();
+          this.resetAutoFollowTimer();
+        });
 
         const CarLayout = window.ymaps.templateLayoutFactory.createClass(
           `<div id="yandex-car-marker" class="tesla-3d-car-marker">
@@ -965,6 +972,15 @@ class TeslaMapEngine {
       preset: 'islands#redDotIconWithCaption'
     });
     this.map.geoObjects.add(this.destMarker);
+
+    try {
+      if (this.routePolyline && this.routePolyline.getBounds()) {
+        this.map.setBounds(this.routePolyline.getBounds(), {
+          checkZoomRange: true,
+          zoomMargin: 60
+        });
+      }
+    } catch (e) {}
   }
 
   renderLeafletRoute(latLngs, destination) {
