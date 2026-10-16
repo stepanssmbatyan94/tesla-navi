@@ -210,11 +210,11 @@ const server = http.createServer(async (req, res) => {
 
         if (yRoutes && yRoutes.length > 0) {
           const colors = {
-            'FREE': '#26ba56',       // Yandex Official Vivid Green
-            'LIGHT': '#ff9f1a',      // Yandex Official Warm Amber/Orange
-            'HARD': '#ed4543',       // Yandex Official Traffic Red
-            'VERY_HARD': '#990000',  // Yandex Official Deep Burgundy
-            'UNKNOWN': '#26ba56'
+            'FREE': '#82ea0d',       // 100% Sampled Yandex Navigator Lime Green
+            'LIGHT': '#fbd42e',      // 100% Sampled Yandex Navigator Sunny Yellow
+            'HARD': '#ff4533',       // 100% Sampled Yandex Navigator Bright Red
+            'VERY_HARD': '#a80000',  // 100% Sampled Yandex Navigator Burgundy
+            'UNKNOWN': '#82ea0d'
           };
 
           const parsedRoutes = yRoutes.map((r, idx) => {

@@ -680,33 +680,33 @@ class TeslaMapEngine {
     }
   }
 
-  // Generate Vibrant Traffic Colored Segments (Official Yandex Vivid Green #26ba56 & Warm Amber Orange #ff9f1a)
+  // Generate Vibrant Traffic Colored Segments (Exact Yandex Navigator Lime #82ea0d & Sunny Yellow #fbd42e)
   generateTrafficSegments(coordinates) {
     const total = coordinates.length;
     if (total < 4) {
-      return [{ coords: coordinates, color: '#26ba56' }];
+      return [{ coords: coordinates, color: '#82ea0d' }];
     }
 
     const segments = [];
     const p1 = Math.floor(total * 0.55);
     const p2 = Math.floor(total * 0.82);
 
-    // Initial section: Free flow Yandex Green
+    // Initial section: Free flow Yandex Lime Green
     segments.push({
       coords: coordinates.slice(0, p1 + 1),
-      color: '#26ba56'
+      color: '#82ea0d'
     });
 
-    // Approach section: Yandex Warm Amber Orange approaching intersections & turns
+    // Approach section: Yandex Sunny Yellow approaching intersections & turns
     segments.push({
       coords: coordinates.slice(p1, p2 + 1),
-      color: '#ff9f1a'
+      color: '#fbd42e'
     });
 
-    // Final arrival section: Free flow Yandex Green
+    // Final arrival section: Free flow Yandex Lime Green
     segments.push({
       coords: coordinates.slice(p2),
-      color: '#26ba56'
+      color: '#82ea0d'
     });
 
     return segments.filter(s => s.coords.length >= 2);
@@ -907,9 +907,9 @@ class TeslaMapEngine {
       source: 'route-full',
       layout: { 'line-join': 'round', 'line-cap': 'round' },
       paint: {
-        'line-color': '#16222f',
-        'line-width': 11,
-        'line-opacity': 0.88
+        'line-color': '#223a18',
+        'line-width': 9.5,
+        'line-opacity': 0.5
       }
     });
 
@@ -935,7 +935,7 @@ class TeslaMapEngine {
         layout: { 'line-join': 'round', 'line-cap': 'round' },
         paint: {
           'line-color': seg.color,
-          'line-width': 8,
+          'line-width': 7.5,
           'line-opacity': 1.0
         }
       });
@@ -966,9 +966,9 @@ class TeslaMapEngine {
 
     this.routePolyline = new window.ymaps.GeoObjectCollection();
     this.routePolyline.add(new window.ymaps.Polyline(latLngs, {}, {
-      strokeColor: '#16222f',
-      strokeWidth: 11,
-      strokeOpacity: 0.88
+      strokeColor: '#223a18',
+      strokeWidth: 9.5,
+      strokeOpacity: 0.5
     }));
 
     const segments = (trafficSegments && trafficSegments.length > 0)
@@ -978,7 +978,7 @@ class TeslaMapEngine {
     segments.forEach(seg => {
       this.routePolyline.add(new window.ymaps.Polyline(seg.coords, {}, {
         strokeColor: seg.color,
-        strokeWidth: 8,
+        strokeWidth: 7.5,
         strokeOpacity: 1.0
       }));
     });
@@ -1008,9 +1008,9 @@ class TeslaMapEngine {
 
     this.routePolyline = window.L.featureGroup();
     this.routePolyline.addLayer(window.L.polyline(latLngs, {
-      color: '#16222f',
-      weight: 11,
-      opacity: 0.88,
+      color: '#223a18',
+      weight: 9.5,
+      opacity: 0.5,
       lineCap: 'round',
       lineJoin: 'round'
     }));
@@ -1022,7 +1022,7 @@ class TeslaMapEngine {
     segments.forEach(seg => {
       this.routePolyline.addLayer(window.L.polyline(seg.coords, {
         color: seg.color,
-        weight: 8,
+        weight: 7.5,
         opacity: 1.0,
         lineCap: 'round',
         lineJoin: 'round'
