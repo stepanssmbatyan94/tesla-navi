@@ -1008,3 +1008,266 @@ html, body {
   background: rgba(239, 68, 68, 0.3);
   animation: carPulse 1.6s infinite ease-out;
 }
+
+/* ==========================================================================
+   Route Alternatives & Turn Details Drawer (Mapsev IMG_3693 Architecture)
+   ========================================================================== */
+.route-alternatives-drawer {
+  position: absolute;
+  top: 16px;
+  left: 78px;
+  z-index: 70;
+  width: 380px;
+  max-height: calc(100vh - 32px);
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: 22px;
+  padding: 16px;
+  backdrop-filter: blur(28px);
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.7);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.route-alternatives-drawer.hidden {
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(20px);
+}
+
+.route-alt-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--border-subtle);
+  padding-bottom: 10px;
+}
+
+.alt-header-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.route-cards-container {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.route-card {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1.5px solid var(--border-subtle);
+  border-radius: 16px;
+  padding: 12px 14px;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  transition: all 0.2s ease;
+}
+
+.route-card:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.route-card.active {
+  background: rgba(2, 132, 199, 0.15);
+  border-color: #38bdf8;
+  box-shadow: 0 0 16px rgba(56, 189, 248, 0.25);
+}
+
+.route-card.hidden {
+  display: none;
+}
+
+.card-badge {
+  display: inline-block;
+  align-self: flex-start;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 6px;
+  text-transform: uppercase;
+}
+
+.card-badge.fastest {
+  background: #0284c7;
+  color: #ffffff;
+}
+
+.card-badge.via {
+  background: rgba(255, 255, 255, 0.12);
+  color: #ffffff;
+}
+
+.card-time-row {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.card-time {
+  font-size: 22px;
+  font-weight: 800;
+  color: #ffffff;
+  font-family: var(--font-mono);
+}
+
+.card-dist {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.card-details-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.card-battery {
+  color: #10b981;
+  font-weight: 700;
+}
+
+.card-tag {
+  color: var(--text-secondary);
+}
+
+/* Turn-by-Turn Maneuvers List inside Drawer */
+.turn-steps-list-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: 1;
+  max-height: 280px;
+  overflow-y: auto;
+  border-top: 1px solid var(--border-subtle);
+  padding-top: 10px;
+}
+
+.turn-list-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.turn-steps-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.turn-step-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 9px 6px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.turn-step-item:last-child {
+  border-bottom: none;
+}
+
+.turn-step-icon {
+  font-size: 18px;
+  width: 26px;
+  text-align: center;
+  color: #38bdf8;
+  flex-shrink: 0;
+}
+
+.turn-step-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.turn-step-street {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.turn-step-dist {
+  font-size: 12.5px;
+  font-weight: 700;
+  font-family: var(--font-mono);
+  color: var(--text-secondary);
+  flex-shrink: 0;
+}
+
+/* Big Blue "Go" Action Button */
+.btn-go-primary {
+  width: 100%;
+  background: #0284c7;
+  color: #ffffff;
+  font-size: 17px;
+  font-weight: 800;
+  padding: 13px;
+  border-radius: 16px;
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  cursor: pointer;
+  box-shadow: 0 8px 24px rgba(2, 132, 199, 0.45);
+  transition: all 0.2s ease;
+}
+
+.btn-go-primary:hover {
+  background: #0369a1;
+  transform: translateY(-1px);
+}
+
+.btn-go-primary:active {
+  transform: translateY(1px);
+}
+
+/* Speed Camera Markers on Map (60 km/h Sign + Camera Icon) */
+.speed-cam-cluster-marker {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(15, 23, 42, 0.88);
+  border: 1.5px solid rgba(255, 255, 255, 0.4);
+  border-radius: 16px;
+  padding: 2px 6px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.5);
+  pointer-events: none;
+}
+
+.speed-cam-sign-circle {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #ffffff;
+  border: 2.5px solid #ef4444;
+  display: grid;
+  place-items: center;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+.speed-cam-sign-val {
+  color: #0f172a;
+  font-size: 10px;
+  font-weight: 900;
+  font-family: var(--font-mono);
+  line-height: 1;
+}
+
+.speed-cam-icon-bubble {
+  font-size: 11px;
+  color: #ffffff;
+}
+

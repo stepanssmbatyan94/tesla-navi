@@ -88,7 +88,10 @@ const I18N = {
     voiceTurnLeft: 'Поверните налево',
     voiceTurnRight: 'Поверните направо',
     voiceStraight: 'Двигайтесь прямо',
-    voiceArrived: 'Вы прибыли в пункт назначения'
+    voiceArrived: 'Вы прибыли в пункт назначения',
+    routeOptions: 'Варианты маршрута',
+    turnDetails: 'Маневры маршрута',
+    go: 'Поехали'
   },
   hy: {
     title: 'Tesla Navi',
@@ -149,7 +152,10 @@ const I18N = {
     voiceTurnLeft: 'Թեքվեք ձախ',
     voiceTurnRight: 'Թեքվեք աջ',
     voiceStraight: 'Շարունակեք ուղիղ',
-    voiceArrived: 'Դուք հասել եք նշանակետին'
+    voiceArrived: 'Դուք հասել եք նշանակետին',
+    routeOptions: 'Երթուղու տարբերակներ',
+    turnDetails: 'Մանրամասներ',
+    go: 'Գնացինք'
   },
   en: {
     title: 'Tesla Navi',
@@ -210,6 +216,9 @@ const I18N = {
     voiceTurnLeft: 'Turn left',
     voiceTurnRight: 'Turn right',
     voiceStraight: 'Continue straight',
-    voiceArrived: 'You have arrived at your destination'
+    voiceArrived: 'You have arrived at your destination',
+    routeOptions: 'Route Options',
+    turnDetails: 'Turn Details',
+    go: 'Go'
   }
 };

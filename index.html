@@ -191,6 +191,59 @@
     </div>
   </aside>
 
+  <!-- Route Alternatives & Turn-by-Turn Maneuvers Drawer (Mapsev IMG_3693 Architecture) -->
+  <aside id="route-alternatives-drawer" class="route-alternatives-drawer hidden">
+    <div class="route-alt-header">
+      <div class="alt-header-title" data-i18n="routeOptions">Варианты маршрута</div>
+      <button id="btn-close-alt-drawer" class="drawer-close-btn" title="Закрыть">✕</button>
+    </div>
+
+    <!-- Comparison Route Cards -->
+    <div class="route-cards-container">
+      <!-- Card 0: Primary / Fastest -->
+      <div id="route-card-0" class="route-card active">
+        <div class="card-badge fastest" data-i18n="fastest">Самый быстрый</div>
+        <div class="card-time-row">
+          <span id="route-0-time" class="card-time">6 мин</span>
+          <span id="route-0-dist" class="card-dist">2.4 км</span>
+        </div>
+        <div class="card-details-row">
+          <span class="card-battery">🔋 80%</span>
+          <span class="card-tag">8 светофоров</span>
+        </div>
+      </div>
+
+      <!-- Card 1: Alternative Route -->
+      <div id="route-card-1" class="route-card hidden">
+        <div id="route-1-badge" class="card-badge via">через Кирк Керкорян</div>
+        <div class="card-time-row">
+          <span id="route-1-time" class="card-time">7 мин</span>
+          <span id="route-1-dist" class="card-dist">3.2 км · +1 мин</span>
+        </div>
+        <div class="card-details-row">
+          <span class="card-battery">🔋 80%</span>
+          <span class="card-tag">Альтернатива</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Turn-by-Turn List (Like IMG_3693) -->
+    <div class="turn-steps-list-wrap">
+      <div class="turn-list-title" data-i18n="turnDetails">Маневры маршрута</div>
+      <div id="turn-steps-list" class="turn-steps-list">
+        <!-- Dynamically populated -->
+      </div>
+    </div>
+
+    <!-- Bottom Actions: Big Blue "Go" Button -->
+    <div class="route-alt-bottom-bar">
+      <button id="btn-start-route-nav" class="btn-go-primary">
+        <span class="go-text" data-i18n="go">Поехали</span>
+        <span class="go-icon">▶</span>
+      </button>
+    </div>
+  </aside>
+
   <!-- 3. Top Maneuver HUD Card (Compact Yandex Navigator Style) -->
   <div id="hud-maneuver-card" class="hud-maneuver-card hidden">
     <div id="maneuver-arrow-box" class="maneuver-arrow-box">↗</div>

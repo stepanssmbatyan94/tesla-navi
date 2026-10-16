@@ -87,12 +87,33 @@ async function startGpsSharing() {
 
   isSharingGps = true;
 
+let lastPhonePos = null;
+
+function calculatePhoneBearing(lat1, lon1, lat2, lon2) {
+  const dLon = ((lon2 - lon1) * Math.PI) / 180;
+  const lat1Rad = (lat1 * Math.PI) / 180;
+  const lat2Rad = (lat2 * Math.PI) / 180;
+  const y = Math.sin(dLon) * Math.cos(lat2Rad);
+  const x = Math.cos(lat1Rad) * Math.sin(lat2Rad) - Math.sin(lat1Rad) * Math.cos(lat2Rad) * Math.cos(dLon);
+  let brng = (Math.atan2(y, x) * 180) / Math.PI;
+  return (brng + 360) % 360;
+}
+
   // Start continuous watchPosition
   watchId = navigator.geolocation.watchPosition(
     (position) => {
       const coords = position.coords;
       const speedKmh = coords.speed ? Math.round(coords.speed * 3.6) : 0;
       
+      let heading = coords.heading || 0;
+      if (!heading && lastPhonePos) {
+        const d = Math.hypot(coords.latitude - lastPhonePos.lat, coords.longitude - lastPhonePos.lng);
+        if (d > 0.000015) { // ~1.5m movement
+          heading = calculatePhoneBearing(lastPhonePos.lat, lastPhonePos.lng, coords.latitude, coords.longitude);
+        }
+      }
+      lastPhonePos = { lat: coords.latitude, lng: coords.longitude };
+
       // Update phone UI
       document.getElementById('phone-speed-val').textContent = speedKmh;
       document.getElementById('phone-accuracy-val').textContent = `±${Math.round(coords.accuracy)}м`;
@@ -101,7 +122,7 @@ async function startGpsSharing() {
       realtimeClient.sendGps({
         lat: coords.latitude,
         lng: coords.longitude,
-        heading: coords.heading || 0,
+        heading: Math.round(heading),
         speed: coords.speed || 0,
         accuracy: coords.accuracy || 5
       });

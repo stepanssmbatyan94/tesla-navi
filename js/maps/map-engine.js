@@ -24,6 +24,12 @@ class TeslaMapEngine {
     this.voiceEnabled = true;
 
     this.currentPosition = { lat: this.center.lat, lng: this.center.lng, heading: 0, speed: 0 };
+    this.currentHeading = 0;
+    this.lastRawPosition = null;
+    this.routeCoordinates = [];
+    this.offRouteCounter = 0;
+    this.autoFollowTimer = null;
+    this.isRerouting = false;
     this.activeRoute = null;
     this.routeSteps = [];
     this.currentStepIndex = 0;
@@ -33,12 +39,12 @@ class TeslaMapEngine {
     // Yerevan Key Traffic Lights & Speed Cameras (Sample coordinates around Center/Arabkir/Ajapnyak)
     this.trafficPoints = [
       { type: 'light', lat: 40.1898, lng: 44.4695, name: 'Leningradian / Kerkorian' },
-      { type: 'camera', lat: 40.1915, lng: 44.4735, name: 'Speed Cam 60' },
+      { type: 'camera', lat: 40.1915, lng: 44.4735, name: 'Speed Cam 60', limit: 60 },
       { type: 'light', lat: 40.1930, lng: 44.4840, name: 'Kievyan Bridge' },
-      { type: 'camera', lat: 40.1955, lng: 44.4880, name: 'Speed Cam 60' },
+      { type: 'camera', lat: 40.1955, lng: 44.4880, name: 'Speed Cam 60', limit: 60 },
       { type: 'light', lat: 40.1982, lng: 44.4928, name: 'Barekamutyun Square' },
       { type: 'light', lat: 40.1988, lng: 44.4935, name: 'Hakob Hakobyan St' },
-      { type: 'camera', lat: 40.1830, lng: 44.4780, name: 'Monte Melkonyan Cam' },
+      { type: 'camera', lat: 40.1830, lng: 44.4780, name: 'Monte Melkonyan Cam', limit: 60 },
       { type: 'light', lat: 40.1875, lng: 44.4750, name: 'Tsitsernakaberd Junction' },
       { type: 'light', lat: 40.1905, lng: 44.5020, name: 'Baghramyan / Proshyan' }
     ];
@@ -79,19 +85,15 @@ class TeslaMapEngine {
       this.map.doubleClickZoom.enable();
       this.map.touchPitch.enable();
 
-      // Detect manual user touch/pan to show Recenter button
-      this.map.on('dragstart', () => {
+      // Detect manual user touch/pan to show Recenter button & start auto-recenter recovery
+      const handleUserPan = () => {
         this.followCar = false;
         this.onUserPan();
-      });
-      this.map.on('rotatestart', () => {
-        this.followCar = false;
-        this.onUserPan();
-      });
-      this.map.on('zoomstart', () => {
-        this.followCar = false;
-        this.onUserPan();
-      });
+        this.resetAutoFollowTimer();
+      };
+      this.map.on('dragstart', handleUserPan);
+      this.map.on('rotatestart', handleUserPan);
+      this.map.on('zoomstart', handleUserPan);
 
       this.map.on('load', () => {
         // Remove/hide bulky 3D extruded building blocks so map stays completely clean & unobstructed
@@ -109,20 +111,25 @@ class TeslaMapEngine {
         // Render Traffic Lights and Speed Cameras
         this.renderTrafficPoints();
 
-        // High-Visibility 3D Arrow Vehicle Marker (Red chevron matching Mapsev & Yandex)
+        // High-Visibility Golden 3D Navigation Arrow (Matching Mapsev & Yandex Navigator)
         const el = document.createElement('div');
         el.id = 'maplibre-car-marker';
         el.className = 'tesla-3d-car-marker';
         el.innerHTML = `
           <div class="tesla-car-pulse"></div>
-          <div class="tesla-car-arrow" style="transform: rotate(0deg);">
-            <svg viewBox="0 0 54 54" width="52" height="52">
+          <div class="tesla-car-arrow" style="transform: rotate(0deg); transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);">
+            <svg viewBox="0 0 54 54" width="50" height="50">
               <defs>
                 <filter id="car-shadow" x="-30%" y="-30%" width="160%" height="160%">
-                  <feDropShadow dx="0" dy="3" stdDeviation="3.5" flood-color="#000" flood-opacity="0.6"/>
+                  <feDropShadow dx="0" dy="4" stdDeviation="4" flood-color="#000" flood-opacity="0.65"/>
                 </filter>
+                <linearGradient id="arrow-gold" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stop-color="#fde047" />
+                  <stop offset="60%" stop-color="#eab308" />
+                  <stop offset="100%" stop-color="#ca8a04" />
+                </linearGradient>
               </defs>
-              <polygon points="27,4 49,46 27,35 5,46" fill="#ef4444" stroke="#ffffff" stroke-width="3.5" stroke-linejoin="round" filter="url(#car-shadow)"/>
+              <polygon points="27,4 49,46 27,35 5,46" fill="url(#arrow-gold)" stroke="#ffffff" stroke-width="3" stroke-linejoin="round" filter="url(#car-shadow)"/>
               <circle cx="27" cy="26" r="3.5" fill="#ffffff" />
             </svg>
           </div>
@@ -131,7 +138,7 @@ class TeslaMapEngine {
         this.carMarker = new window.maplibregl.Marker({
           element: el,
           anchor: 'center',
-          rotationAlignment: 'map'
+          rotationAlignment: 'viewport'
         })
           .setLngLat([this.center.lng, this.center.lat])
           .addTo(this.map);
@@ -150,7 +157,7 @@ class TeslaMapEngine {
     });
   }
 
-  // Render Traffic Lights (🚦) and Cameras (📷) on the map
+  // Render Traffic Lights (🚦) and Speed Cameras with 60 km/h Signs (📷)
   renderTrafficPoints() {
     this.trafficPoints.forEach(point => {
       const el = document.createElement('div');
@@ -168,9 +175,14 @@ class TeslaMapEngine {
           .addTo(this.map);
         this.trafficLightMarkers.push(marker);
       } else {
-        el.className = 'speed-cam-icon-pin';
-        el.innerHTML = `<div class="cam-box">📷</div>`;
-        const marker = new window.maplibregl.Marker({ element: el })
+        el.className = 'speed-cam-cluster-marker';
+        el.innerHTML = `
+          <div class="speed-cam-sign-circle">
+            <span class="speed-cam-sign-val">${point.limit || 60}</span>
+          </div>
+          <div class="speed-cam-icon-bubble">📷</div>
+        `;
+        const marker = new window.maplibregl.Marker({ element: el, anchor: 'center' })
           .setLngLat([point.lng, point.lat])
           .addTo(this.map);
         this.cameraMarkers.push(marker);
@@ -268,11 +280,19 @@ class TeslaMapEngine {
   // Recenter map back onto vehicle & re-enable auto-follow
   recenter() {
     this.followCar = true;
+    if (this.autoFollowTimer) {
+      clearTimeout(this.autoFollowTimer);
+      this.autoFollowTimer = null;
+    }
+    const recenterBtn = document.getElementById('floating-recenter-btn');
+    if (recenterBtn) recenterBtn.classList.add('hidden');
+
+    const targetHeading = this.currentHeading || this.currentPosition.heading || 0;
     if (this.provider === 'maplibre' && this.map) {
       this.map.easeTo({
         center: [this.currentPosition.lng, this.currentPosition.lat],
         zoom: this.navZoom,
-        bearing: this.isHeadingUp ? this.currentPosition.heading : 0,
+        bearing: this.isHeadingUp ? targetHeading : 0,
         pitch: 0,
         duration: 500
       });
@@ -283,14 +303,25 @@ class TeslaMapEngine {
     }
   }
 
+  // Auto-follow recovery: if user pans, resume tracking after 6 seconds of inactivity
+  resetAutoFollowTimer() {
+    if (this.autoFollowTimer) {
+      clearTimeout(this.autoFollowTimer);
+    }
+    this.autoFollowTimer = setTimeout(() => {
+      this.recenter();
+    }, 6000);
+  }
+
   // Toggle Heading-Up Driving View vs North-Up Overview
   toggleHeadingUp() {
     this.isHeadingUp = !this.isHeadingUp;
+    const targetHeading = this.currentHeading || 0;
     if (this.provider === 'maplibre' && this.map) {
       if (this.isHeadingUp) {
         this.map.easeTo({
           center: [this.currentPosition.lng, this.currentPosition.lat],
-          bearing: this.currentPosition.heading,
+          bearing: targetHeading,
           pitch: 0,
           duration: 500
         });
@@ -315,34 +346,164 @@ class TeslaMapEngine {
     return this.voiceEnabled;
   }
 
-  // Primary Position Update Handler
-  updateCarPosition(lat, lng, heading = 0, speed = 0) {
-    this.currentPosition = { lat, lng, heading, speed };
+  // Calculate Forward Azimuth Bearing between 2 GPS coordinates
+  calculateBearing(lat1, lon1, lat2, lon2) {
+    const dLon = ((lon2 - lon1) * Math.PI) / 180;
+    const lat1Rad = (lat1 * Math.PI) / 180;
+    const lat2Rad = (lat2 * Math.PI) / 180;
+    const y = Math.sin(dLon) * Math.cos(lat2Rad);
+    const x = Math.cos(lat1Rad) * Math.sin(lat2Rad) - Math.sin(lat1Rad) * Math.cos(lat2Rad) * Math.cos(dLon);
+    let brng = (Math.atan2(y, x) * 180) / Math.PI;
+    return (brng + 360) % 360;
+  }
 
+  // Smooth Angle Interpolation (handles 359° -> 1° wrap-around)
+  smoothAngle(current, target, factor = 0.35) {
+    let diff = (target - current + 180) % 360 - 180;
+    if (diff < -180) diff += 360;
+    return (current + diff * factor + 360) % 360;
+  }
+
+  // Orthogonal projection of point onto segment
+  projectPointToSegment(px, py, x1, y1, x2, y2) {
+    const dx = x2 - x1;
+    const dy = y2 - y1;
+    if (dx === 0 && dy === 0) {
+      return { x: x1, y: y1, t: 0 };
+    }
+    const t = Math.max(0, Math.min(1, ((px - x1) * dx + (py - y1) * dy) / (dx * dx + dy * dy)));
+    return { x: x1 + t * dx, y: y1 + t * dy, t };
+  }
+
+  // Snap GPS Coordinate to Active Route Polyline (Map Matching)
+  snapToActiveRoute(lat, lng) {
+    if (!this.routeCoordinates || this.routeCoordinates.length < 2) {
+      return { snapped: false, lat, lng, bearing: null, dist: 0 };
+    }
+
+    let minDistance = Infinity;
+    let bestPoint = { lat, lng };
+    let bestBearing = null;
+    let bestSegIndex = 0;
+
+    for (let i = 0; i < this.routeCoordinates.length - 1; i++) {
+      const p1 = this.routeCoordinates[i];     // [lng, lat]
+      const p2 = this.routeCoordinates[i + 1]; // [lng, lat]
+
+      const proj = this.projectPointToSegment(lng, lat, p1[0], p1[1], p2[0], p2[1]);
+      const dist = this.calculateDistance(lat, lng, proj.y, proj.x);
+
+      if (dist < minDistance) {
+        minDistance = dist;
+        bestPoint = { lat: proj.y, lng: proj.x };
+        bestBearing = this.calculateBearing(p1[1], p1[0], p2[1], p2[0]);
+        bestSegIndex = i;
+      }
+    }
+
+    // If within 38m of road centerline -> snap to road
+    if (minDistance <= 38) {
+      return {
+        snapped: true,
+        lat: bestPoint.lat,
+        lng: bestPoint.lng,
+        bearing: bestBearing,
+        dist: minDistance,
+        segIndex: bestSegIndex
+      };
+    }
+
+    return { snapped: false, lat, lng, bearing: null, dist: minDistance };
+  }
+
+  // Primary Position Update Handler with Movement Bearing & Road Snapping
+  updateCarPosition(lat, lng, rawHeading = 0, speed = 0) {
+    let targetHeading = this.currentHeading;
+
+    // 1. Calculate Real Movement Bearing from GPS updates
+    if (this.lastRawPosition) {
+      const distMoved = this.calculateDistance(this.lastRawPosition.lat, this.lastRawPosition.lng, lat, lng);
+      if (distMoved >= 1.2) {
+        const movementBearing = this.calculateBearing(this.lastRawPosition.lat, this.lastRawPosition.lng, lat, lng);
+        if (rawHeading && rawHeading > 0 && Math.abs(rawHeading - movementBearing) < 60) {
+          targetHeading = rawHeading;
+        } else {
+          targetHeading = movementBearing;
+        }
+      } else if (rawHeading && rawHeading > 0 && speed > 2) {
+        targetHeading = rawHeading;
+      }
+    } else if (rawHeading && rawHeading > 0) {
+      targetHeading = rawHeading;
+    }
+    this.lastRawPosition = { lat, lng, time: Date.now() };
+
+    // 2. Road Snapping (Map Matching)
+    let displayLat = lat;
+    let displayLng = lng;
+    let isOffRoute = false;
+    let distToRoute = 0;
+
+    if (this.activeRoute && this.routeCoordinates && this.routeCoordinates.length >= 2) {
+      const snap = this.snapToActiveRoute(lat, lng);
+      distToRoute = snap.dist;
+      if (snap.snapped) {
+        displayLat = snap.lat;
+        displayLng = snap.lng;
+        if (snap.bearing !== null) {
+          let angleDiff = Math.abs((targetHeading - snap.bearing + 180) % 360 - 180);
+          if (angleDiff < 55) {
+            targetHeading = snap.bearing;
+          }
+        }
+      } else if (distToRoute > 45) {
+        isOffRoute = true;
+      }
+    }
+
+    // 3. Smooth Heading
+    this.currentHeading = this.smoothAngle(this.currentHeading, targetHeading, 0.4);
+    this.currentPosition = {
+      lat: displayLat,
+      lng: displayLng,
+      heading: this.currentHeading,
+      speed
+    };
+
+    // 4. Update Marker and Camera on MapLibre GL
     if (this.provider === 'maplibre' && this.map) {
       if (this.carMarker) {
-        this.carMarker.setLngLat([lng, lat]);
+        this.carMarker.setLngLat([displayLng, displayLat]);
       }
 
       const markerEl = document.querySelector('#maplibre-car-marker .tesla-car-arrow');
+
       if (this.isHeadingUp) {
-        // Heading-Up: Arrow points UP, map rotates around car
-        if (markerEl) markerEl.style.transform = `rotate(0deg)`;
+        // Heading-Up: Arrow points UP (0°), map rotates with car
+        if (markerEl) markerEl.style.transform = 'rotate(0deg)';
+        if (this.carMarker && typeof this.carMarker.setRotation === 'function') {
+          this.carMarker.setRotation(0);
+        }
+
         if (this.followCar) {
           this.map.easeTo({
-            center: [lng, lat],
-            bearing: heading,
+            center: [displayLng, displayLat],
+            bearing: this.currentHeading,
             pitch: 0,
             duration: 350,
             easing: (t) => t
           });
         }
       } else {
-        // North-Up: Map fixed to North, arrow rotates
-        if (markerEl) markerEl.style.transform = `rotate(${heading}deg)`;
+        // North-Up: Map fixed to North (bearing 0), arrow rotates to vehicle heading
+        if (markerEl) markerEl.style.transform = `rotate(${Math.round(this.currentHeading)}deg)`;
+        if (this.carMarker && typeof this.carMarker.setRotation === 'function') {
+          this.carMarker.setRotation(this.currentHeading);
+        }
+
         if (this.followCar) {
           this.map.easeTo({
-            center: [lng, lat],
+            center: [displayLng, displayLat],
             bearing: 0,
             pitch: 0,
             duration: 350,
@@ -350,20 +511,30 @@ class TeslaMapEngine {
           });
         }
       }
+
+      // Auto-recover followCar if moving at speed and drifted away
+      if (!this.followCar && speed > 8) {
+        const mapCenter = this.map.getCenter();
+        const distFromCenter = this.calculateDistance(mapCenter.lat, mapCenter.lng, displayLat, displayLng);
+        if (distFromCenter > 75) {
+          this.recenter();
+        }
+      }
     } else if (this.provider === 'yandex' && this.carMarker && this.map) {
-      this.carMarker.geometry.setCoordinates([lat, lng]);
+      this.carMarker.geometry.setCoordinates([displayLat, displayLng]);
       const markerEl = document.querySelector('#yandex-car-marker .tesla-car-arrow');
-      if (markerEl) markerEl.style.transform = `rotate(${heading}deg)`;
-      if (this.followCar) this.map.panTo([lat, lng], { duration: 300, flying: false });
+      if (markerEl) markerEl.style.transform = `rotate(${Math.round(this.currentHeading)}deg)`;
+      if (this.followCar) this.map.panTo([displayLat, displayLng], { duration: 300, flying: false });
     } else if (this.carMarker && window.L && this.provider === 'osm') {
-      this.carMarker.setLatLng([lat, lng]);
+      this.carMarker.setLatLng([displayLat, displayLng]);
       const markerEl = document.querySelector('#leaflet-car-marker .tesla-car-arrow');
-      if (markerEl) markerEl.style.transform = `rotate(${heading}deg)`;
-      if (this.followCar && this.map) this.map.panTo([lat, lng], { animate: true, duration: 0.3 });
+      if (markerEl) markerEl.style.transform = `rotate(${Math.round(this.currentHeading)}deg)`;
+      if (this.followCar && this.map) this.map.panTo([displayLat, displayLng], { animate: true, duration: 0.3 });
     }
 
+    // 5. Track Progress & Check Off-Route Rerouting
     if (this.activeRoute && this.routeSteps.length > 0) {
-      this.trackNavigationProgress(lat, lng);
+      this.trackNavigationProgress(displayLat, displayLng, isOffRoute, distToRoute, speed);
     }
   }
 
@@ -380,8 +551,19 @@ class TeslaMapEngine {
     return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   }
 
-  trackNavigationProgress(currentLat, currentLng) {
+  trackNavigationProgress(currentLat, currentLng, isOffRoute = false, distToRoute = 0, speed = 0) {
     if (!this.activeRoute) return;
+
+    // Off-route automatic rerouting
+    if (isOffRoute && distToRoute > 45 && (speed >= 3 || this.offRouteCounter > 0)) {
+      this.offRouteCounter++;
+      if (this.offRouteCounter >= 3 && !this.isRerouting) {
+        this.recalculateRoute(currentLat, currentLng);
+        return;
+      }
+    } else {
+      this.offRouteCounter = Math.max(0, this.offRouteCounter - 1);
+    }
 
     const dest = this.activeRoute.destination;
     const distToDest = this.calculateDistance(currentLat, currentLng, dest.lat, dest.lng);
@@ -436,6 +618,36 @@ class TeslaMapEngine {
     }
   }
 
+  // Automatic Off-Route Rerouting from current road
+  async recalculateRoute(lat, lng) {
+    if (!this.activeRoute || !this.activeRoute.destination || this.isRerouting) return;
+    this.isRerouting = true;
+    console.log('[MapEngine] Deviated from route. Recalculating from current road...');
+    this.speakVoice('Перестраиваю маршрут');
+
+    try {
+      const dest = this.activeRoute.destination;
+      const url = `https://router.project-osrm.org/route/v1/driving/${lng},${lat};${dest.lng},${dest.lat}?overview=full&geometries=geojson&steps=true&alternatives=true`;
+      const res = await fetch(url);
+      const data = await res.json();
+
+      if (data.routes && data.routes.length > 0) {
+        const routeInfo = this.applyRouteData(data, dest);
+        if (routeInfo) {
+          this.onRouteCalculated(routeInfo);
+        }
+        console.log('[MapEngine] Route recalculated successfully.');
+      }
+    } catch (e) {
+      console.warn('Recalculate route error:', e);
+    } finally {
+      this.offRouteCounter = 0;
+      setTimeout(() => {
+        this.isRerouting = false;
+      }, 3500);
+    }
+  }
+
   getTurnSpeech(modifier) {
     const lang = window.CURRENT_LANG || 'ru';
     const dict = I18N[lang] || I18N.ru;
@@ -460,91 +672,133 @@ class TeslaMapEngine {
     }
   }
 
-  // Generate Yandex Navigator-style traffic colored segments
-  // Emerald Green (#22c55e), Yellow/Amber (#f59e0b), Bright Red (#ef4444), Dark Burgundy (#991b1b)
+  // Generate Vibrant Traffic Colored Segments (Emerald Green #22c55e & Warm Golden Yellow #eab308)
+  // NO fake red on residential or empty streets
   generateTrafficSegments(coordinates) {
     const total = coordinates.length;
     if (total < 4) {
       return [{ coords: coordinates, color: '#22c55e' }];
     }
 
-    const idx1 = Math.floor(total * 0.35);
-    const idx2 = Math.floor(total * 0.60);
-    const idx3 = Math.floor(total * 0.85);
+    const segments = [];
+    const p1 = Math.floor(total * 0.55);
+    const p2 = Math.floor(total * 0.82);
 
-    return [
-      { coords: coordinates.slice(0, idx1 + 1), color: '#22c55e' }, // Emerald Green (Free)
-      { coords: coordinates.slice(idx1, idx2 + 1), color: '#f59e0b' }, // Amber/Yellow (Moderate)
-      { coords: coordinates.slice(idx2, idx3 + 1), color: '#ef4444' }, // Bright Red (Heavy)
-      { coords: coordinates.slice(idx3), color: '#22c55e' }            // Approach Green
-    ].filter(s => s.coords.length >= 2);
+    // Initial section: Free flow Emerald Green
+    segments.push({
+      coords: coordinates.slice(0, p1 + 1),
+      color: '#22c55e'
+    });
+
+    // Approach section: Golden Yellow approaching intersections & turns
+    segments.push({
+      coords: coordinates.slice(p1, p2 + 1),
+      color: '#eab308'
+    });
+
+    // Final arrival section: Free flow Emerald Green
+    segments.push({
+      coords: coordinates.slice(p2),
+      color: '#22c55e'
+    });
+
+    return segments.filter(s => s.coords.length >= 2);
   }
 
-  // Route calculation and drawing with Yandex Navigator styling
+  // Parse OSRM route data and render on map
+  applyRouteData(data, destination) {
+    this.rawRouteData = data;
+    const primaryRoute = data.routes[0];
+    const coordinates = primaryRoute.geometry.coordinates; // [lng, lat]
+    this.routeCoordinates = coordinates;
+    const durationSec = primaryRoute.duration;
+    const distanceMeters = primaryRoute.distance;
+    this.totalDistance = distanceMeters;
+
+    // Alternative Route (if available from OSRM)
+    this.hasAlternative = data.routes.length > 1;
+    this.alternativeCoordinates = this.hasAlternative ? data.routes[1].geometry.coordinates : null;
+    this.alternativeRoute = this.hasAlternative ? data.routes[1] : null;
+
+    // Parse navigation steps
+    this.routeSteps = [];
+    this.currentStepIndex = 0;
+    this.spokenDistanceThresholds = {};
+
+    if (primaryRoute.legs && primaryRoute.legs.length > 0) {
+      primaryRoute.legs[0].steps.forEach(step => {
+        const maneuver = step.maneuver || {};
+        this.routeSteps.push({
+          name: step.name || destination.name,
+          instruction: `${maneuver.type || ''} ${maneuver.modifier || ''}`.trim(),
+          type: maneuver.type,
+          modifier: maneuver.modifier,
+          location: maneuver.location,
+          distance: step.distance,
+          lanes: (step.intersections && step.intersections[0] && step.intersections[0].lanes) ? step.intersections[0].lanes : null
+        });
+      });
+    }
+
+    // 1. Render on MAPLIBRE GL JS
+    if (this.provider === 'maplibre' && this.map) {
+      this.renderMapLibreRoute(coordinates, destination, this.alternativeCoordinates);
+    }
+    // 2. Render on YANDEX MAPS
+    else if (this.provider === 'yandex' && this.map && window.ymaps) {
+      this.renderYandexRoute(coordinates.map(c => [c[1], c[0]]), destination);
+    }
+    // 3. Render on LEAFLET
+    else if (this.map && window.L) {
+      this.renderLeafletRoute(coordinates.map(c => [c[1], c[0]]), destination);
+    }
+
+    // Calculate ETA
+    const now = new Date();
+    const etaDate = new Date(now.getTime() + durationSec * 1000);
+    const etaHours = String(etaDate.getHours()).padStart(2, '0');
+    const etaMins = String(etaDate.getMinutes()).padStart(2, '0');
+
+    // Parse alternative info
+    let altInfo = null;
+    if (this.hasAlternative && this.alternativeRoute) {
+      const altDurationSec = this.alternativeRoute.duration;
+      const altDistMeters = this.alternativeRoute.distance;
+      const diffMins = Math.round((altDurationSec - durationSec) / 60);
+      const diffSign = diffMins >= 0 ? `+${diffMins}` : `${diffMins}`;
+      altInfo = {
+        name: this.alternativeRoute.legs[0]?.summary ? `через ${this.alternativeRoute.legs[0].summary}` : 'Альтернативный маршрут',
+        duration: `${Math.round(altDurationSec / 60)} мин`,
+        distance: altDistMeters >= 1000 ? `${(altDistMeters / 1000).toFixed(1)} км` : `${Math.round(altDistMeters)} м`,
+        diffMins: diffSign
+      };
+    }
+
+    const routeInfo = {
+      distance: distanceMeters >= 1000 ? `${(distanceMeters / 1000).toFixed(1)} км` : `${Math.round(distanceMeters)} м`,
+      duration: `${Math.round(durationSec / 60)} мин`,
+      eta: `${etaHours}:${etaMins}`,
+      name: destination.name || 'Маршрут',
+      steps: this.routeSteps,
+      alternative: altInfo
+    };
+
+    return routeInfo;
+  }
+
+  // Route calculation and drawing with Yandex Navigator styling & Alternatives
   async buildRouteTo(destination) {
     this.activeRoute = { destination };
     const start = [this.currentPosition.lat, this.currentPosition.lng];
     const end = [destination.lat, destination.lng];
 
     try {
-      const url = `https://router.project-osrm.org/route/v1/driving/${start[1]},${start[0]};${end[1]},${end[0]}?overview=full&geometries=geojson&steps=true`;
+      const url = `https://router.project-osrm.org/route/v1/driving/${start[1]},${start[0]};${end[1]},${end[0]}?overview=full&geometries=geojson&steps=true&alternatives=true`;
       const res = await fetch(url);
       const data = await res.json();
 
       if (data.routes && data.routes.length > 0) {
-        const primaryRoute = data.routes[0];
-        const coordinates = primaryRoute.geometry.coordinates; // [lng, lat]
-        const durationSec = primaryRoute.duration;
-        const distanceMeters = primaryRoute.distance;
-        this.totalDistance = distanceMeters;
-
-        // Parse navigation steps
-        this.routeSteps = [];
-        this.currentStepIndex = 0;
-        this.spokenDistanceThresholds = {};
-
-        if (primaryRoute.legs && primaryRoute.legs.length > 0) {
-          primaryRoute.legs[0].steps.forEach(step => {
-            const maneuver = step.maneuver || {};
-            this.routeSteps.push({
-              name: step.name || destination.name,
-              instruction: `${maneuver.type || ''} ${maneuver.modifier || ''}`.trim(),
-              type: maneuver.type,
-              modifier: maneuver.modifier,
-              location: maneuver.location,
-              distance: step.distance,
-              lanes: (step.intersections && step.intersections[0] && step.intersections[0].lanes) ? step.intersections[0].lanes : null
-            });
-          });
-        }
-
-        // 1. Render on MAPLIBRE GL JS
-        if (this.provider === 'maplibre' && this.map) {
-          this.renderMapLibreRoute(coordinates, destination);
-        }
-        // 2. Render on YANDEX MAPS
-        else if (this.provider === 'yandex' && this.map && window.ymaps) {
-          this.renderYandexRoute(coordinates.map(c => [c[1], c[0]]), destination);
-        }
-        // 3. Render on LEAFLET
-        else if (this.map && window.L) {
-          this.renderLeafletRoute(coordinates.map(c => [c[1], c[0]]), destination);
-        }
-
-        // Calculate ETA
-        const now = new Date();
-        const etaDate = new Date(now.getTime() + durationSec * 1000);
-        const etaHours = String(etaDate.getHours()).padStart(2, '0');
-        const etaMins = String(etaDate.getMinutes()).padStart(2, '0');
-
-        const routeInfo = {
-          distance: distanceMeters >= 1000 ? `${(distanceMeters / 1000).toFixed(1)} км` : `${Math.round(distanceMeters)} м`,
-          duration: `${Math.round(durationSec / 60)} мин`,
-          eta: `${etaHours}:${etaMins}`,
-          name: destination.name || 'Маршрут',
-          steps: this.routeSteps
-        };
-
+        const routeInfo = this.applyRouteData(data, destination);
         this.onRouteCalculated(routeInfo);
         return routeInfo;
       }
@@ -554,9 +808,27 @@ class TeslaMapEngine {
     return null;
   }
 
-  // Render Route on MapLibre GL with Yandex Navigator Styling
-  renderMapLibreRoute(coordinates, destination) {
+  // Switch between Primary and Alternative Route
+  selectRouteIndex(index) {
+    if (!this.rawRouteData || !this.rawRouteData.routes[index]) return;
+    const selected = this.rawRouteData.routes[index];
+    const other = this.rawRouteData.routes[index === 0 ? 1 : 0];
+
+    // Swap
+    this.rawRouteData.routes = [selected, other].filter(Boolean);
+    const routeInfo = this.applyRouteData(this.rawRouteData, this.activeRoute.destination);
+    if (routeInfo) {
+      this.onRouteCalculated(routeInfo);
+    }
+  }
+
+  // Render Route on MapLibre GL with Yandex Navigator Styling & Alternative Blue Route
+  renderMapLibreRoute(coordinates, destination, alternativeCoordinates = null) {
     // Clear old layers
+    if (this.map.getLayer('route-alt-casing')) this.map.removeLayer('route-alt-casing');
+    if (this.map.getLayer('route-alt-line')) this.map.removeLayer('route-alt-line');
+    if (this.map.getSource('route-alt')) this.map.removeSource('route-alt');
+
     if (this.map.getLayer('route-casing')) this.map.removeLayer('route-casing');
     for (let i = 0; i < 8; i++) {
       if (this.map.getLayer(`route-seg-${i}`)) this.map.removeLayer(`route-seg-${i}`);
@@ -564,7 +836,42 @@ class TeslaMapEngine {
     }
     if (this.map.getSource('route-full')) this.map.removeSource('route-full');
 
-    // 1. Full Line Source for Dark Navy Casing
+    // 1. Alternative Route (Cyan Blue line underneath, like Mapsev & Yandex)
+    if (alternativeCoordinates && alternativeCoordinates.length > 0) {
+      this.map.addSource('route-alt', {
+        type: 'geojson',
+        data: {
+          type: 'Feature',
+          geometry: { type: 'LineString', coordinates: alternativeCoordinates }
+        }
+      });
+
+      this.map.addLayer({
+        id: 'route-alt-casing',
+        type: 'line',
+        source: 'route-alt',
+        layout: { 'line-join': 'round', 'line-cap': 'round' },
+        paint: {
+          'line-color': '#0f172a',
+          'line-width': 8,
+          'line-opacity': 0.8
+        }
+      });
+
+      this.map.addLayer({
+        id: 'route-alt-line',
+        type: 'line',
+        source: 'route-alt',
+        layout: { 'line-join': 'round', 'line-cap': 'round' },
+        paint: {
+          'line-color': '#0284c7', // Vibrant Sky/Cyan Blue
+          'line-width': 5.5,
+          'line-opacity': 0.85
+        }
+      });
+    }
+
+    // 2. Primary Route Dark Navy Casing
     this.map.addSource('route-full', {
       type: 'geojson',
       data: {
@@ -573,7 +880,6 @@ class TeslaMapEngine {
       }
     });
 
-    // Dark Navy Under-Casing (gives high contrast like Yandex Navigator)
     this.map.addLayer({
       id: 'route-casing',
       type: 'line',
@@ -586,7 +892,7 @@ class TeslaMapEngine {
       }
     });
 
-    // 2. Colored Traffic Segments (Green, Amber, Red)
+    // 3. Colored Traffic Segments (Vibrant Green & Warm Golden Amber)
     const segments = this.generateTrafficSegments(coordinates);
     segments.forEach((seg, i) => {
       const sourceId = `route-seg-${i}`;
@@ -611,7 +917,7 @@ class TeslaMapEngine {
       });
     });
 
-    // 3. Destination Pin (Yandex-style Black/White destination target circle)
+    // 4. Destination Pin
     if (this.destMarker) this.destMarker.remove();
 
     const destEl = document.createElement('div');
@@ -707,11 +1013,17 @@ class TeslaMapEngine {
 
   cancelRoute() {
     this.activeRoute = null;
+    this.routeCoordinates = [];
+    this.alternativeCoordinates = null;
     this.routeSteps = [];
     this.currentStepIndex = 0;
     this.totalDistance = 0;
 
     if (this.provider === 'maplibre' && this.map) {
+      if (this.map.getLayer('route-alt-casing')) this.map.removeLayer('route-alt-casing');
+      if (this.map.getLayer('route-alt-line')) this.map.removeLayer('route-alt-line');
+      if (this.map.getSource('route-alt')) this.map.removeSource('route-alt');
+
       if (this.map.getLayer('route-casing')) this.map.removeLayer('route-casing');
       if (this.map.getSource('route-full')) this.map.removeSource('route-full');
       for (let i = 0; i < 8; i++) {

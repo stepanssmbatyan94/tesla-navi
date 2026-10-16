@@ -203,13 +203,66 @@ const COMMUTE_LOCATIONS = {
   work: { name: 'Работа', address: 'ул. Акоп Акопян, 3', lat: 40.1982, lng: 44.4928 }
 };
 
+let currentRouteInfo = null;
+
+// Dynamic Yerevan Traffic Score Calculation (UTC+4)
+function getLiveTrafficScore() {
+  const now = new Date();
+  const utcHours = now.getUTCHours();
+  const utcMinutes = now.getUTCMinutes();
+  const yerevanHour = (utcHours + 4 + (utcMinutes / 60)) % 24;
+
+  let score = 2;
+  let color = '#22c55e'; // Vibrant Green
+  let label = 'Дороги свободны';
+
+  if (yerevanHour >= 8.5 && yerevanHour < 10.5) {
+    score = 7;
+    color = '#ef4444'; // Red
+    label = 'Утренний час пик';
+  } else if (yerevanHour >= 17.0 && yerevanHour < 19.75) {
+    score = 8;
+    color = '#ef4444'; // Red
+    label = 'Вечерний час пик';
+  } else if (yerevanHour >= 13.0 && yerevanHour < 15.0) {
+    score = 5;
+    color = '#f59e0b'; // Amber
+    label = 'Умеренное движение';
+  } else if (yerevanHour >= 10.5 && yerevanHour < 17.0) {
+    score = 4;
+    color = '#eab308'; // Yellow
+    label = 'Обычный трафик';
+  } else if (yerevanHour >= 19.75 && yerevanHour < 21.0) {
+    score = 4;
+    color = '#eab308';
+    label = 'Трафик спадает';
+  } else {
+    // 21:00 - 08:30 (Matches 21:28 user drive photo!)
+    score = 2;
+    color = '#22c55e';
+    label = 'Свободно';
+  }
+
+  return { score, color, label };
+}
+
+function updateLiveTrafficBadge() {
+  const badge = document.getElementById('traffic-score-badge');
+  if (!badge) return;
+  const traffic = getLiveTrafficScore();
+  badge.textContent = traffic.score;
+  badge.style.background = traffic.color;
+  badge.style.boxShadow = `0 4px 14px ${traffic.color}90`;
+  badge.title = `Пробки в Ереване: ${traffic.score} из 10 баллов (${traffic.label})`;
+}
+
 // 4. Map Engine Initialization
 async function initMap() {
   mapEngine = new TeslaMapEngine('map-container', {
     provider: 'maplibre',
     center: CONFIG.defaultCenter,
     onRouteCalculated: (route) => {
-      showNavigationHud(route);
+      showRouteAlternativesDrawer(route);
     },
     onManeuverUpdate: (maneuver) => {
       updateManeuverHud(maneuver);
@@ -231,6 +284,8 @@ async function initMap() {
 
   await mapEngine.init();
   updateCommuteEtas();
+  updateLiveTrafficBadge();
+  setInterval(updateLiveTrafficBadge, 30000);
 }
 
 // 5. Toolbar & Drawer UI Handlers
@@ -273,11 +328,64 @@ function initToolbarHandlers() {
     });
   }
 
-  // Traffic Score Badge
+  // Traffic Score Badge Alert
   const trafficBadge = document.getElementById('traffic-score-badge');
   if (trafficBadge) {
     trafficBadge.addEventListener('click', () => {
-      alert('Пробки в Ереване: 8 баллов (Сложная дорожная ситуация)\nСредняя задержка на ключевых проспектах 10-15 минут.');
+      const traffic = getLiveTrafficScore();
+      alert(`Пробки в Ереване: ${traffic.score} из 10 баллов\n${traffic.label}\nВремя: UTC+4 (Ереван)`);
+    });
+  }
+
+  // Route Alternatives Drawer Handlers (IMG_3693)
+  const card0 = document.getElementById('route-card-0');
+  const card1 = document.getElementById('route-card-1');
+  if (card0) {
+    card0.addEventListener('click', () => {
+      card0.classList.add('active');
+      if (card1) card1.classList.remove('active');
+      if (mapEngine) mapEngine.selectRouteIndex(0);
+    });
+  }
+  if (card1) {
+    card1.addEventListener('click', () => {
+      card1.classList.add('active');
+      if (card0) card0.classList.remove('active');
+      if (mapEngine) mapEngine.selectRouteIndex(1);
+    });
+  }
+
+  const btnCloseAltDrawer = document.getElementById('btn-close-alt-drawer');
+  if (btnCloseAltDrawer) {
+    btnCloseAltDrawer.addEventListener('click', () => {
+      document.getElementById('route-alternatives-drawer').classList.add('hidden');
+    });
+  }
+
+  // "Go / Поехали" Action Button
+  const btnStartRouteNav = document.getElementById('btn-start-route-nav');
+  if (btnStartRouteNav) {
+    btnStartRouteNav.addEventListener('click', () => {
+      document.getElementById('route-alternatives-drawer').classList.add('hidden');
+      if (currentRouteInfo) {
+        showNavigationHud(currentRouteInfo);
+        if (mapEngine) {
+          mapEngine.speakVoice('Маршрут построен. В путь!');
+          mapEngine.recenter();
+        }
+      }
+    });
+  }
+
+  // Tap on bottom nav bar to view full turn-by-turn steps
+  const bottomBar = document.getElementById('bottom-nav-bar');
+  if (bottomBar) {
+    bottomBar.addEventListener('click', (e) => {
+      if (e.target.id === 'btn-cancel-nav') return;
+      const drawer = document.getElementById('route-alternatives-drawer');
+      if (drawer && currentRouteInfo) {
+        drawer.classList.toggle('hidden');
+      }
     });
   }
 
@@ -453,7 +561,7 @@ async function startNavigationTo(destination) {
   if (mapEngine) {
     const route = await mapEngine.buildRouteTo(destination);
     if (route) {
-      showNavigationHud(route);
+      showRouteAlternativesDrawer(route);
     }
   }
 }
@@ -461,6 +569,82 @@ async function startNavigationTo(destination) {
 function handleIncomingDestination(destination) {
   console.log('📍 Destination received from Phone:', destination);
   startNavigationTo(destination);
+}
+
+// Route Alternatives & Turn Details Drawer (Mapsev IMG_3693)
+function showRouteAlternativesDrawer(route) {
+  currentRouteInfo = route;
+  const drawer = document.getElementById('route-alternatives-drawer');
+  if (!drawer) return;
+
+  // Card 0: Primary / Fastest
+  document.getElementById('route-0-time').textContent = route.duration;
+  document.getElementById('route-0-dist').textContent = route.distance;
+  const card0 = document.getElementById('route-card-0');
+  card0.classList.add('active');
+
+  // Card 1: Alternative Route
+  const card1 = document.getElementById('route-card-1');
+  if (route.alternative) {
+    card1.classList.remove('hidden');
+    card1.classList.remove('active');
+    document.getElementById('route-1-badge').textContent = route.alternative.name;
+    document.getElementById('route-1-time').textContent = route.alternative.duration;
+    document.getElementById('route-1-dist').textContent = `${route.alternative.distance} · ${route.alternative.diffMins} мин`;
+  } else {
+    card1.classList.add('hidden');
+  }
+
+  // Populate Turn-by-Turn list matching IMG_3693
+  const listEl = document.getElementById('turn-steps-list');
+  listEl.innerHTML = '';
+
+  // Step 0: My Location
+  const locItem = document.createElement('div');
+  locItem.className = 'turn-step-item';
+  locItem.innerHTML = `
+    <div class="turn-step-icon" style="color: #ef4444;">●</div>
+    <div class="turn-step-info">
+      <div class="turn-step-street">${I18N[currentLang]?.myLocation || 'Мое местоположение'}</div>
+    </div>
+    <div class="turn-step-dist">0 м</div>
+  `;
+  listEl.appendChild(locItem);
+
+  if (route.steps && route.steps.length > 0) {
+    route.steps.forEach(step => {
+      let icon = '↑';
+      if (step.modifier && step.modifier.includes('left')) icon = '↰';
+      else if (step.modifier && step.modifier.includes('right')) icon = '↱';
+      else if (step.modifier && step.modifier.includes('uturn')) icon = '↺';
+
+      const distStr = step.distance >= 1000 ? `${(step.distance / 1000).toFixed(1)} км` : `${Math.round(step.distance)} м`;
+      const item = document.createElement('div');
+      item.className = 'turn-step-item';
+      item.innerHTML = `
+        <div class="turn-step-icon">${icon}</div>
+        <div class="turn-step-info">
+          <div class="turn-step-street">${step.instruction || step.name}</div>
+        </div>
+        <div class="turn-step-dist">${distStr}</div>
+      `;
+      listEl.appendChild(item);
+    });
+  }
+
+  // Arrival Step
+  const arrivalItem = document.createElement('div');
+  arrivalItem.className = 'turn-step-item';
+  arrivalItem.innerHTML = `
+    <div class="turn-step-icon" style="color: #10b981;">🏁</div>
+    <div class="turn-step-info">
+      <div class="turn-step-street">${route.name}</div>
+    </div>
+    <div class="turn-step-dist">${route.eta}</div>
+  `;
+  listEl.appendChild(arrivalItem);
+
+  drawer.classList.remove('hidden');
 }
 
 // 7. Navigation HUD Displays
@@ -499,7 +683,10 @@ function cancelActiveNavigation() {
   document.getElementById('hud-maneuver-card').classList.add('hidden');
   document.getElementById('bottom-nav-bar').classList.add('hidden');
   document.getElementById('lane-guidance-pill').classList.add('hidden');
+  const altDrawer = document.getElementById('route-alternatives-drawer');
+  if (altDrawer) altDrawer.classList.add('hidden');
   selectedDestination = null;
+  currentRouteInfo = null;
   if (mapEngine) {
     mapEngine.cancelRoute();
   }
