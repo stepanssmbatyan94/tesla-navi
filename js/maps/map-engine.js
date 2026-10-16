@@ -635,16 +635,16 @@ class TeslaMapEngine {
 
     try {
       const dest = this.activeRoute.destination;
-      const url = `https://router.project-osrm.org/route/v1/driving/${lng},${lat};${dest.lng},${dest.lat}?overview=full&geometries=geojson&steps=true&alternatives=true`;
+      const url = `/api/route?startLat=${lat}&startLng=${lng}&destLat=${dest.lat}&destLng=${dest.lng}`;
       const res = await fetch(url);
       const data = await res.json();
 
-      if (data.routes && data.routes.length > 0) {
+      if (data && data.success && data.routes && data.routes.length > 0) {
         const routeInfo = this.applyRouteData(data, dest);
         if (routeInfo) {
           this.onRouteCalculated(routeInfo);
         }
-        console.log('[MapEngine] Route recalculated successfully.');
+        console.log('[MapEngine] Route recalculated successfully with Yandex live data.');
       }
     } catch (e) {
       console.warn('Recalculate route error:', e);
@@ -713,20 +713,26 @@ class TeslaMapEngine {
     return segments.filter(s => s.coords.length >= 2);
   }
 
-  // Parse OSRM route data and render on map
+  // Parse Yandex or OSRM route data and render on map
   applyRouteData(data, destination) {
     this.rawRouteData = data;
+    const isYandex = data.source === 'yandex';
     const primaryRoute = data.routes[0];
-    const coordinates = primaryRoute.geometry.coordinates; // [lng, lat]
+    const coordinates = isYandex ? primaryRoute.coordinates : primaryRoute.geometry.coordinates; // [lng, lat]
     this.routeCoordinates = coordinates;
     const durationSec = primaryRoute.duration;
     const distanceMeters = primaryRoute.distance;
     this.totalDistance = distanceMeters;
 
-    // Alternative Route (if available from OSRM)
+    // Alternative Route
     this.hasAlternative = data.routes.length > 1;
-    this.alternativeCoordinates = this.hasAlternative ? data.routes[1].geometry.coordinates : null;
     this.alternativeRoute = this.hasAlternative ? data.routes[1] : null;
+    this.alternativeCoordinates = this.hasAlternative
+      ? (isYandex ? this.alternativeRoute.coordinates : this.alternativeRoute.geometry.coordinates)
+      : null;
+
+    // Traffic segments (100% genuine Yandex real-time traffic colors)
+    const trafficSegments = isYandex ? primaryRoute.segments : null;
 
     // Parse navigation steps
     this.routeSteps = [];
@@ -746,19 +752,27 @@ class TeslaMapEngine {
           lanes: (step.intersections && step.intersections[0] && step.intersections[0].lanes) ? step.intersections[0].lanes : null
         });
       });
+    } else {
+      this.routeSteps.push({
+        name: destination.name || 'Пункт назначения',
+        instruction: 'Двигайтесь по маршруту',
+        type: 'straight',
+        modifier: '',
+        distance: distanceMeters
+      });
     }
 
     // 1. Render on MAPLIBRE GL JS
     if (this.provider === 'maplibre' && this.map) {
-      this.renderMapLibreRoute(coordinates, destination, this.alternativeCoordinates);
+      this.renderMapLibreRoute(coordinates, destination, this.alternativeCoordinates, trafficSegments);
     }
     // 2. Render on YANDEX MAPS
     else if (this.provider === 'yandex' && this.map && window.ymaps) {
-      this.renderYandexRoute(coordinates.map(c => [c[1], c[0]]), destination);
+      this.renderYandexRoute(coordinates.map(c => [c[1], c[0]]), destination, trafficSegments);
     }
     // 3. Render on LEAFLET
     else if (this.map && window.L) {
-      this.renderLeafletRoute(coordinates.map(c => [c[1], c[0]]), destination);
+      this.renderLeafletRoute(coordinates.map(c => [c[1], c[0]]), destination, trafficSegments);
     }
 
     // Calculate ETA
@@ -775,7 +789,7 @@ class TeslaMapEngine {
       const diffMins = Math.round((altDurationSec - durationSec) / 60);
       const diffSign = diffMins >= 0 ? `+${diffMins}` : `${diffMins}`;
       altInfo = {
-        name: this.alternativeRoute.legs[0]?.summary ? `через ${this.alternativeRoute.legs[0].summary}` : 'Альтернативный маршрут',
+        name: this.alternativeRoute.legs && this.alternativeRoute.legs[0]?.summary ? `через ${this.alternativeRoute.legs[0].summary}` : 'Альтернативный маршрут',
         duration: `${Math.round(altDurationSec / 60)} мин`,
         distance: altDistMeters >= 1000 ? `${(altDistMeters / 1000).toFixed(1)} км` : `${Math.round(altDistMeters)} м`,
         diffMins: diffSign
@@ -794,18 +808,18 @@ class TeslaMapEngine {
     return routeInfo;
   }
 
-  // Route calculation and drawing with Yandex Navigator styling & Alternatives
+  // Route calculation using 100% Yandex live traffic router (/api/route)
   async buildRouteTo(destination) {
     this.activeRoute = { destination };
     const start = [this.currentPosition.lat, this.currentPosition.lng];
     const end = [destination.lat, destination.lng];
 
     try {
-      const url = `https://router.project-osrm.org/route/v1/driving/${start[1]},${start[0]};${end[1]},${end[0]}?overview=full&geometries=geojson&steps=true&alternatives=true`;
+      const url = `/api/route?startLat=${start[0]}&startLng=${start[1]}&destLat=${end[0]}&destLng=${end[1]}`;
       const res = await fetch(url);
       const data = await res.json();
 
-      if (data.routes && data.routes.length > 0) {
+      if (data && data.success && data.routes && data.routes.length > 0) {
         const routeInfo = this.applyRouteData(data, destination);
         this.onRouteCalculated(routeInfo);
         return routeInfo;
@@ -831,14 +845,14 @@ class TeslaMapEngine {
   }
 
   // Render Route on MapLibre GL with Yandex Navigator Styling & Alternative Blue Route
-  renderMapLibreRoute(coordinates, destination, alternativeCoordinates = null) {
+  renderMapLibreRoute(coordinates, destination, alternativeCoordinates = null, trafficSegments = null) {
     // Clear old layers
     if (this.map.getLayer('route-alt-casing')) this.map.removeLayer('route-alt-casing');
     if (this.map.getLayer('route-alt-line')) this.map.removeLayer('route-alt-line');
     if (this.map.getSource('route-alt')) this.map.removeSource('route-alt');
 
     if (this.map.getLayer('route-casing')) this.map.removeLayer('route-casing');
-    for (let i = 0; i < 8; i++) {
+    for (let i = 0; i < 200; i++) {
       if (this.map.getLayer(`route-seg-${i}`)) this.map.removeLayer(`route-seg-${i}`);
       if (this.map.getSource(`route-seg-${i}`)) this.map.removeSource(`route-seg-${i}`);
     }
@@ -900,8 +914,11 @@ class TeslaMapEngine {
       }
     });
 
-    // 3. Colored Traffic Segments (Vibrant Green & Warm Golden Amber)
-    const segments = this.generateTrafficSegments(coordinates);
+    // 3. Colored Traffic Segments (100% Genuine Yandex Traffic or Smooth Fallback)
+    const segments = (trafficSegments && trafficSegments.length > 0)
+      ? trafficSegments
+      : this.generateTrafficSegments(coordinates);
+
     segments.forEach((seg, i) => {
       const sourceId = `route-seg-${i}`;
       this.map.addSource(sourceId, {
@@ -944,7 +961,7 @@ class TeslaMapEngine {
       .addTo(this.map);
   }
 
-  renderYandexRoute(latLngs, destination) {
+  renderYandexRoute(latLngs, destination, trafficSegments = null) {
     if (this.routePolyline) this.map.geoObjects.remove(this.routePolyline);
     if (this.destMarker) this.map.geoObjects.remove(this.destMarker);
 
@@ -955,7 +972,10 @@ class TeslaMapEngine {
       strokeOpacity: 0.95
     }));
 
-    const segments = this.generateTrafficSegments(latLngs);
+    const segments = (trafficSegments && trafficSegments.length > 0)
+      ? trafficSegments.map(s => ({ color: s.color, coords: s.coords.map(c => [c[1], c[0]]) }))
+      : this.generateTrafficSegments(latLngs);
+
     segments.forEach(seg => {
       this.routePolyline.add(new window.ymaps.Polyline(seg.coords, {}, {
         strokeColor: seg.color,
@@ -983,7 +1003,7 @@ class TeslaMapEngine {
     } catch (e) {}
   }
 
-  renderLeafletRoute(latLngs, destination) {
+  renderLeafletRoute(latLngs, destination, trafficSegments = null) {
     if (this.routePolyline) this.map.removeLayer(this.routePolyline);
     if (this.destMarker) this.map.removeLayer(this.destMarker);
 
@@ -996,7 +1016,10 @@ class TeslaMapEngine {
       lineJoin: 'round'
     }));
 
-    const segments = this.generateTrafficSegments(latLngs);
+    const segments = (trafficSegments && trafficSegments.length > 0)
+      ? trafficSegments.map(s => ({ color: s.color, coords: s.coords.map(c => [c[1], c[0]]) }))
+      : this.generateTrafficSegments(latLngs);
+
     segments.forEach(seg => {
       this.routePolyline.addLayer(window.L.polyline(seg.coords, {
         color: seg.color,

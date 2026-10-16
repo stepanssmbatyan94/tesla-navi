@@ -180,6 +180,104 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  // API 3: /api/route (100% Genuine Yandex Route with Live Traffic Segments & OSRM Fallback)
+  if (pathname === '/api/route') {
+    const startLat = parsedUrl.searchParams.get('startLat');
+    const startLng = parsedUrl.searchParams.get('startLng');
+    const destLat = parsedUrl.searchParams.get('destLat');
+    const destLng = parsedUrl.searchParams.get('destLng');
+
+    if (!startLat || !startLng || !destLat || !destLng) {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Missing coordinates' }));
+      return;
+    }
+
+    try {
+      // 1. Query live Yandex Maps Router
+      const yandexUrl = `https://yandex.com/maps/10262/yerevan/?mode=routes&rtext=${startLat}%2C${startLng}~${destLat}%2C${destLng}&rtt=auto`;
+      const yRes = await fetch(yandexUrl, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36'
+        }
+      });
+      const html = await yRes.text();
+      const match = html.match(/<script type="application\/json" class="state-view">([\s\S]*?)<\/script>/);
+
+      if (match) {
+        const stateData = JSON.parse(match[1]);
+        const yRoutes = stateData.config?.routerResponse?.routes;
+
+        if (yRoutes && yRoutes.length > 0) {
+          const colors = {
+            'FREE': '#22c55e',       // Emerald Green
+            'LIGHT': '#eab308',      // Amber / Golden Yellow
+            'HARD': '#ef4444',       // Traffic Red
+            'VERY_HARD': '#7f1d1d',  // Burgundy / Dark Red
+            'UNKNOWN': '#22c55e'
+          };
+
+          const parsedRoutes = yRoutes.map((r, idx) => {
+            const coords = r.coordinates || [];
+            const colorize = r.colorizeInfo || [];
+            const segments = [];
+            let curIdx = 0;
+
+            for (const info of colorize) {
+              const nextIdx = Math.min(curIdx + info.count, coords.length);
+              const segCoords = coords.slice(curIdx, nextIdx + 1);
+              if (segCoords.length >= 2) {
+                segments.push({
+                  type: info.type,
+                  color: colors[info.type] || '#22c55e',
+                  coords: segCoords // [[lng, lat], ...]
+                });
+              }
+              curIdx = nextIdx;
+            }
+
+            return {
+              index: idx,
+              distance: r.distance?.value || 0,
+              duration: r.durationInTraffic || r.duration || 0,
+              durationWithoutTraffic: r.duration || 0,
+              coordinates: coords, // [lng, lat]
+              segments: segments.length ? segments : [{ type: 'FREE', color: '#22c55e', coords }]
+            };
+          });
+
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({
+            success: true,
+            source: 'yandex',
+            routes: parsedRoutes
+          }));
+          return;
+        }
+      }
+    } catch (err) {
+      console.warn('Yandex route fetch warning:', err.message);
+    }
+
+    // 2. Fallback to OSRM if Yandex fails
+    try {
+      const osrmUrl = `https://router.project-osrm.org/route/v1/driving/${startLng},${startLat};${destLng},${destLat}?overview=full&geometries=geojson&steps=true&alternatives=true`;
+      const osrmRes = await fetch(osrmUrl);
+      const osrmData = await osrmRes.json();
+
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({
+        success: true,
+        source: 'osrm',
+        ...osrmData
+      }));
+    } catch (osrmErr) {
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: osrmErr.message }));
+    }
+    return;
+  }
+
   // API 3: /api/traffic-yerevan (Live Official Yandex Traffic Score for Yerevan, Region 10262)
   if (pathname === '/api/traffic-yerevan') {
     const now = Date.now();
