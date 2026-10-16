@@ -518,6 +518,10 @@ function initSearchHandlers() {
   searchInput.addEventListener('input', () => {
     clearTimeout(debounceTimer);
     const query = searchInput.value.trim();
+    const sectionTitle = document.getElementById('drawer-section-title');
+    if (sectionTitle) {
+      sectionTitle.textContent = query ? 'Результаты поиска' : (I18N[window.CURRENT_LANG || 'ru']?.history || 'История');
+    }
 
     if (query.length < 2) return;
 

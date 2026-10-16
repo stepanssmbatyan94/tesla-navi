@@ -87,6 +87,44 @@ async function resolveYandexOrgCoords(oid) {
   return null;
 }
 
+// Helper: Fetch Yandex Suggest results with smart word-order permutation and language fallback
+async function fetchYandexSuggestResults(q, userLng = 44.5125, userLat = 40.1776) {
+  async function doReq(query, lang = 'ru_RU') {
+    try {
+      const url = `https://suggest-maps.yandex.ru/suggest-geo?v=9&search_type=all&part=${encodeURIComponent(query)}&lang=${lang}&n=8&origin=maps-form&ll=${userLng},${userLat}&spn=1.8,1.8`;
+      const res = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)' } });
+      const text = await res.text();
+      const json = JSON.parse(text.replace(/^[^({]*\(/, '').replace(/\);?$/, ''));
+      return json.results || [];
+    } catch (e) {
+      return [];
+    }
+  }
+
+  let results = await doReq(q, 'ru_RU');
+
+  // If empty and multi-word, try reversed word order (e.g. "армавир нораван" -> "нораван армавир")
+  if (results.length === 0 && q.includes(' ')) {
+    const words = q.trim().split(/\s+/);
+    if (words.length >= 2) {
+      const reversed = words.slice().reverse().join(' ');
+      results = await doReq(reversed, 'ru_RU');
+    }
+  }
+
+  // If still empty, try en_US (for English queries like "armavir noravan")
+  if (results.length === 0) {
+    results = await doReq(q, 'en_US');
+    if (results.length === 0 && q.includes(' ')) {
+      const words = q.trim().split(/\s+/);
+      const reversed = words.slice().reverse().join(' ');
+      results = await doReq(reversed, 'en_US');
+    }
+  }
+
+  return results;
+}
+
   // API 1: /api/resolve-location (Resolves Google Maps links, coordinates, or search queries)
   if (pathname === '/api/resolve-location') {
     const input = (parsedUrl.searchParams.get('url') || parsedUrl.searchParams.get('q') || '').trim();
@@ -115,12 +153,9 @@ async function resolveYandexOrgCoords(oid) {
       // 1. Try Yandex Maps Suggest first (Best for Armenia villages, addresses, Russian & Armenian names)
       if (!coords) {
         try {
-          const yUrl = `https://suggest-maps.yandex.ru/suggest-geo?v=9&search_type=all&part=${encodeURIComponent(input)}&lang=ru_RU&n=3&origin=maps-form&ll=44.5125,40.1776&spn=1.8,1.8`;
-          const yRes = await fetch(yUrl, { headers: { 'User-Agent': 'Mozilla/5.0' } });
-          const yText = await yRes.text();
-          const yJson = JSON.parse(yText.replace(/^[^({]*\(/, '').replace(/\);?$/, ''));
-          if (yJson.results && yJson.results.length > 0) {
-            for (const r of yJson.results) {
+          const yResults = await fetchYandexSuggestResults(input, 44.5125, 40.1776);
+          if (yResults && yResults.length > 0) {
+            for (const r of yResults) {
               let geo = parseYandexGeoUri(r.uri);
               if (!geo && r.uri && r.uri.includes('oid=')) {
                 const m = r.uri.match(/oid=(\d+)/);
@@ -200,16 +235,13 @@ async function resolveYandexOrgCoords(oid) {
     }
 
     try {
-      // 1. Primary: Yandex Maps Suggest API (armenia bounding box, exact village, street & region names)
-      const yandexSuggestUrl = `https://suggest-maps.yandex.ru/suggest-geo?v=9&search_type=all&part=${encodeURIComponent(q)}&lang=ru_RU&n=8&origin=maps-form&ll=${userLng},${userLat}&spn=1.8,1.8`;
-      const yRes = await fetch(yandexSuggestUrl, { headers: { 'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)' } });
-      const yText = await yRes.text();
-      const yJson = JSON.parse(yText.replace(/^[^({]*\(/, '').replace(/\);?$/, ''));
+      // 1. Primary: Yandex Maps Suggest API with smart word order permutation & English fallback
+      const yResults = await fetchYandexSuggestResults(q, userLng, userLat);
 
       let items = [];
-      if (yJson.results && yJson.results.length > 0) {
+      if (yResults && yResults.length > 0) {
         const rawItems = [];
-        for (const r of yJson.results) {
+        for (const r of yResults) {
           const title = r.title ? r.title.text : q;
           const subtitle = r.subtitle ? r.subtitle.text : (r.where?.name || 'Армения');
           let coords = parseYandexGeoUri(r.uri);
