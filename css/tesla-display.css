@@ -129,15 +129,15 @@ html, body {
   transition: transform 0.2s ease;
 }
 
-/* Floating Recenter Button (Centered horizontally above bottom HUD, impossible to miss) */
+/* Floating Recenter Button (Centered horizontally, appears when user drags map) */
 .floating-recenter-btn {
   position: absolute;
-  bottom: 112px;
+  bottom: 36px;
   left: 50%;
   transform: translateX(-50%);
   z-index: 85;
   background: rgba(15, 23, 42, 0.94);
-  border: 1.5px solid rgba(56, 189, 248, 0.5);
+  border: 1.5px solid rgba(56, 189, 248, 0.55);
   border-radius: 30px;
   padding: 10px 24px;
   display: flex;
@@ -152,6 +152,11 @@ html, body {
   box-shadow: 0 12px 35px rgba(0, 0, 0, 0.65), 0 0 20px rgba(56, 189, 248, 0.25);
   transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
   white-space: nowrap;
+}
+
+/* When bottom navigation card is open, elevate button cleanly above it */
+.bottom-nav-bar:not(.hidden) ~ .floating-recenter-btn {
+  bottom: 116px;
 }
 
 .floating-recenter-btn:hover {
