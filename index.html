@@ -102,6 +102,31 @@
     </div>
 
     <div class="drawer-body">
+      <!-- Quick Commute Bookmarks: Home / Work with Live ETAs (Yandex Style) -->
+      <div class="commute-tiles-container">
+        <div id="commute-home" class="commute-tile-item" data-type="home">
+          <div class="commute-top-row">
+            <div class="commute-icon-title">
+              <span>🏠</span>
+              <span>Дом</span>
+            </div>
+            <span id="home-eta-badge" class="commute-eta-badge">12 мин</span>
+          </div>
+          <div id="home-address-sub" class="commute-address-sub">ул. Амиряна, 18</div>
+        </div>
+
+        <div id="commute-work" class="commute-tile-item" data-type="work">
+          <div class="commute-top-row">
+            <div class="commute-icon-title">
+              <span>💼</span>
+              <span>Работа</span>
+            </div>
+            <span id="work-eta-badge" class="commute-eta-badge">19 мин</span>
+          </div>
+          <div id="work-address-sub" class="commute-address-sub">ул. Акоп Акопян, 3</div>
+        </div>
+      </div>
+
       <!-- Quick Categories Row -->
       <div class="drawer-chips-row">
         <div class="drawer-chip" data-type="charging">
@@ -166,14 +191,14 @@
     </div>
   </aside>
 
-  <!-- 3. Top Maneuver HUD Card (Road floating turn card IMG_3659) -->
+  <!-- 3. Top Maneuver HUD Card (Compact Yandex Navigator Style) -->
   <div id="hud-maneuver-card" class="hud-maneuver-card hidden">
-    <div id="maneuver-arrow-box" class="maneuver-arrow-box">↰</div>
+    <div id="maneuver-arrow-box" class="maneuver-arrow-box">↗</div>
     <div class="maneuver-info">
       <div class="maneuver-dist-row">
-        <span id="maneuver-dist" class="maneuver-dist-val">120 м</span>
+        <span id="maneuver-dist" class="maneuver-dist-val">800 м</span>
       </div>
-      <span id="maneuver-street" class="maneuver-street-name">ул. Мецаренца</span>
+      <span id="maneuver-street" class="maneuver-street-name">ул. Монте Мелконян</span>
     </div>
   </div>
 
@@ -184,7 +209,7 @@
     <span class="lane-arrow">↱</span>
   </div>
 
-  <!-- 4. Speedometer & Speed Limit HUD (Top Right Cluster IMG_3650 / IMG_3652) -->
+  <!-- 4. Speedometer & Speed Limit HUD + Yandex Traffic Score & Sound Toggle -->
   <div class="speed-limit-hud">
     <div class="speed-cluster-badge">
       <div class="current-speed-wrap">
@@ -194,6 +219,12 @@
       <div class="speed-limit-circle">60</div>
     </div>
 
+    <!-- Top Right Auxiliary Row: Traffic Score Badge (8 баллов) + Sound Toggle Button -->
+    <div class="top-aux-row">
+      <div id="traffic-score-badge" class="traffic-score-badge" title="Балл пробок: 8 из 10">8</div>
+      <button id="btn-sound-toggle" class="sound-toggle-btn" title="Звук навигатора">🔊</button>
+    </div>
+
     <!-- Traffic Camera / Signal Alert (Counting down distance) -->
     <div id="camera-alert-badge" class="camera-alert-badge">
       <div class="camera-alert-icon">📷</div>
@@ -201,15 +232,34 @@
     </div>
   </div>
 
-  <!-- 5. Bottom Navigation Status Bar (IMG_3650 / IMG_3658) -->
+  <!-- Floating Recenter Button (Appears when map is dragged/moved by user) -->
+  <button id="floating-recenter-btn" class="floating-recenter-btn hidden" title="Вернуть по центру">
+    <span>🎯</span>
+    <span>В центр</span>
+  </button>
+
+  <!-- 5. Bottom Navigation Status Bar with Yandex Traffic Progress Bar -->
   <div id="bottom-nav-bar" class="bottom-nav-bar hidden">
-    <div class="nav-metrics">
-      <span id="nav-duration" class="nav-metric-duration">4 мин</span>
-      <span id="nav-distance">1.8 км</span>
-      <span id="nav-eta">15:50</span>
-      <span class="nav-battery-badge">🔋 80%</span>
+    <div class="nav-metrics-top-row">
+      <div class="nav-metrics">
+        <span id="nav-duration" class="nav-metric-duration">17 мин</span>
+        <span id="nav-distance">4 км</span>
+        <span id="nav-eta">18:40</span>
+        <span class="nav-battery-badge">🔋 82%</span>
+      </div>
+      <button id="btn-cancel-nav" class="nav-cancel-btn" title="Отменить маршрут">✕</button>
     </div>
-    <button id="btn-cancel-nav" class="nav-cancel-btn" title="Отменить маршрут">✕</button>
+
+    <!-- Traffic Segments Progress Bar with Live Moving Cursor (Yandex Navigator Style) -->
+    <div class="route-progress-track">
+      <div class="route-progress-bar">
+        <div class="prog-seg green" style="width: 35%;"></div>
+        <div class="prog-seg yellow" style="width: 25%;"></div>
+        <div class="prog-seg red" style="width: 25%;"></div>
+        <div class="prog-seg green" style="width: 15%;"></div>
+      </div>
+      <div id="prog-car-cursor" class="prog-car-cursor" style="left: 0%;">▷</div>
+    </div>
   </div>
 
   <!-- 6. Compact Modals -->
@@ -274,21 +324,52 @@
     </div>
   </div>
 
-  <!-- YouTube Floating Music PIP Player (IMG_3655 / IMG_3658) -->
-  <div id="music-floating-pip" class="music-floating-pip hidden">
-    <div class="music-pip-header">
-      <div class="music-title-wrap">
-        <span style="color: #ef4444; font-size: 16px;">▶</span>
-        <span id="music-track-title" class="music-track-title">BRUNETTE - ANHETANAM</span>
+  <!-- YouTube Video / Music Player Modal with Search and Embedded Video Frame -->
+  <div id="youtube-player-modal" class="youtube-player-modal hidden">
+    <div class="card-top-row">
+      <div class="card-title" style="display: flex; align-items: center; gap: 8px;">
+        <span style="color: #ef4444; font-size: 20px;">▶</span>
+        <span>YouTube Music</span>
       </div>
-      <button id="btn-close-music" class="card-close-btn" style="width: 26px; height: 26px; font-size: 12px;">✕</button>
+      <button id="btn-close-music" class="card-close-btn">✕</button>
     </div>
 
-    <!-- Hidden audio/video iframe -->
-    <div style="height: 0; overflow: hidden;">
-      <iframe id="yt-player-iframe" width="200" height="150" src="" frameborder="0" allow="autoplay; encrypted-media"></iframe>
+    <!-- Search Row -->
+    <div class="yt-search-row">
+      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5">
+        <circle cx="11" cy="11" r="8"></circle>
+        <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+      </svg>
+      <input id="yt-search-input" class="yt-search-input" type="text" placeholder="Поиск видео или трека..." autocomplete="off" />
+      <button id="btn-yt-search-go" class="card-close-btn" style="width: 26px; height: 26px; font-size: 11px;">🔍</button>
     </div>
 
+    <!-- Embedded Video Player Frame -->
+    <div class="yt-video-frame">
+      <iframe id="yt-player-iframe" src="https://www.youtube-nocookie.com/embed/m-V84sU0Y3I?autoplay=0&enablejsapi=1" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe>
+    </div>
+
+    <!-- Popular Track Suggestions -->
+    <div id="yt-suggestions-list" class="yt-suggestions-row">
+      <div class="yt-song-item active" data-id="m-V84sU0Y3I" data-title="BRUNETTE - ANHETANAM">
+        <span>🎵 BRUNETTE - ANHETANAM</span>
+        <span>3:12</span>
+      </div>
+      <div class="yt-song-item" data-id="aM5Wv12xPqQ" data-title="K/ES - yellowheart. feat Misho">
+        <span>🎵 K/ES - yellowheart (Misho)</span>
+        <span>2:55</span>
+      </div>
+      <div class="yt-song-item" data-id="kJQP7kiw5Fk" data-title="Arkadi Dumikyan - Im Hreshtak">
+        <span>🎵 Arkadi Dumikyan - Im Hreshtak</span>
+        <span>3:40</span>
+      </div>
+      <div class="yt-song-item" data-id="2Vv-BfVoq4g" data-title="Artur Arakelyan - Kyanqis Hamar">
+        <span>🎵 Artur Arakelyan - Kyanqis Hamar</span>
+        <span>3:22</span>
+      </div>
+    </div>
+
+    <!-- Transport Controls -->
     <div class="music-controls-row">
       <button id="btn-music-prev" class="music-ctrl-btn">⏮</button>
       <button id="btn-music-play" class="music-ctrl-btn music-play-circle">▶</button>

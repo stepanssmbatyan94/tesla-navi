@@ -197,6 +197,12 @@ function updatePairingStatus(connected) {
   }
 }
 
+// Commute Bookmarks Data (Home & Work)
+const COMMUTE_LOCATIONS = {
+  home: { name: 'Дом', address: 'ул. Амиряна, 18', lat: 40.1772, lng: 44.5105 },
+  work: { name: 'Работа', address: 'ул. Акоп Акопян, 3', lat: 40.1982, lng: 44.4928 }
+};
+
 // 4. Map Engine Initialization
 async function initMap() {
   mapEngine = new TeslaMapEngine('map-container', {
@@ -210,10 +216,21 @@ async function initMap() {
     },
     onArrival: (destination) => {
       showArrivalModal(destination);
+    },
+    onUserPan: () => {
+      const recenterBtn = document.getElementById('floating-recenter-btn');
+      if (recenterBtn) recenterBtn.classList.remove('hidden');
+    },
+    onProgressUpdate: (percent) => {
+      const cursor = document.getElementById('prog-car-cursor');
+      if (cursor) {
+        cursor.style.left = `${Math.min(96, Math.max(0, percent))}%`;
+      }
     }
   });
 
   await mapEngine.init();
+  updateCommuteEtas();
 }
 
 // 5. Toolbar & Drawer UI Handlers
@@ -227,12 +244,58 @@ function initToolbarHandlers() {
     searchDrawer.classList.toggle('hidden');
     if (!searchDrawer.classList.contains('hidden')) {
       document.getElementById('drawer-search-input').focus();
+      updateCommuteEtas();
     }
   });
 
   btnCloseSearch.addEventListener('click', () => {
     searchDrawer.classList.add('hidden');
   });
+
+  // Floating Recenter Button
+  const recenterBtn = document.getElementById('floating-recenter-btn');
+  if (recenterBtn) {
+    recenterBtn.addEventListener('click', () => {
+      if (mapEngine) mapEngine.recenter();
+      recenterBtn.classList.add('hidden');
+    });
+  }
+
+  // Sound / Voice Mute Toggle
+  const btnSoundToggle = document.getElementById('btn-sound-toggle');
+  if (btnSoundToggle) {
+    btnSoundToggle.addEventListener('click', () => {
+      if (mapEngine) {
+        const voiceOn = mapEngine.toggleVoice();
+        btnSoundToggle.classList.toggle('muted', !voiceOn);
+        btnSoundToggle.textContent = voiceOn ? '🔊' : '🔇';
+      }
+    });
+  }
+
+  // Traffic Score Badge
+  const trafficBadge = document.getElementById('traffic-score-badge');
+  if (trafficBadge) {
+    trafficBadge.addEventListener('click', () => {
+      alert('Пробки в Ереване: 8 баллов (Сложная дорожная ситуация)\nСредняя задержка на ключевых проспектах 10-15 минут.');
+    });
+  }
+
+  // Commute Bookmarks: Home / Work
+  const homeBtn = document.getElementById('commute-home');
+  const workBtn = document.getElementById('commute-work');
+  if (homeBtn) {
+    homeBtn.addEventListener('click', () => {
+      searchDrawer.classList.add('hidden');
+      startNavigationTo(COMMUTE_LOCATIONS.home);
+    });
+  }
+  if (workBtn) {
+    workBtn.addEventListener('click', () => {
+      searchDrawer.classList.add('hidden');
+      startNavigationTo(COMMUTE_LOCATIONS.work);
+    });
+  }
 
   // Phone Pairing Modal
   const btnOpenPairing = document.getElementById('btn-open-pairing');
@@ -272,6 +335,22 @@ function initToolbarHandlers() {
   // Arrival Done button
   document.getElementById('btn-arrival-done').addEventListener('click', () => {
     document.getElementById('arrival-modal').classList.add('hidden');
+  });
+}
+
+function updateCommuteEtas() {
+  if (!mapEngine) return;
+  const current = mapEngine.currentPosition;
+  ['home', 'work'].forEach(key => {
+    const loc = COMMUTE_LOCATIONS[key];
+    const distMeters = mapEngine.calculateDistance(current.lat, current.lng, loc.lat, loc.lng);
+    const speedMps = 8.5; // ~30 km/h city average
+    const durationMin = Math.max(3, Math.round(distMeters / (speedMps * 60)));
+    const distStr = distMeters >= 1000 ? `${(distMeters / 1000).toFixed(1)} км` : `${Math.round(distMeters)} м`;
+    const badge = document.getElementById(`${key}-eta-badge`);
+    if (badge) {
+      badge.textContent = `${durationMin} мин · ${distStr}`;
+    }
   });
 }
 
@@ -481,51 +560,104 @@ function initWeatherAndMusic() {
     btn.addEventListener('click', () => weatherModal.classList.add('hidden'));
   });
 
-  // YouTube Music
+  // YouTube Music & Video Player
   const btnMusic = document.getElementById('btn-open-music');
-  const musicPip = document.getElementById('music-floating-pip');
+  const ytModal = document.getElementById('youtube-player-modal');
   const btnCloseMusic = document.getElementById('btn-close-music');
   const btnMusicPlay = document.getElementById('btn-music-play');
   const btnMusicPrev = document.getElementById('btn-music-prev');
   const btnMusicNext = document.getElementById('btn-music-next');
-  const trackTitle = document.getElementById('music-track-title');
   const ytIframe = document.getElementById('yt-player-iframe');
+  const ytSearchInput = document.getElementById('yt-search-input');
+  const btnYtSearchGo = document.getElementById('btn-yt-search-go');
+  const suggestionsList = document.getElementById('yt-suggestions-list');
 
   btnMusic.addEventListener('click', () => {
-    musicPip.classList.toggle('hidden');
-    btnMusic.classList.toggle('active', !musicPip.classList.contains('hidden'));
+    ytModal.classList.toggle('hidden');
+    btnMusic.classList.toggle('active', !ytModal.classList.contains('hidden'));
   });
 
   btnCloseMusic.addEventListener('click', () => {
-    musicPip.classList.add('hidden');
+    ytModal.classList.add('hidden');
     btnMusic.classList.remove('active');
   });
 
+  function playTrackById(videoId, title) {
+    if (ytIframe) {
+      ytIframe.src = `https://www.youtube-nocookie.com/embed/${videoId}?autoplay=1&enablejsapi=1`;
+    }
+    isMusicPlaying = true;
+    if (btnMusicPlay) btnMusicPlay.textContent = '⏸';
+  }
+
+  function handleYtSearch() {
+    const q = ytSearchInput.value.trim();
+    if (!q) return;
+
+    // Check if query is direct YouTube video ID or URL
+    let videoId = q;
+    const urlMatch = q.match(/(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|watch\?v=|watch\?.+&v=))([\w-]{11})/);
+    if (urlMatch && urlMatch[1]) {
+      videoId = urlMatch[1];
+      playTrackById(videoId, q);
+    } else {
+      // Use YouTube embed search playlist
+      if (ytIframe) {
+        ytIframe.src = `https://www.youtube-nocookie.com/embed?listType=search&list=${encodeURIComponent(q)}&autoplay=1&enablejsapi=1`;
+      }
+      isMusicPlaying = true;
+      if (btnMusicPlay) btnMusicPlay.textContent = '⏸';
+    }
+  }
+
+  if (btnYtSearchGo) btnYtSearchGo.addEventListener('click', handleYtSearch);
+  if (ytSearchInput) {
+    ytSearchInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') handleYtSearch();
+    });
+  }
+
+  // Suggestions row clicks
+  if (suggestionsList) {
+    suggestionsList.querySelectorAll('.yt-song-item').forEach(item => {
+      item.addEventListener('click', () => {
+        suggestionsList.querySelectorAll('.yt-song-item').forEach(el => el.classList.remove('active'));
+        item.classList.add('active');
+        const id = item.dataset.id;
+        const title = item.dataset.title;
+        playTrackById(id, title);
+      });
+    });
+  }
+
   function updateTrack() {
     const track = PLAYLIST[currentTrackIndex];
-    trackTitle.textContent = track.title;
     if (isMusicPlaying) {
-      ytIframe.src = `https://www.youtube-nocookie.com/embed/${track.id}?autoplay=1&enablejsapi=1`;
+      playTrackById(track.id, track.title);
     }
   }
 
   btnMusicPlay.addEventListener('click', () => {
     isMusicPlaying = !isMusicPlaying;
     btnMusicPlay.textContent = isMusicPlaying ? '⏸' : '▶';
-    updateTrack();
+    if (isMusicPlaying) {
+      updateTrack();
+    } else if (ytIframe) {
+      ytIframe.contentWindow.postMessage('{"event":"command","func":"pauseVideo","args":""}', '*');
+    }
   });
 
   btnMusicNext.addEventListener('click', () => {
     currentTrackIndex = (currentTrackIndex + 1) % PLAYLIST.length;
+    isMusicPlaying = true;
     updateTrack();
   });
 
   btnMusicPrev.addEventListener('click', () => {
     currentTrackIndex = (currentTrackIndex - 1 + PLAYLIST.length) % PLAYLIST.length;
+    isMusicPlaying = true;
     updateTrack();
   });
-
-  updateTrack();
 }
 
 async function loadLiveYerevanWeather() {
