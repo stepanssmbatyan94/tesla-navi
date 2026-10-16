@@ -16,6 +16,9 @@ const MIME_TYPES = {
   '.ico': 'image/x-icon'
 };
 
+// Cache for live Yandex traffic data in Yerevan
+let trafficCache = { time: 0, data: null };
+
 // Extract coordinates from text or URL
 function extractCoords(str) {
   const atMatch = str.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/);
@@ -173,6 +176,57 @@ const server = http.createServer(async (req, res) => {
     } catch (err) {
       res.writeHead(500, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify([]));
+    }
+    return;
+  }
+
+  // API 3: /api/traffic-yerevan (Live Official Yandex Traffic Score for Yerevan, Region 10262)
+  if (pathname === '/api/traffic-yerevan') {
+    const now = Date.now();
+    if (trafficCache.data && (now - trafficCache.time < 60000)) {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify(trafficCache.data));
+      return;
+    }
+
+    try {
+      const xmlRes = await fetch('https://export.yandex.ru/bar/reginfo.xml?region=10262', {
+        headers: { 'User-Agent': 'Mozilla/5.0' }
+      });
+      const xmlText = await xmlRes.text();
+
+      const levelMatch = xmlText.match(/<level>(\d+)<\/level>/);
+      const iconMatch = xmlText.match(/<icon>([a-z]+)<\/icon>/);
+      const hintMatch = xmlText.match(/<hint lang="ru">([^<]+)<\/hint>/);
+      const timeMatch = xmlText.match(/<time>([^<]+)<\/time>/);
+
+      const level = levelMatch ? parseInt(levelMatch[1], 10) : 2;
+      const icon = iconMatch ? iconMatch[1] : 'green';
+      const hint = hintMatch ? hintMatch[1] : 'Дороги свободны';
+      const time = timeMatch ? timeMatch[1] : '';
+
+      let color = '#22c55e';
+      if (level >= 7) color = '#ef4444';
+      else if (level >= 5) color = '#f97316';
+      else if (level >= 4) color = '#eab308';
+
+      const data = {
+        success: true,
+        score: level,
+        icon,
+        color,
+        hint,
+        time,
+        source: 'yandex'
+      };
+
+      trafficCache = { time: now, data };
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify(data));
+    } catch (e) {
+      console.warn('Yandex traffic fetch warning:', e.message);
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ success: false, fallback: true }));
     }
     return;
   }

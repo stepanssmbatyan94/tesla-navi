@@ -246,9 +246,25 @@ function getLiveTrafficScore() {
   return { score, color, label };
 }
 
-function updateLiveTrafficBadge() {
+let liveTrafficData = null;
+
+async function updateLiveTrafficBadge() {
   const badge = document.getElementById('traffic-score-badge');
   if (!badge) return;
+
+  try {
+    const res = await fetch('/api/traffic-yerevan');
+    const data = await res.json();
+    if (data && data.success) {
+      liveTrafficData = data;
+      badge.textContent = data.score;
+      badge.style.background = data.color;
+      badge.style.boxShadow = `0 4px 14px ${data.color}90`;
+      badge.title = `Пробки в Ереване: ${data.score} из 10 (${data.hint}) · Яндекс`;
+      return;
+    }
+  } catch (e) {}
+
   const traffic = getLiveTrafficScore();
   badge.textContent = traffic.score;
   badge.style.background = traffic.color;
@@ -285,7 +301,7 @@ async function initMap() {
   await mapEngine.init();
   updateCommuteEtas();
   updateLiveTrafficBadge();
-  setInterval(updateLiveTrafficBadge, 30000);
+  setInterval(updateLiveTrafficBadge, 45000); // Live poll Yandex Traffic every 45s
 }
 
 // 5. Toolbar & Drawer UI Handlers
@@ -328,12 +344,16 @@ function initToolbarHandlers() {
     });
   }
 
-  // Traffic Score Badge Alert
+  // Traffic Score Badge Alert (Official Yandex Traffic Data)
   const trafficBadge = document.getElementById('traffic-score-badge');
   if (trafficBadge) {
     trafficBadge.addEventListener('click', () => {
-      const traffic = getLiveTrafficScore();
-      alert(`Пробки в Ереване: ${traffic.score} из 10 баллов\n${traffic.label}\nВремя: UTC+4 (Ереван)`);
+      if (liveTrafficData && liveTrafficData.success) {
+        alert(`🚦 Яндекс.Пробки Ереван\nБалл: ${liveTrafficData.score} из 10\nСитуация: ${liveTrafficData.hint}\nВремя обновления: ${liveTrafficData.time || 'сейчас'}\nИсточник: Официальный информер Яндекс`);
+      } else {
+        const traffic = getLiveTrafficScore();
+        alert(`🚦 Пробки в Ереване: ${traffic.score} из 10 баллов\n${traffic.label}\nВремя: UTC+4 (Ереван)`);
+      }
     });
   }
 
@@ -362,7 +382,7 @@ function initToolbarHandlers() {
     });
   }
 
-  // "Go / Поехали" Action Button
+  // "Go / Поехали" Action Button (Starts active turn-by-turn navigation)
   const btnStartRouteNav = document.getElementById('btn-start-route-nav');
   if (btnStartRouteNav) {
     btnStartRouteNav.addEventListener('click', () => {
@@ -370,6 +390,7 @@ function initToolbarHandlers() {
       if (currentRouteInfo) {
         showNavigationHud(currentRouteInfo);
         if (mapEngine) {
+          mapEngine.startNavigation(); // Activates movement tracking & off-route rerouting
           mapEngine.speakVoice('Маршрут построен. В путь!');
           mapEngine.recenter();
         }

@@ -31,6 +31,7 @@ class TeslaMapEngine {
     this.autoFollowTimer = null;
     this.isRerouting = false;
     this.activeRoute = null;
+    this.isNavigating = false;
     this.routeSteps = [];
     this.currentStepIndex = 0;
     this.totalDistance = 0;
@@ -554,8 +555,8 @@ class TeslaMapEngine {
   trackNavigationProgress(currentLat, currentLng, isOffRoute = false, distToRoute = 0, speed = 0) {
     if (!this.activeRoute) return;
 
-    // Off-route automatic rerouting
-    if (isOffRoute && distToRoute > 45 && (speed >= 3 || this.offRouteCounter > 0)) {
+    // Off-route automatic rerouting: ONLY when active navigation is ON and car is actually driving (> 4 km/h)
+    if (this.isNavigating && speed >= 5 && isOffRoute && distToRoute > 45) {
       this.offRouteCounter++;
       if (this.offRouteCounter >= 3 && !this.isRerouting) {
         this.recalculateRoute(currentLat, currentLng);
@@ -1011,8 +1012,14 @@ class TeslaMapEngine {
     this.destMarker = window.L.marker([destination.lat, destination.lng], { icon: destIcon }).addTo(this.map);
   }
 
+  startNavigation() {
+    this.isNavigating = true;
+    this.offRouteCounter = 0;
+  }
+
   cancelRoute() {
     this.activeRoute = null;
+    this.isNavigating = false;
     this.routeCoordinates = [];
     this.alternativeCoordinates = null;
     this.routeSteps = [];
