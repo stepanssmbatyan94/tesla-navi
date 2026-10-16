@@ -1,0 +1,23 @@
+{
+  "name": "tesla-navi",
+  "version": "1.0.0",
+  "description": "Ultra-lightweight In-Car Navigation & Phone GPS Sharing for Tesla vehicles",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.118.0",
+    "ws": "^8.18.0"
+  },
+  "keywords": [
+    "tesla",
+    "navigation",
+    "gps-sharing",
+    "hud",
+    "in-car-browser"
+  ],
+  "author": "",
+  "license": "MIT"
+}

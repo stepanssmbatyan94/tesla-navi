@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Tesla Navi — In-Car Browser Navigation</title>
+
+  <!-- Leaflet CSS Fallback -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+
+  <!-- Tesla Cockpit CSS (DESIGN.md Compliant) -->
+  <link rel="stylesheet" href="css/tesla-display.css">
+
+  <!-- Yandex Maps JS API (2.1) -->
+  <script src="https://api-maps.yandex.ru/2.1/?lang=ru_RU&amp;coordorder=latlong" type="text/javascript"></script>
+
+  <!-- Leaflet JS Fallback -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <!-- Supabase JS Client for Realtime Broadcast -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+
+  <!-- Fullscreen Interactive Map -->
+  <div id="map-container"></div>
+
+  <!-- Top Floating Search Bar & Route Launcher (Like tmap.ge) -->
+  <div id="search-route-container" class="search-route-container">
+    <div class="search-input-card">
+      <div class="search-icon">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.5">
+          <circle cx="11" cy="11" r="8"></circle>
+          <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+        </svg>
+      </div>
+      <input id="search-input" class="search-input-field" type="text" placeholder="Поиск улицы, места или адреса..." autocomplete="off" data-i18n-placeholder="searchPlaceholder" />
+      <button id="btn-start-route" class="btn-go-action">
+        <span data-i18n="btnGo">В путь</span>
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.5">
+          <polygon points="5 3 19 12 5 21 5 3"></polygon>
+        </svg>
+      </button>
+
+      <!-- Auto-suggestions Dropdown -->
+      <div id="search-suggestions" class="search-suggestions-dropdown"></div>
+    </div>
+
+    <!-- Category Pills Underneath Search -->
+    <div class="search-categories-row">
+      <div class="category-pill" data-type="charging">
+        <span>⚡</span>
+        <span data-i18n="charging">Зарядка</span>
+      </div>
+      <div class="category-pill" data-type="fuel">
+        <span>⛽</span>
+        <span data-i18n="fuel">Топливо</span>
+      </div>
+      <div class="category-pill" data-type="food">
+        <span>🍽️</span>
+        <span data-i18n="food">Еда</span>
+      </div>
+      <div class="category-pill" data-type="coffee">
+        <span>☕</span>
+        <span data-i18n="coffee">Кофе</span>
+      </div>
+      <div class="category-pill" data-type="parking">
+        <span>🅿️</span>
+        <span data-i18n="parking">Парковка</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Top Floating Turn-by-Turn HUD Banner -->
+  <div id="hud-banner" class="hud-banner hidden">
+    <div class="hud-arrow-icon">
+      <!-- Straight / Turn Arrow SVG -->
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <line x1="12" y1="19" x2="12" y2="5"></line>
+        <polyline points="5 12 12 5 19 12"></polyline>
+      </svg>
+    </div>
+    <div class="hud-content">
+      <div class="hud-distance-street">
+        <div id="hud-distance" class="hud-distance">450 м</div>
+        <div id="hud-street" class="hud-street">ул. Кирк Керкорян</div>
+      </div>
+      <div id="hud-eta" class="hud-telemetry">14 мин · ETA 11:15 · 3.9 км</div>
+    </div>
+    <button id="btn-end-route" class="btn-end-route" data-i18n="endRoute">Завершить</button>
+  </div>
+
+  <!-- Left Floating Cockpit Panel -->
+  <aside class="cockpit-sidebar">
+    <!-- Header & Language Switcher -->
+    <div class="brand-header">
+      <div class="brand-title-wrap">
+        <div class="brand-logo-icon">⚡</div>
+        <div>
+          <div class="brand-text">Tesla Navi</div>
+          <div class="brand-region-badge">Armenia · Caucasus</div>
+        </div>
+      </div>
+
+      <!-- Language selector: RU, HY, EN -->
+      <div class="lang-selector">
+        <button class="lang-btn active" data-lang="ru">RU</button>
+        <button class="lang-btn" data-lang="hy">ՀԱՅ</button>
+        <button class="lang-btn" data-lang="en">EN</button>
+      </div>
+    </div>
+
+    <!-- Quick Commute Grid: Home / Work -->
+    <div class="commute-grid">
+      <div id="tile-home" class="commute-tile">
+        <div class="commute-icon">🏠</div>
+        <div>
+          <div class="commute-label" data-i18n="home">Дом</div>
+          <div class="commute-sub">Кирк Керкорян</div>
+        </div>
+      </div>
+      <div id="tile-work" class="commute-tile">
+        <div class="commute-icon">💼</div>
+        <div>
+          <div class="commute-label" data-i18n="work">Работа</div>
+          <div class="commute-sub">Центр</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Phone GPS Pairing Card -->
+    <div class="pairing-card">
+      <div class="pairing-header">
+        <div class="pairing-title" data-i18n="devicePairing">Сопряжение с телефоном</div>
+        <div id="pairing-status-chip" class="pairing-status-chip waiting">
+          <span class="pairing-status-dot"></span>
+          <span id="pairing-status-text" data-i18n="waitingPhone">Ожидание телефона...</span>
+        </div>
+      </div>
+
+      <div class="pairing-body">
+        <div class="qr-wrapper">
+          <img id="qr-image" alt="QR Code to pair phone" src="" />
+        </div>
+        <div class="pairing-details">
+          <div class="pairing-code-label">Код подключения:</div>
+          <div id="pairing-code-display" class="pairing-code">------</div>
+          <div style="font-size: 11px; color: var(--text-low);" data-i18n="shareGpsPrompt">
+            Отсканируйте камерой смартфона для точного GPS
+          </div>
+        </div>
+      </div>
+
+      <!-- Live GPS Telemetry Table -->
+      <div class="telemetry-grid">
+        <div class="telemetry-cell">
+          <div class="telemetry-label" data-i18n="latitude">Широта</div>
+          <div id="tel-lat" class="telemetry-val">40.189551</div>
+        </div>
+        <div class="telemetry-cell">
+          <div class="telemetry-label" data-i18n="longitude">Долгота</div>
+          <div id="tel-lng" class="telemetry-val">44.468663</div>
+        </div>
+        <div class="telemetry-cell">
+          <div class="telemetry-label" data-i18n="accuracy">Точность</div>
+          <div id="tel-accuracy" class="telemetry-val">±8 м</div>
+        </div>
+        <div class="telemetry-cell">
+          <div class="telemetry-label" data-i18n="age">Пинг</div>
+          <div id="tel-age" class="telemetry-val">-- мс</div>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Right Floating Action Column -->
+  <div class="actions-bar">
+    <button id="btn-traffic" class="action-btn active" title="Пробки">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
+      </svg>
+    </button>
+    <button id="btn-provider" class="action-btn active" title="Сменить карту: Яндекс / OSM">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"></polygon>
+        <line x1="8" y1="2" x2="8" y2="18"></line>
+        <line x1="16" y1="6" x2="16" y2="22"></line>
+      </svg>
+    </button>
+    <button id="btn-recenter" class="action-btn" title="Мое местоположение">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="10"></circle>
+        <line x1="22" y1="12" x2="18" y2="12"></line>
+        <line x1="6" y1="12" x2="2" y2="12"></line>
+        <line x1="12" y1="6" x2="12" y2="2"></line>
+        <line x1="12" y1="22" x2="12" y2="18"></line>
+      </svg>
+    </button>
+  </div>
+
+  <!-- Bottom Speedometer Overlay -->
+  <div class="bottom-telemetry-hud">
+    <div id="speedometer-val" class="speed-value">0</div>
+    <div class="speed-unit" data-i18n="kmh">км/ч</div>
+  </div>
+
+  <!-- Scripts -->
+  <script src="js/config.js"></script>
+  <script src="js/realtime.js"></script>
+  <script src="js/maps/map-engine.js"></script>
+  <script src="js/tesla-cockpit.js"></script>
+</body>
+</html>

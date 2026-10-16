@@ -1,0 +1,299 @@
+/* Tesla Phone Remote Stylesheet */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600;700&family=Space+Grotesk:wght@600;700&display=swap');
+
+:root {
+  --bg-dark: #0b0f17;
+  --bg-card: #141923;
+  --bg-card-subtle: #1c2230;
+  --border-card: rgba(255, 255, 255, 0.08);
+
+  --primary-cyan: #00f0ff;
+  --primary-blue: #2563eb;
+  --accent-green: #10b981;
+  --accent-red: #ef4444;
+
+  --text-high: #ffffff;
+  --text-med: rgba(255, 255, 255, 0.70);
+  --text-low: rgba(255, 255, 255, 0.40);
+
+  --font-display: 'Space Grotesk', -apple-system, sans-serif;
+  --font-telemetry: 'JetBrains Mono', monospace;
+  --font-body: 'Inter', sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  -webkit-tap-highlight-color: transparent;
+}
+
+body {
+  background-color: var(--bg-dark);
+  color: var(--text-high);
+  font-family: var(--font-body);
+  padding: 16px;
+  max-width: 480px;
+  margin: 0 auto;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* Header */
+.remote-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 4px 0;
+}
+
+.remote-badge {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--primary-cyan);
+  text-transform: uppercase;
+}
+
+.lang-toggle-btn {
+  background: rgba(255, 255, 255, 0.08);
+  border: none;
+  color: #fff;
+  padding: 4px 10px;
+  border-radius: 8px;
+  font-family: var(--font-telemetry);
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+/* Pairing Code Card */
+.phone-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-card);
+  border-radius: 20px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.pairing-title {
+  font-size: 12px;
+  color: var(--text-med);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-weight: 600;
+}
+
+.pairing-code-display {
+  font-family: var(--font-display);
+  font-size: 32px;
+  font-weight: 700;
+  color: #ffffff;
+  letter-spacing: 0.04em;
+}
+
+.connection-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  border-radius: 12px;
+  font-size: 13px;
+  font-weight: 600;
+  width: fit-content;
+}
+
+.connection-pill.connected {
+  background: rgba(16, 185, 129, 0.15);
+  color: var(--accent-green);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.connection-pill.disconnected {
+  background: rgba(239, 68, 68, 0.15);
+  color: var(--accent-red);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+.pill-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+/* Big Action Button (Share GPS) */
+.btn-share-gps {
+  background: linear-gradient(135deg, #1d4ed8 0%, #2563eb 100%);
+  color: #ffffff;
+  border: none;
+  border-radius: 18px;
+  padding: 18px 24px;
+  font-family: var(--font-display);
+  font-size: 18px;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  box-shadow: 0 10px 25px -5px rgba(37, 99, 235, 0.5);
+  transition: all 0.2s;
+}
+
+.btn-share-gps:active {
+  transform: scale(0.98);
+}
+
+.btn-share-gps.active {
+  background: linear-gradient(135deg, #059669 0%, #10b981 100%);
+  box-shadow: 0 10px 25px -5px rgba(16, 185, 129, 0.5);
+}
+
+.satellite-icon {
+  width: 24px;
+  height: 24px;
+}
+
+/* Search Card ("Where to?") */
+.card-section-title {
+  font-family: var(--font-display);
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  color: var(--text-med);
+  text-transform: uppercase;
+}
+
+.input-group {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.search-input-wrap {
+  display: flex;
+  align-items: center;
+  background: var(--bg-card-subtle);
+  border: 1px solid var(--border-card);
+  border-radius: 14px;
+  padding: 4px 12px;
+  gap: 10px;
+}
+
+.search-input-wrap input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  color: #ffffff;
+  font-family: var(--font-body);
+  font-size: 15px;
+  padding: 10px 0;
+  outline: none;
+}
+
+.search-input-wrap input::placeholder {
+  color: var(--text-low);
+}
+
+.icon-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-med);
+  cursor: pointer;
+  padding: 6px;
+  display: grid;
+  place-items: center;
+  border-radius: 8px;
+}
+
+.icon-btn:hover {
+  color: #ffffff;
+}
+
+.action-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.btn-secondary {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--border-card);
+  color: #ffffff;
+  border-radius: 12px;
+  padding: 12px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  text-align: center;
+}
+
+.btn-primary-action {
+  background: var(--primary-blue);
+  border: none;
+  color: #ffffff;
+  border-radius: 12px;
+  padding: 12px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  text-align: center;
+}
+
+/* Speedometer & Live Telemetry */
+.speedometer-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--bg-card);
+  border: 1px solid var(--border-card);
+  border-radius: 20px;
+  padding: 20px;
+}
+
+.speed-display {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.phone-speed-val {
+  font-family: var(--font-display);
+  font-size: 52px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.phone-speed-unit {
+  font-size: 16px;
+  color: var(--text-low);
+  font-weight: 600;
+}
+
+.telemetry-stats {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  text-align: right;
+  font-family: var(--font-telemetry);
+  font-size: 12px;
+  color: var(--text-med);
+}
+
+/* Guidance Footer */
+.guidance-box {
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--border-card);
+  border-radius: 14px;
+  padding: 14px;
+  font-size: 12px;
+  color: var(--text-low);
+  line-height: 1.5;
+  text-align: center;
+}

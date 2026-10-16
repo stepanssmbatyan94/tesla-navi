@@ -1,0 +1,671 @@
+/* Tesla In-Car Display Stylesheet (DESIGN.md Compliant) */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap');
+
+:root {
+  --bg-cockpit: #0b0f17;
+  --bg-surface: rgba(18, 22, 32, 0.92);
+  --bg-surface-elevated: #1e2433;
+  --border-subtle: rgba(255, 255, 255, 0.10);
+  --border-focus: rgba(0, 102, 255, 0.6);
+  
+  --primary-cyan: #00f0ff;
+  --primary-blue: #0066ff;
+  --accent-green: #10b981;
+  --accent-amber: #f59e0b;
+  --accent-red: #ef4444;
+
+  --text-high: #ffffff;
+  --text-med: rgba(255, 255, 255, 0.75);
+  --text-low: rgba(255, 255, 255, 0.45);
+
+  --font-display: 'Space Grotesk', -apple-system, sans-serif;
+  --font-telemetry: 'JetBrains Mono', monospace;
+  --font-body: 'Inter', sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+}
+
+html, body {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background-color: var(--bg-cockpit);
+  color: var(--text-high);
+  font-family: var(--font-body);
+}
+
+/* Full-bleed Map Viewport */
+#map-container {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: 1;
+}
+
+/* Top Floating Search & Route Launcher (Like tmap.ge) */
+.search-route-container {
+  position: absolute;
+  top: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 60;
+  width: 600px;
+  max-width: 90vw;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.search-route-container.hidden {
+  opacity: 0;
+  pointer-events: none;
+  transform: translate(-50%, -20px);
+}
+
+.search-input-card {
+  position: relative;
+  display: flex;
+  align-items: center;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: 20px;
+  padding: 6px 10px 6px 18px;
+  backdrop-filter: blur(24px);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.5);
+  gap: 12px;
+}
+
+.search-icon {
+  color: var(--text-med);
+  display: grid;
+  place-items: center;
+}
+
+.search-input-field {
+  flex: 1;
+  background: transparent;
+  border: none;
+  color: #ffffff;
+  font-family: var(--font-body);
+  font-size: 16px;
+  font-weight: 500;
+  padding: 12px 0;
+  outline: none;
+}
+
+.search-input-field::placeholder {
+  color: var(--text-low);
+}
+
+.btn-go-action {
+  background: var(--primary-blue);
+  color: #ffffff;
+  border: none;
+  border-radius: 14px;
+  padding: 12px 24px;
+  font-family: var(--font-display);
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  box-shadow: 0 4px 16px rgba(0, 102, 255, 0.4);
+  transition: all 0.2s;
+}
+
+.btn-go-action:active {
+  transform: scale(0.96);
+  background: #0052cc;
+}
+
+/* Auto-suggestions Dropdown */
+.search-suggestions-dropdown {
+  position: absolute;
+  top: 74px;
+  left: 0;
+  right: 0;
+  background: #141923; /* Solid opaque high-contrast background */
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 20px;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.92);
+  overflow-y: auto;
+  max-height: 380px;
+  display: none;
+  flex-direction: column;
+  z-index: 1000;
+}
+
+.suggestion-item {
+  padding: 14px 18px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  transition: background 0.15s;
+}
+
+.suggestion-item:last-child {
+  border-bottom: none;
+}
+
+.suggestion-item:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.suggestion-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: #ffffff;
+}
+
+.suggestion-sub {
+  font-size: 12px;
+  color: var(--text-low);
+}
+
+/* Quick Category Chips Underneath Search */
+.search-categories-row {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+}
+
+.category-pill {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: 24px;
+  padding: 8px 16px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-high);
+  cursor: pointer;
+  backdrop-filter: blur(16px);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+  transition: all 0.2s;
+}
+
+.category-pill:hover {
+  background: rgba(255, 255, 255, 0.15);
+  border-color: rgba(255, 255, 255, 0.25);
+}
+
+/* Top Floating Turn-by-Turn HUD Banner */
+.hud-banner {
+  position: absolute;
+  top: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 70;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  background: linear-gradient(135deg, #005ce6 0%, #0066ff 100%);
+  border: 2px solid rgba(255, 255, 255, 0.35);
+  box-shadow: 0 16px 40px -10px rgba(0, 102, 255, 0.6);
+  border-radius: 24px;
+  padding: 16px 28px;
+  min-width: 540px;
+  max-width: 90vw;
+  backdrop-filter: blur(20px);
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.hud-banner.hidden {
+  opacity: 0;
+  pointer-events: none;
+  transform: translate(-50%, -30px);
+}
+
+.hud-arrow-icon {
+  width: 56px;
+  height: 56px;
+  display: grid;
+  place-items: center;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 18px;
+  color: #ffffff;
+}
+
+.hud-arrow-icon svg {
+  width: 36px;
+  height: 36px;
+}
+
+.hud-content {
+  flex: 1;
+}
+
+.hud-distance-street {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+}
+
+.hud-distance {
+  font-family: var(--font-display);
+  font-size: 38px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: #ffffff;
+}
+
+.hud-street {
+  font-family: var(--font-display);
+  font-size: 22px;
+  font-weight: 600;
+  color: #ffffff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 280px;
+}
+
+.hud-telemetry {
+  display: flex;
+  gap: 16px;
+  margin-top: 4px;
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.9);
+  font-weight: 500;
+}
+
+.btn-end-route {
+  background: rgba(239, 68, 68, 0.95);
+  color: #ffffff;
+  border: none;
+  border-radius: 14px;
+  padding: 12px 20px;
+  font-family: var(--font-display);
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-end-route:active {
+  transform: scale(0.96);
+  background: #dc2626;
+}
+
+/* Floating Cockpit Sidebar (Left) */
+.cockpit-sidebar {
+  position: absolute;
+  top: 20px;
+  left: 20px;
+  bottom: 20px;
+  width: 390px;
+  z-index: 50;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  backdrop-filter: blur(24px);
+  border-radius: 28px;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.6);
+  overflow-y: auto;
+}
+
+/* Header & Brand */
+.brand-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.brand-title-wrap {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.brand-logo-icon {
+  width: 36px;
+  height: 36px;
+  background: linear-gradient(135deg, var(--primary-cyan) 0%, var(--primary-blue) 100%);
+  border-radius: 10px;
+  display: grid;
+  place-items: center;
+  color: #000;
+  font-weight: 900;
+  font-size: 18px;
+}
+
+.brand-text {
+  font-family: var(--font-display);
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.brand-region-badge {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
+  color: var(--primary-cyan);
+}
+
+/* Language Selector */
+.lang-selector {
+  display: flex;
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 10px;
+  padding: 3px;
+  gap: 2px;
+}
+
+.lang-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-med);
+  font-family: var(--font-telemetry);
+  font-size: 11px;
+  font-weight: 600;
+  padding: 5px 8px;
+  border-radius: 7px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.lang-btn.active {
+  background: #ffffff;
+  color: #000000;
+}
+
+/* Commute Tiles (Home / Work) */
+.commute-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.commute-tile {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border-subtle);
+  border-radius: 16px;
+  padding: 14px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.commute-tile:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.15);
+}
+
+.commute-icon {
+  font-size: 20px;
+}
+
+.commute-label {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.commute-sub {
+  font-size: 11px;
+  color: var(--text-low);
+}
+
+/* Phone Pairing Card */
+.pairing-card {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border-subtle);
+  border-radius: 20px;
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.pairing-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.pairing-title {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  color: var(--text-med);
+  text-transform: uppercase;
+}
+
+.pairing-body {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+}
+
+.qr-wrapper {
+  background: #ffffff;
+  padding: 8px;
+  border-radius: 14px;
+  width: 104px;
+  height: 104px;
+  display: grid;
+  place-items: center;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+}
+
+.qr-wrapper img {
+  width: 88px;
+  height: 88px;
+  display: block;
+}
+
+.pairing-details {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.pairing-code-label {
+  font-size: 11px;
+  color: var(--text-low);
+}
+
+.pairing-code {
+  font-family: var(--font-telemetry);
+  font-size: 28px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  color: var(--primary-cyan);
+}
+
+.pairing-status-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 20px;
+  width: fit-content;
+}
+
+.pairing-status-chip.waiting {
+  background: rgba(245, 158, 11, 0.15);
+  color: var(--accent-amber);
+}
+
+.pairing-status-chip.connected {
+  background: rgba(16, 185, 129, 0.15);
+  color: var(--accent-green);
+}
+
+.pairing-status-chip.disconnected {
+  background: rgba(239, 68, 68, 0.15);
+  color: var(--accent-red);
+}
+
+.pairing-status-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+  animation: pulseDot 2s infinite;
+}
+
+@keyframes pulseDot {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.4; transform: scale(0.8); }
+}
+
+/* Telemetry Grid */
+.telemetry-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.telemetry-cell {
+  background: rgba(255, 255, 255, 0.02);
+  padding: 8px 10px;
+  border-radius: 10px;
+}
+
+.telemetry-label {
+  font-family: var(--font-telemetry);
+  font-size: 10px;
+  color: var(--text-low);
+  text-transform: uppercase;
+}
+
+.telemetry-val {
+  font-family: var(--font-telemetry);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-high);
+  margin-top: 2px;
+}
+
+/* Right Quick Actions Bar */
+.actions-bar {
+  position: absolute;
+  top: 50%;
+  right: 20px;
+  transform: translateY(-50%);
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.action-btn {
+  width: 54px;
+  height: 54px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: 18px;
+  color: var(--text-high);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  backdrop-filter: blur(20px);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+  transition: all 0.2s;
+}
+
+.action-btn:hover {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.action-btn.active {
+  background: var(--primary-blue);
+  color: #ffffff;
+  border-color: #3b82f6;
+}
+
+.action-btn svg {
+  width: 24px;
+  height: 24px;
+}
+
+/* Bottom Speedometer Overlay */
+.bottom-telemetry-hud {
+  position: absolute;
+  bottom: 24px;
+  right: 24px;
+  z-index: 50;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: 24px;
+  padding: 16px 24px;
+  backdrop-filter: blur(20px);
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.5);
+}
+
+.speed-value {
+  font-family: var(--font-display);
+  font-size: 64px;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -0.04em;
+  color: #ffffff;
+}
+
+.speed-unit {
+  font-family: var(--font-display);
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text-low);
+}
+
+/* Custom Navigation Chevron / Vehicle Marker (Vivid Royal Blue & White Outline like tmap.ge) */
+.tesla-car-marker {
+  position: relative;
+  width: 48px;
+  height: 48px;
+  transition: transform 0.25s linear;
+}
+
+.tesla-car-pulse {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: rgba(0, 102, 255, 0.35);
+  animation: radarPulse 2s infinite ease-out;
+}
+
+@keyframes radarPulse {
+  0% { transform: scale(0.6); opacity: 0.9; }
+  100% { transform: scale(2.4); opacity: 0; }
+}
+
+.tesla-car-body {
+  position: relative;
+  z-index: 2;
+  filter: drop-shadow(0 4px 14px rgba(0, 102, 255, 0.8));
+}
