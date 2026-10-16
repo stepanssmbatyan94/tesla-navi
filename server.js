@@ -50,6 +50,43 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+// Helper: Parse coordinates directly from Yandex Maps protobuf URI
+function parseYandexGeoUri(uri) {
+  if (!uri || !uri.includes('data=')) return null;
+  try {
+    const raw = uri.split('data=')[1].replace(/,/g, '');
+    const buf = Buffer.from(decodeURIComponent(raw), 'base64');
+    for (let i = 0; i <= buf.length - 10; i++) {
+      if (buf[i] === 0x0d && buf[i + 5] === 0x15) {
+        const lng = buf.readFloatLE(i + 1);
+        const lat = buf.readFloatLE(i + 6);
+        if (lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180 && !isNaN(lat) && !isNaN(lng)) {
+          return { lat, lng };
+        }
+      }
+    }
+  } catch (e) {}
+  return null;
+}
+
+// Helper: Resolve organization coordinates by oid
+async function resolveYandexOrgCoords(oid) {
+  try {
+    const url = `https://yandex.com/maps/org/${oid}`;
+    const res = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)' } });
+    const html = await res.text();
+    const match = html.match(/class="state-view">([^<]+)<\/script>/);
+    if (match) {
+      const data = JSON.parse(match[1]);
+      const coords = data.stack?.[0]?.results?.items?.[0]?.coordinates;
+      if (coords && coords.length === 2) {
+        return { lat: coords[1], lng: coords[0] };
+      }
+    }
+  } catch (e) {}
+  return null;
+}
+
   // API 1: /api/resolve-location (Resolves Google Maps links, coordinates, or search queries)
   if (pathname === '/api/resolve-location') {
     const input = (parsedUrl.searchParams.get('url') || parsedUrl.searchParams.get('q') || '').trim();
@@ -75,7 +112,33 @@ const server = http.createServer(async (req, res) => {
         }
       }
 
-      // High-precision Photon fuzzy search first (understands Latin & Armenian transliterations)
+      // 1. Try Yandex Maps Suggest first (Best for Armenia villages, addresses, Russian & Armenian names)
+      if (!coords) {
+        try {
+          const yUrl = `https://suggest-maps.yandex.ru/suggest-geo?v=9&search_type=all&part=${encodeURIComponent(input)}&lang=ru_RU&n=3&origin=maps-form&ll=44.5125,40.1776&spn=1.8,1.8`;
+          const yRes = await fetch(yUrl, { headers: { 'User-Agent': 'Mozilla/5.0' } });
+          const yText = await yRes.text();
+          const yJson = JSON.parse(yText.replace(/^[^({]*\(/, '').replace(/\);?$/, ''));
+          if (yJson.results && yJson.results.length > 0) {
+            for (const r of yJson.results) {
+              let geo = parseYandexGeoUri(r.uri);
+              if (!geo && r.uri && r.uri.includes('oid=')) {
+                const m = r.uri.match(/oid=(\d+)/);
+                if (m) geo = await resolveYandexOrgCoords(m[1]);
+              }
+              if (geo) {
+                const name = r.title ? r.title.text : input;
+                coords = { name, lat: geo.lat, lng: geo.lng };
+                break;
+              }
+            }
+          }
+        } catch (e) {
+          console.warn('Yandex Suggest resolve error:', e.message);
+        }
+      }
+
+      // 2. High-precision Photon fuzzy search fallback
       if (!coords) {
         try {
           const photonUrl = `https://photon.komoot.io/api/?q=${encodeURIComponent(input)}&lat=40.18&lon=44.49&limit=1`;
@@ -96,7 +159,7 @@ const server = http.createServer(async (req, res) => {
         }
       }
 
-      // Nominatim Fallback
+      // 3. Nominatim Fallback
       if (!coords) {
         const nomUrl = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(input)}&countrycodes=am,ge&addressdetails=1&limit=1`;
         const nomRes = await fetch(nomUrl, { headers: { 'User-Agent': 'TeslaNavi/1.0 (stepansmbatyan94@gmail.com)' } });
@@ -125,9 +188,11 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  // API 2: /api/geocode (Auto-suggestions with Photon multilingual search)
+  // API 2: /api/geocode (Authentic Yandex Maps search suggestions + village/province resolution)
   if (pathname === '/api/geocode') {
     const q = (parsedUrl.searchParams.get('q') || '').trim();
+    const userLat = parseFloat(parsedUrl.searchParams.get('lat')) || 40.1776;
+    const userLng = parseFloat(parsedUrl.searchParams.get('lng')) || 44.5125;
     if (!q || q.length < 2) {
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify([]));
@@ -135,45 +200,71 @@ const server = http.createServer(async (req, res) => {
     }
 
     try {
-      // 1. Try Photon (Best for Armenian, Russian, Latin transliterations like "hakob hakobyan 3")
-      const photonUrl = `https://photon.komoot.io/api/?q=${encodeURIComponent(q)}&lat=40.18&lon=44.49&limit=6`;
-      const pRes = await fetch(photonUrl);
-      const pData = await pRes.json();
+      // 1. Primary: Yandex Maps Suggest API (armenia bounding box, exact village, street & region names)
+      const yandexSuggestUrl = `https://suggest-maps.yandex.ru/suggest-geo?v=9&search_type=all&part=${encodeURIComponent(q)}&lang=ru_RU&n=8&origin=maps-form&ll=${userLng},${userLat}&spn=1.8,1.8`;
+      const yRes = await fetch(yandexSuggestUrl, { headers: { 'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)' } });
+      const yText = await yRes.text();
+      const yJson = JSON.parse(yText.replace(/^[^({]*\(/, '').replace(/\);?$/, ''));
 
       let items = [];
-      if (pData.features && pData.features.length > 0) {
-        items = pData.features.map(f => {
-          const p = f.properties;
-          const title = [p.housenumber, p.name || p.street].filter(Boolean).join(' ') || q;
-          const subtitle = [p.district || p.city, p.country || 'Հայաստան'].filter(Boolean).join(', ');
-          return {
-            title,
-            subtitle,
-            lat: f.geometry.coordinates[1],
-            lng: f.geometry.coordinates[0]
-          };
-        });
+      if (yJson.results && yJson.results.length > 0) {
+        const rawItems = [];
+        for (const r of yJson.results) {
+          const title = r.title ? r.title.text : q;
+          const subtitle = r.subtitle ? r.subtitle.text : (r.where?.name || 'Армения');
+          let coords = parseYandexGeoUri(r.uri);
+          let oid = null;
+          if (r.uri && r.uri.includes('oid=')) {
+            const m = r.uri.match(/oid=(\d+)/);
+            if (m) oid = m[1];
+          }
+          rawItems.push({ title, subtitle, coords, oid, uri: r.uri });
+        }
+
+        // Parallel resolve organization coords for entries without protobuf data
+        await Promise.all(rawItems.slice(0, 4).map(async (item) => {
+          if (!item.coords && item.oid) {
+            item.coords = await resolveYandexOrgCoords(item.oid);
+          }
+        }));
+
+        items = rawItems
+          .filter(it => it.coords && it.coords.lat && it.coords.lng)
+          .map(it => ({
+            title: it.title,
+            subtitle: it.subtitle,
+            lat: it.coords.lat,
+            lng: it.coords.lng
+          }));
       }
 
-      // 2. If Photon returned few or empty, merge with Nominatim
+      // 2. If Yandex returned few or query is in English/Armenian Latin, merge with Photon
       if (items.length < 2) {
         try {
-          const nomUrl = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q)}&countrycodes=am,ge&addressdetails=1&limit=4`;
-          const nomRes = await fetch(nomUrl, { headers: { 'User-Agent': 'TeslaNavi/1.0 (stepansmbatyan94@gmail.com)' } });
-          const nomResults = await nomRes.json();
-          const nomItems = (nomResults || []).map(r => ({
-            title: r.display_name.split(',')[0],
-            subtitle: r.display_name.split(',').slice(1, 3).join(',').trim(),
-            lat: parseFloat(r.lat),
-            lng: parseFloat(r.lon)
-          }));
-          items = items.concat(nomItems);
+          const photonUrl = `https://photon.komoot.io/api/?q=${encodeURIComponent(q)}&lat=${userLat}&lon=${userLng}&limit=6`;
+          const pRes = await fetch(photonUrl);
+          const pData = await pRes.json();
+          if (pData.features && pData.features.length > 0) {
+            const photonItems = pData.features.map(f => {
+              const p = f.properties;
+              const title = [p.housenumber, p.name || p.street].filter(Boolean).join(' ') || q;
+              const subtitle = [p.district || p.city, p.country || 'Армения'].filter(Boolean).join(', ');
+              return {
+                title,
+                subtitle,
+                lat: f.geometry.coordinates[1],
+                lng: f.geometry.coordinates[0]
+              };
+            });
+            items = items.concat(photonItems);
+          }
         } catch (e) {}
       }
 
       res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify(items.slice(0, 6)));
+      res.end(JSON.stringify(items.slice(0, 8)));
     } catch (err) {
+      console.warn('Geocode handler error:', err.message);
       res.writeHead(500, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify([]));
     }

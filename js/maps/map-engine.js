@@ -576,16 +576,28 @@ class TeslaMapEngine {
     const dest = this.activeRoute.destination;
     const distToDest = this.calculateDistance(currentLat, currentLng, dest.lat, dest.lng);
 
-    // Update bottom traffic progress bar cursor
-    if (this.totalDistance > 0) {
-      const remainingRatio = Math.max(0, Math.min(1, distToDest / this.totalDistance));
-      const progressPercent = Math.round((1 - remainingRatio) * 100);
+    // Update bottom traffic progress bar cursor (accurate polyline projection, starts strictly at 0%)
+    if (this.routeCoordinates && this.routeCoordinates.length > 1) {
+      let closestIdx = 0;
+      let minDist = Infinity;
+      const startSearch = Math.max(0, (this.lastProgressIndex || 0) - 2);
+      const endSearch = Math.min(this.routeCoordinates.length, startSearch + 40);
+      for (let i = startSearch; i < endSearch; i++) {
+        const pt = this.routeCoordinates[i];
+        const d = this.calculateDistance(currentLat, currentLng, pt[1], pt[0]);
+        if (d < minDist) {
+          minDist = d;
+          closestIdx = i;
+        }
+      }
+      this.lastProgressIndex = Math.max(this.lastProgressIndex || 0, closestIdx);
+      const progressPercent = Math.min(96, Math.round((this.lastProgressIndex / (this.routeCoordinates.length - 1)) * 100));
       this.onProgressUpdate(progressPercent);
     }
 
     // Destination Arrival
     if (distToDest < 25) {
-      this.speakVoice(I18N[window.CURRENT_LANG || 'ru'].voiceArrived);
+      this.speakVoice('Вы прибыли в пункт назначения');
       this.onArrival(dest);
       this.cancelRoute();
       return;
@@ -613,11 +625,13 @@ class TeslaMapEngine {
         lanes: activeStep.lanes || null
       });
 
-      // Voice announcements at 250m and 50m
+      // Voice announcements at 250m and 50m (Yandex Navigator phraseology)
       if (this.voiceEnabled) {
         if (activeDist <= 260 && activeDist >= 200 && !this.spokenDistanceThresholds['250']) {
           this.spokenDistanceThresholds['250'] = true;
-          this.speakVoice(`${this.getTurnSpeech(activeStep.modifier)} через 250 метров`);
+          const turnText = this.getTurnSpeech(activeStep.modifier);
+          const streetText = activeStep.name ? ` на ${activeStep.name}` : '';
+          this.speakVoice(`Через 250 метров ${turnText.toLowerCase()}${streetText}`);
         } else if (activeDist <= 70 && activeDist >= 30 && !this.spokenDistanceThresholds['50']) {
           this.spokenDistanceThresholds['50'] = true;
           this.speakVoice(this.getTurnSpeech(activeStep.modifier));
@@ -664,17 +678,65 @@ class TeslaMapEngine {
     return dict.voiceStraight;
   }
 
+  // Authentic High-Tech Navigation Audio Chime (880Hz -> 1320Hz ping)
+  playNavChime() {
+    try {
+      const AudioCtx = window.AudioContext || window.webkitAudioContext;
+      if (!AudioCtx) return;
+      if (!this.audioCtx) this.audioCtx = new AudioCtx();
+      if (this.audioCtx.state === 'suspended') this.audioCtx.resume();
+
+      const ctx = this.audioCtx;
+      const now = ctx.currentTime;
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(880, now);
+      osc.frequency.exponentialRampToValueAtTime(1320, now + 0.07);
+
+      gain.gain.setValueAtTime(0.0001, now);
+      gain.gain.exponentialRampToValueAtTime(0.18, now + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.25);
+
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+
+      osc.start(now);
+      osc.stop(now + 0.26);
+    } catch (e) {}
+  }
+
+  // Select the highest-quality Russian natural female voice (like Yandex Alisa / Siri Milena)
+  getBestRussianVoice() {
+    if (!('speechSynthesis' in window)) return null;
+    const voices = window.speechSynthesis.getVoices() || [];
+    const alisa = voices.find(v => /alisa|yandex/i.test(v.name));
+    if (alisa) return alisa;
+    const milena = voices.find(v => /milena|katya/i.test(v.name));
+    if (milena) return milena;
+    const neural = voices.find(v => /svetlana|dariya|irina/i.test(v.name));
+    if (neural) return neural;
+    const google = voices.find(v => /google.*(рус|ru)/i.test(v.name));
+    if (google) return google;
+    return voices.find(v => v.lang && v.lang.startsWith('ru')) || null;
+  }
+
+  // Voice output matching Yandex Navigator audio cues
   speakVoice(text) {
     if (!this.voiceEnabled || !('speechSynthesis' in window)) return;
     try {
-      window.speechSynthesis.cancel();
-      const utterance = new SpeechSynthesisUtterance(text);
-      utterance.rate = 1.05;
-      const lang = window.CURRENT_LANG || 'ru';
-      if (lang === 'hy') utterance.lang = 'hy-AM';
-      else if (lang === 'en') utterance.lang = 'en-US';
-      else utterance.lang = 'ru-RU';
-      window.speechSynthesis.speak(utterance);
+      this.playNavChime();
+      setTimeout(() => {
+        window.speechSynthesis.cancel();
+        const utterance = new SpeechSynthesisUtterance(text);
+        const voice = this.getBestRussianVoice();
+        if (voice) utterance.voice = voice;
+        utterance.lang = 'ru-RU';
+        utterance.rate = 1.02;
+        utterance.pitch = 1.04;
+        window.speechSynthesis.speak(utterance);
+      }, 130);
     } catch (e) {
       console.warn('SpeechSynthesis error:', e);
     }
@@ -801,8 +863,12 @@ class TeslaMapEngine {
       eta: `${etaHours}:${etaMins}`,
       name: destination.name || 'Маршрут',
       steps: this.routeSteps,
-      alternative: altInfo
+      alternative: altInfo,
+      trafficSegments: trafficSegments || [{ coords: coordinates, color: '#82ea0d' }]
     };
+
+    this.lastProgressIndex = 0;
+    this.onProgressUpdate(0);
 
     return routeInfo;
   }
@@ -1053,11 +1119,16 @@ class TeslaMapEngine {
   startNavigation() {
     this.isNavigating = true;
     this.offRouteCounter = 0;
+    this.lastProgressIndex = 0;
+    this.onProgressUpdate(0);
+    this.speakVoice('Маршрут построен. Поехали!');
   }
 
   cancelRoute() {
     this.activeRoute = null;
     this.isNavigating = false;
+    this.lastProgressIndex = 0;
+    this.onProgressUpdate(0);
     this.routeCoordinates = [];
     this.alternativeCoordinates = null;
     this.routeSteps = [];

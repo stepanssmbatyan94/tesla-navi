@@ -393,8 +393,7 @@ function initToolbarHandlers() {
       if (currentRouteInfo) {
         showNavigationHud(currentRouteInfo);
         if (mapEngine) {
-          mapEngine.startNavigation(); // Activates movement tracking & off-route rerouting
-          mapEngine.speakVoice('Маршрут построен. В путь!');
+          mapEngine.startNavigation(); // Activates movement tracking, audio cue & off-route rerouting
           mapEngine.recenter();
         }
       }
@@ -515,7 +514,7 @@ function initSearchHandlers() {
   const searchDrawer = document.getElementById('search-drawer');
   let debounceTimer = null;
 
-  // Autocomplete typing with Photon geocoder
+  // Autocomplete typing with Yandex-powered geocoder
   searchInput.addEventListener('input', () => {
     clearTimeout(debounceTimer);
     const query = searchInput.value.trim();
@@ -524,22 +523,22 @@ function initSearchHandlers() {
 
     debounceTimer = setTimeout(async () => {
       try {
-        const photonUrl = `https://photon.komoot.io/api/?q=${encodeURIComponent(query)}&lat=40.18&lon=44.49&limit=6`;
-        const res = await fetch(photonUrl);
-        const data = await res.json();
+        const cur = mapEngine ? mapEngine.currentPosition : { lat: 40.1776, lng: 44.5125 };
+        const url = `/api/geocode?q=${encodeURIComponent(query)}&lat=${cur.lat}&lng=${cur.lng}`;
+        const res = await fetch(url);
+        const items = await res.json();
 
         resultsList.innerHTML = '';
 
-        if (data.features && data.features.length > 0) {
-          data.features.forEach(f => {
-            const p = f.properties;
-            const title = [p.housenumber, p.name || p.street].filter(Boolean).join(' ') || query;
-            const subtitle = [p.district || p.city, p.country || 'Armenia'].filter(Boolean).join(', ');
-            const lat = f.geometry.coordinates[1];
-            const lng = f.geometry.coordinates[0];
+        if (items && items.length > 0) {
+          items.forEach(it => {
+            const title = it.title || query;
+            const subtitle = it.subtitle || 'Армения';
+            const lat = it.lat;
+            const lng = it.lng;
 
-            // Calculate distance
-            const distMeters = mapEngine ? mapEngine.calculateDistance(mapEngine.currentPosition.lat, mapEngine.currentPosition.lng, lat, lng) : 1000;
+            // Calculate distance from current vehicle location
+            const distMeters = mapEngine ? mapEngine.calculateDistance(cur.lat, cur.lng, lat, lng) : 1000;
             const distStr = distMeters >= 1000 ? `${(distMeters / 1000).toFixed(1)} км` : `${Math.round(distMeters)} м`;
 
             const item = document.createElement('div');
@@ -694,6 +693,34 @@ function showRouteAlternativesDrawer(route) {
 }
 
 // 7. Navigation HUD Displays
+function renderTrafficProgressBar(segments) {
+  const barContainer = document.querySelector('.route-progress-bar');
+  if (!barContainer) return;
+  barContainer.innerHTML = '';
+
+  if (!segments || segments.length === 0) {
+    barContainer.innerHTML = '<div class="prog-seg green" style="width: 100%; background: #82ea0d;"></div>';
+    return;
+  }
+
+  // Count total coordinates across all segments
+  const totalPoints = segments.reduce((sum, s) => sum + (s.coords ? s.coords.length : 1), 0);
+  if (totalPoints <= 0) {
+    barContainer.innerHTML = '<div class="prog-seg green" style="width: 100%; background: #82ea0d;"></div>';
+    return;
+  }
+
+  segments.forEach(seg => {
+    const pts = seg.coords ? seg.coords.length : 1;
+    const widthPct = (pts / totalPoints) * 100;
+    const segDiv = document.createElement('div');
+    segDiv.className = 'prog-seg';
+    segDiv.style.width = `${widthPct.toFixed(2)}%`;
+    segDiv.style.background = seg.color || '#82ea0d';
+    barContainer.appendChild(segDiv);
+  });
+}
+
 function showNavigationHud(route) {
   document.getElementById('hud-maneuver-card').classList.remove('hidden');
   document.getElementById('bottom-nav-bar').classList.remove('hidden');
@@ -705,6 +732,13 @@ function showNavigationHud(route) {
   document.getElementById('nav-duration').textContent = route.duration;
   document.getElementById('nav-distance').textContent = route.distance;
   document.getElementById('nav-eta').textContent = route.eta;
+
+  // Reset progress car cursor to 0% at route start
+  const cursor = document.getElementById('prog-car-cursor');
+  if (cursor) cursor.style.left = '0%';
+
+  // Render authentic live traffic segments on the bottom progress bar
+  renderTrafficProgressBar(route.trafficSegments);
 }
 
 function updateManeuverHud(m) {
