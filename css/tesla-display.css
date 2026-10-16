@@ -129,37 +129,46 @@ html, body {
   transition: transform 0.2s ease;
 }
 
-/* Floating Recenter Button (Appears when map is dragged/moved by user) */
+/* Floating Recenter Button (Centered horizontally above bottom HUD, impossible to miss) */
 .floating-recenter-btn {
   position: absolute;
-  bottom: 84px;
-  right: 20px;
-  z-index: 58;
-  background: var(--bg-surface);
-  border: 1px solid var(--border-subtle);
-  border-radius: 20px;
-  padding: 8px 16px;
+  bottom: 112px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 85;
+  background: rgba(15, 23, 42, 0.94);
+  border: 1.5px solid rgba(56, 189, 248, 0.5);
+  border-radius: 30px;
+  padding: 10px 24px;
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
   color: #ffffff;
-  font-size: 13px;
+  font-size: 15px;
   font-weight: 700;
   cursor: pointer;
-  backdrop-filter: blur(16px);
-  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.45);
-  transition: all 0.25s ease;
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  box-shadow: 0 12px 35px rgba(0, 0, 0, 0.65), 0 0 20px rgba(56, 189, 248, 0.25);
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  white-space: nowrap;
 }
 
 .floating-recenter-btn:hover {
-  background: rgba(255, 255, 255, 0.16);
-  transform: scale(1.04);
+  background: rgba(30, 41, 59, 0.98);
+  border-color: rgba(56, 189, 248, 0.85);
+  transform: translateX(-50%) scale(1.05);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.75), 0 0 25px rgba(56, 189, 248, 0.4);
+}
+
+.floating-recenter-btn:active {
+  transform: translateX(-50%) scale(0.96);
 }
 
 .floating-recenter-btn.hidden {
   opacity: 0;
   pointer-events: none;
-  transform: translateY(12px);
+  transform: translateX(-50%) translateY(16px);
 }
 
 /* 3. Sliding Search Drawer (Left Drawer, Sleek & Fully Closable) */
