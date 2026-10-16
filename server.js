@@ -78,7 +78,9 @@ async function resolveYandexOrgCoords(oid) {
     const match = html.match(/class="state-view">([^<]+)<\/script>/);
     if (match) {
       const data = JSON.parse(match[1]);
-      const coords = data.stack?.[0]?.results?.items?.[0]?.coordinates;
+      const coords = data.stack?.[0]?.results?.items?.[0]?.coordinates ||
+                     data.stack?.[0]?.stops?.data?.coordinates ||
+                     data.card?.coordinates;
       if (coords && coords.length === 2) {
         return { lat: coords[1], lng: coords[0] };
       }
@@ -103,20 +105,42 @@ async function fetchYandexSuggestResults(q, userLng = 44.5125, userLat = 40.1776
 
   let results = await doReq(q, 'ru_RU');
 
-  // If empty and multi-word, try reversed word order (e.g. "армавир нораван" -> "нораван армавир")
-  if (results.length === 0 && q.includes(' ')) {
-    const words = q.trim().split(/\s+/);
-    if (words.length >= 2) {
+  // Handle multi-word input (e.g. "армавир норава", "армавир нораван")
+  const words = q.trim().split(/\s+/);
+  if (words.length >= 2) {
+    // 2a. If direct returned few (< 2), try reversed word order (e.g. "нораван армавир")
+    if (results.length < 2) {
       const reversed = words.slice().reverse().join(' ');
-      results = await doReq(reversed, 'ru_RU');
+      const revResults = await doReq(reversed, 'ru_RU');
+      if (revResults.length > results.length) {
+        results = revResults;
+      }
+    }
+
+    // 2b. If still few (< 2), search by target place prefix (last word) and rank by region/context (first words)
+    if (results.length < 2) {
+      const placeWord = words[words.length - 1];
+      const contextWord = words.slice(0, words.length - 1).join(' ').toLowerCase();
+      const placeResults = await doReq(placeWord, 'ru_RU');
+      if (placeResults.length > 0) {
+        placeResults.sort((a, b) => {
+          const textA = `${a.title.text} ${a.subtitle?.text || ''} ${a.where?.name || ''}`.toLowerCase();
+          const textB = `${b.title.text} ${b.subtitle?.text || ''} ${b.where?.name || ''}`.toLowerCase();
+          const matchA = textA.includes(contextWord);
+          const matchB = textB.includes(contextWord);
+          if (matchA && !matchB) return -1;
+          if (!matchA && matchB) return 1;
+          return 0;
+        });
+        results = placeResults;
+      }
     }
   }
 
-  // If still empty, try en_US (for English queries like "armavir noravan")
+  // 3. If still empty, try en_US (for English queries like "armavir noravan")
   if (results.length === 0) {
     results = await doReq(q, 'en_US');
-    if (results.length === 0 && q.includes(' ')) {
-      const words = q.trim().split(/\s+/);
+    if (results.length === 0 && words.length >= 2) {
       const reversed = words.slice().reverse().join(' ');
       results = await doReq(reversed, 'en_US');
     }
