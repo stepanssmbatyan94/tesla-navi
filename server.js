@@ -383,13 +383,74 @@ async function fetchYandexSuggestResults(q, userLng = 44.5125, userLat = 40.1776
               curIdx = nextIdx;
             }
 
+            // Parse turn-by-turn navigation steps from Yandex paths segments
+            const rawSections = (r.paths && r.paths[0] && r.paths[0].segments) ? r.paths[0].segments : (r.sections || []);
+            const steps = rawSections.map((sec, sIdx) => {
+              const actionVal = (sec.action?.value || sec.action?.text || '').toUpperCase();
+              let modifier = 'straight';
+              let type = 'turn';
+
+              if (actionVal.includes('LEFT')) {
+                modifier = (actionVal.includes('FORK') || actionVal.includes('EXIT')) ? 'slight left' : 'left';
+              } else if (actionVal.includes('RIGHT')) {
+                modifier = (actionVal.includes('FORK') || actionVal.includes('EXIT')) ? 'slight right' : 'right';
+              } else if (actionVal.includes('UTURN')) {
+                modifier = 'u-turn';
+              } else if (actionVal.includes('ROUNDABOUT')) {
+                modifier = 'roundabout';
+                type = 'roundabout';
+              } else {
+                modifier = 'straight';
+              }
+
+              const streetName = sec.street || sec.text || '';
+              // Authentic turn instruction
+              let instruction = 'Двигайтесь прямо';
+              if (modifier === 'left') instruction = `Поверните налево${streetName ? ` на ${streetName}` : ''}`;
+              else if (modifier === 'right') instruction = `Поверните направо${streetName ? ` на ${streetName}` : ''}`;
+              else if (modifier === 'slight left') instruction = `Держитесь левее${streetName ? ` на ${streetName}` : ''}`;
+              else if (modifier === 'slight right') instruction = `Держитесь правее${streetName ? ` на ${streetName}` : ''}`;
+              else if (modifier === 'u-turn') instruction = 'Развернитесь';
+              else if (modifier === 'roundabout') instruction = 'Круговое движение';
+              else if (streetName) instruction = `Двигайтесь по ${streetName}`;
+
+              // Determine speed limit for this section
+              let speedLimit = 60;
+              const isHwy = /highway|трасса|шоссе|\b[MH]-\d+/i.test(streetName);
+              const loc = (sec.edgePoints && sec.edgePoints[0]) ? sec.edgePoints[0] : null;
+              if (isHwy) {
+                speedLimit = 90;
+              } else if (loc) {
+                // Check distance from Yerevan center (40.1772, 44.5105)
+                const dLat = (loc[1] - 40.1772) * 111;
+                const dLng = (loc[0] - 44.5105) * 85;
+                const distCenter = Math.sqrt(dLat * dLat + dLng * dLng);
+                if (distCenter > 14) speedLimit = 90;
+              }
+
+              return {
+                index: sIdx,
+                name: streetName,
+                instruction: instruction,
+                action: actionVal,
+                modifier: modifier,
+                type: type,
+                distance: sec.distance?.value || 0,
+                duration: sec.durationInTraffic?.value || sec.duration?.value || 0,
+                location: loc, // [lng, lat]
+                speedLimit: speedLimit
+              };
+            });
+
             return {
               index: idx,
               distance: r.distance?.value || 0,
               duration: r.durationInTraffic || r.duration || 0,
               durationWithoutTraffic: r.duration || 0,
               coordinates: coords, // [lng, lat]
-              segments: segments.length ? segments : [{ type: 'FREE', color: '#22c55e', coords }]
+              segments: segments.length ? segments : [{ type: 'FREE', color: '#22c55e', coords }],
+              steps: steps,
+              specialRoadPoints: r.specialRoadPoints || []
             };
           });
 
@@ -427,6 +488,28 @@ async function fetchYandexSuggestResults(q, userLng = 44.5125, userLat = 40.1776
 
   // API 3: /api/traffic-yerevan (Live Official Yandex Traffic Score for Yerevan, Region 10262)
   if (pathname === '/api/traffic-yerevan') {
+    const qLat = parseFloat(parsedUrl.searchParams.get('lat'));
+    const qLng = parseFloat(parsedUrl.searchParams.get('lng'));
+    if (!isNaN(qLat) && !isNaN(qLng)) {
+      const dLat = (qLat - 40.1772) * 111;
+      const dLng = (qLng - 44.5105) * 85;
+      const distKm = Math.sqrt(dLat * dLat + dLng * dLng);
+      if (distKm > 18) {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({
+          success: true,
+          outsideCity: true,
+          score: 1,
+          icon: 'green',
+          color: '#22c55e',
+          hint: 'Трасса свободна',
+          time: '',
+          source: 'highway'
+        }));
+        return;
+      }
+    }
+
     const now = Date.now();
     if (trafficCache.data && (now - trafficCache.time < 60000)) {
       res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -472,6 +555,49 @@ async function fetchYandexSuggestResults(q, userLng = 44.5125, userLat = 40.1776
       console.warn('Yandex traffic fetch warning:', e.message);
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ success: false, fallback: true }));
+    }
+    return;
+  }
+
+  // API 4: /api/yt-search (Live YouTube Search for Tesla Cockpit)
+  if (pathname === '/api/yt-search') {
+    const q = parsedUrl.searchParams.get('q');
+    if (!q) {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Query parameter q is required' }));
+      return;
+    }
+    try {
+      const ytUrl = 'https://www.youtube.com/results?search_query=' + encodeURIComponent(q);
+      const ytRes = await fetch(ytUrl, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          'Accept-Language': 'ru-RU,ru;q=0.9,en-US;q=0.8,en;q=0.7,hy;q=0.6'
+        }
+      });
+      const html = await ytRes.text();
+      const dataMatch = html.match(/var ytInitialData = ({.*?});<\/script>/);
+      const results = [];
+      if (dataMatch) {
+        const data = JSON.parse(dataMatch[1]);
+        const contents = data.contents?.twoColumnSearchResultsRenderer?.primaryContents?.sectionListRenderer?.contents?.[0]?.itemSectionRenderer?.contents || [];
+        for (const item of contents) {
+          const v = item.videoRenderer;
+          if (v && v.videoId) {
+            const title = v.title?.runs?.[0]?.text || '';
+            const duration = v.lengthText?.simpleText || '';
+            const thumbnail = v.thumbnail?.thumbnails?.[0]?.url || '';
+            results.push({ id: v.videoId, title, duration, thumbnail });
+            if (results.length >= 8) break;
+          }
+        }
+      }
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ success: true, results }));
+    } catch (e) {
+      console.warn('YouTube search fetch warning:', e.message);
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ success: false, error: e.message, results: [] }));
     }
     return;
   }

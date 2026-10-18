@@ -11,6 +11,7 @@ class TeslaMapEngine {
     this.onManeuverUpdate = options.onManeuverUpdate || (() => {});
     this.onUserPan = options.onUserPan || (() => {});
     this.onProgressUpdate = options.onProgressUpdate || (() => {});
+    this.onCameraAlert = options.onCameraAlert || (() => {});
     
     this.map = null;
     this.carMarker = null;
@@ -297,11 +298,16 @@ class TeslaMapEngine {
 
     const targetHeading = this.currentHeading || this.currentPosition.heading || 0;
     if (this.provider === 'maplibre' && this.map) {
+      const markerEl = document.querySelector('#maplibre-car-marker .tesla-car-arrow');
+      if (this.isHeadingUp && markerEl) {
+        markerEl.style.transform = 'rotate(0deg)';
+      }
       this.map.easeTo({
         center: [this.currentPosition.lng, this.currentPosition.lat],
         zoom: this.navZoom,
         bearing: this.isHeadingUp ? targetHeading : 0,
-        pitch: 0,
+        pitch: this.isNavigating ? 35 : 0,
+        padding: this.isNavigating ? { top: 60, bottom: 220, left: 0, right: 0 } : { top: 0, bottom: 0, left: 0, right: 0 },
         duration: 500
       });
     } else if (this.provider === 'yandex' && this.map) {
@@ -326,18 +332,23 @@ class TeslaMapEngine {
     this.isHeadingUp = !this.isHeadingUp;
     const targetHeading = this.currentHeading || 0;
     if (this.provider === 'maplibre' && this.map) {
+      const markerEl = document.querySelector('#maplibre-car-marker .tesla-car-arrow');
       if (this.isHeadingUp) {
+        if (markerEl) markerEl.style.transform = 'rotate(0deg)';
         this.map.easeTo({
           center: [this.currentPosition.lng, this.currentPosition.lat],
           bearing: targetHeading,
-          pitch: 0,
+          pitch: this.isNavigating ? 35 : 0,
+          padding: this.isNavigating ? { top: 60, bottom: 220, left: 0, right: 0 } : { top: 0, bottom: 0, left: 0, right: 0 },
           duration: 500
         });
       } else {
+        if (markerEl) markerEl.style.transform = `rotate(${Math.round(this.currentHeading)}deg)`;
         this.map.easeTo({
           center: [this.currentPosition.lng, this.currentPosition.lat],
           bearing: 0,
           pitch: 0,
+          padding: { top: 0, bottom: 0, left: 0, right: 0 },
           duration: 500
         });
       }
@@ -497,8 +508,9 @@ class TeslaMapEngine {
           this.map.easeTo({
             center: [displayLng, displayLat],
             bearing: this.currentHeading,
-            pitch: 0,
-            duration: 350,
+            pitch: this.isNavigating ? 35 : 0,
+            padding: this.isNavigating ? { top: 60, bottom: 220, left: 0, right: 0 } : { top: 0, bottom: 0, left: 0, right: 0 },
+            duration: 250,
             easing: (t) => t
           });
         }
@@ -514,7 +526,8 @@ class TeslaMapEngine {
             center: [displayLng, displayLat],
             bearing: 0,
             pitch: 0,
-            duration: 350,
+            padding: { top: 0, bottom: 0, left: 0, right: 0 },
+            duration: 250,
             easing: (t) => t
           });
         }
@@ -576,12 +589,12 @@ class TeslaMapEngine {
     const dest = this.activeRoute.destination;
     const distToDest = this.calculateDistance(currentLat, currentLng, dest.lat, dest.lng);
 
-    // Update bottom traffic progress bar cursor (accurate polyline projection, starts strictly at 0%)
+    // 1. Determine vehicle progress along route polyline
+    let closestIdx = 0;
+    let minDist = Infinity;
     if (this.routeCoordinates && this.routeCoordinates.length > 1) {
-      let closestIdx = 0;
-      let minDist = Infinity;
       const startSearch = Math.max(0, (this.lastProgressIndex || 0) - 2);
-      const endSearch = Math.min(this.routeCoordinates.length, startSearch + 40);
+      const endSearch = Math.min(this.routeCoordinates.length, startSearch + 50);
       for (let i = startSearch; i < endSearch; i++) {
         const pt = this.routeCoordinates[i];
         const d = this.calculateDistance(currentLat, currentLng, pt[1], pt[0]);
@@ -591,8 +604,57 @@ class TeslaMapEngine {
         }
       }
       this.lastProgressIndex = Math.max(this.lastProgressIndex || 0, closestIdx);
-      const progressPercent = Math.min(96, Math.round((this.lastProgressIndex / (this.routeCoordinates.length - 1)) * 100));
-      this.onProgressUpdate(progressPercent);
+
+      // 2. Update traveled route line on MapLibre GL (Dimmed gray #475569)
+      if (this.provider === 'maplibre' && this.map) {
+        const traveledSource = this.map.getSource('route-traveled');
+        if (traveledSource) {
+          const traveledCoords = this.routeCoordinates.slice(0, this.lastProgressIndex + 1);
+          traveledCoords.push([currentLng, currentLat]);
+          traveledSource.setData({
+            type: 'Feature',
+            geometry: { type: 'LineString', coordinates: traveledCoords }
+          });
+        }
+      }
+
+      // 3. Calculate remaining route distance dynamically
+      let remainingMeters = 0;
+      const currentRoutePt = this.routeCoordinates[this.lastProgressIndex];
+      remainingMeters += this.calculateDistance(currentLat, currentLng, currentRoutePt[1], currentRoutePt[0]);
+      for (let i = this.lastProgressIndex; i < this.routeCoordinates.length - 1; i++) {
+        const p1 = this.routeCoordinates[i];
+        const p2 = this.routeCoordinates[i + 1];
+        remainingMeters += this.calculateDistance(p1[1], p1[0], p2[1], p2[0]);
+      }
+
+      const totalDist = this.totalDistance || 1000;
+      const progressPercent = Math.min(96, Math.max(0, Math.round((1 - remainingMeters / totalDist) * 100)));
+
+      // Calculate remaining duration and ETA
+      const totalDurSec = this.activeRoute.durationSec || (this.totalDistance / 11);
+      const remainingRatio = Math.max(0, Math.min(1, remainingMeters / totalDist));
+      const remainingDurationSec = Math.max(30, Math.round(totalDurSec * remainingRatio));
+      const remainingMinutes = Math.max(1, Math.round(remainingDurationSec / 60));
+
+      const now = new Date();
+      const etaDate = new Date(now.getTime() + remainingDurationSec * 1000);
+      const etaHours = String(etaDate.getHours()).padStart(2, '0');
+      const etaMins = String(etaDate.getMinutes()).padStart(2, '0');
+
+      const remainingDistanceStr = remainingMeters >= 1000
+        ? `${(remainingMeters / 1000).toFixed(1)} км`
+        : `${Math.round(remainingMeters)} м`;
+      const remainingDurationStr = `${remainingMinutes} мин`;
+      const etaStr = `${etaHours}:${etaMins}`;
+
+      this.onProgressUpdate({
+        percent: progressPercent,
+        remainingDistance: remainingDistanceStr,
+        remainingDuration: remainingDurationStr,
+        eta: etaStr,
+        remainingMeters: remainingMeters
+      });
     }
 
     // Destination Arrival
@@ -603,25 +665,44 @@ class TeslaMapEngine {
       return;
     }
 
-    // Maneuver advancement
-    if (this.currentStepIndex < this.routeSteps.length) {
-      const step = this.routeSteps[this.currentStepIndex];
-      const stepDist = this.calculateDistance(currentLat, currentLng, step.location[1], step.location[0]);
-
-      if (stepDist < 25 && this.currentStepIndex < this.routeSteps.length - 1) {
-        this.currentStepIndex++;
-        this.spokenDistanceThresholds = {};
+    // 4. Maneuver advancement & countdown
+    if (this.routeSteps && this.routeSteps.length > 0) {
+      while (this.currentStepIndex < this.routeSteps.length - 1) {
+        const step = this.routeSteps[this.currentStepIndex];
+        if (!step.location) {
+          break;
+        }
+        const stepDist = this.calculateDistance(currentLat, currentLng, step.location[1], step.location[0]);
+        if (stepDist < 35) {
+          this.currentStepIndex++;
+          this.spokenDistanceThresholds = {};
+        } else {
+          break;
+        }
       }
 
-      const activeStep = this.routeSteps[this.currentStepIndex];
-      const activeDist = Math.round(this.calculateDistance(currentLat, currentLng, activeStep.location[1], activeStep.location[0]));
+      const activeStep = this.routeSteps[this.currentStepIndex] || this.routeSteps[this.routeSteps.length - 1];
+      let activeDist = 0;
+      if (activeStep.location) {
+        activeDist = Math.round(this.calculateDistance(currentLat, currentLng, activeStep.location[1], activeStep.location[0]));
+      } else {
+        activeDist = Math.round(distToDest);
+      }
+
+      // Check distance from Yerevan center to adjust speed limit if outside
+      const dLatYerevan = (currentLat - 40.1772) * 111;
+      const dLngYerevan = (currentLng - 44.5105) * 85;
+      const distFromYerevan = Math.sqrt(dLatYerevan * dLatYerevan + dLngYerevan * dLngYerevan);
+      const currentSpeedLimit = activeStep.speedLimit || (distFromYerevan > 14 ? 90 : 60);
 
       this.onManeuverUpdate({
         distance: activeDist < 1000 ? `${activeDist} м` : `${(activeDist / 1000).toFixed(1)} км`,
         distanceMeters: activeDist,
-        instruction: activeStep.name || activeStep.instruction,
+        instruction: activeStep.instruction || activeStep.name || 'Двигайтесь прямо',
+        street: activeStep.name || activeStep.instruction || dest.name,
         modifier: activeStep.modifier || 'straight',
         type: activeStep.type || 'turn',
+        speedLimit: currentSpeedLimit,
         lanes: activeStep.lanes || null
       });
 
@@ -637,6 +718,30 @@ class TeslaMapEngine {
           this.speakVoice(this.getTurnSpeech(activeStep.modifier));
         }
       }
+    }
+
+    // 5. Proximity to speed cameras (Only show if camera < 600m, else hide)
+    let nearestCameraDist = Infinity;
+    const allCameras = [
+      ...this.trafficPoints.filter(p => p.type === 'camera'),
+      ...(this.specialRoadPoints || []).filter(p => p.type === 'camera' || p.type === 'speed_cam')
+    ];
+
+    for (const cam of allCameras) {
+      const camLat = cam.lat || cam.location?.[1];
+      const camLng = cam.lng || cam.location?.[0];
+      if (camLat && camLng) {
+        const d = this.calculateDistance(currentLat, currentLng, camLat, camLng);
+        if (d < 600 && d < nearestCameraDist) {
+          nearestCameraDist = Math.round(d);
+        }
+      }
+    }
+
+    if (nearestCameraDist < 600) {
+      this.onCameraAlert({ visible: true, distance: `${nearestCameraDist} м` });
+    } else {
+      this.onCameraAlert({ visible: false });
     }
   }
 
@@ -799,8 +904,23 @@ class TeslaMapEngine {
     this.routeSteps = [];
     this.currentStepIndex = 0;
     this.spokenDistanceThresholds = {};
+    this.specialRoadPoints = primaryRoute.specialRoadPoints || [];
+    this.activeRoute = { destination, durationSec, distanceMeters };
 
-    if (primaryRoute.legs && primaryRoute.legs.length > 0) {
+    if (primaryRoute.steps && primaryRoute.steps.length > 0) {
+      this.routeSteps = primaryRoute.steps.map(s => ({
+        name: s.name || destination.name,
+        instruction: s.instruction || 'Двигайтесь прямо',
+        action: s.action || '',
+        modifier: s.modifier || 'straight',
+        type: s.type || 'turn',
+        location: s.location, // [lng, lat]
+        distance: s.distance,
+        duration: s.duration,
+        speedLimit: s.speedLimit || 60,
+        lanes: s.lanes || null
+      }));
+    } else if (primaryRoute.legs && primaryRoute.legs.length > 0) {
       primaryRoute.legs[0].steps.forEach(step => {
         const maneuver = step.maneuver || {};
         this.routeSteps.push({
@@ -810,6 +930,7 @@ class TeslaMapEngine {
           modifier: maneuver.modifier,
           location: maneuver.location,
           distance: step.distance,
+          speedLimit: 60,
           lanes: (step.intersections && step.intersections[0] && step.intersections[0].lanes) ? step.intersections[0].lanes : null
         });
       });
@@ -819,7 +940,8 @@ class TeslaMapEngine {
         instruction: 'Двигайтесь по маршруту',
         type: 'straight',
         modifier: '',
-        distance: distanceMeters
+        distance: distanceMeters,
+        speedLimit: 60
       });
     }
 
@@ -1007,6 +1129,30 @@ class TeslaMapEngine {
       });
     });
 
+    // 3.5. Traveled Route Line (Dimmed slate gray, rendered on top of traffic segments)
+    if (this.map.getLayer('route-traveled-line')) this.map.removeLayer('route-traveled-line');
+    if (this.map.getSource('route-traveled')) this.map.removeSource('route-traveled');
+
+    this.map.addSource('route-traveled', {
+      type: 'geojson',
+      data: {
+        type: 'Feature',
+        geometry: { type: 'LineString', coordinates: [] }
+      }
+    });
+
+    this.map.addLayer({
+      id: 'route-traveled-line',
+      type: 'line',
+      source: 'route-traveled',
+      layout: { 'line-join': 'round', 'line-cap': 'round' },
+      paint: {
+        'line-color': '#475569',
+        'line-width': 8.5,
+        'line-opacity': 0.75
+      }
+    });
+
     // 4. Destination Pin
     if (this.destMarker) this.destMarker.remove();
 
@@ -1118,9 +1264,26 @@ class TeslaMapEngine {
 
   startNavigation() {
     this.isNavigating = true;
+    this.followCar = true;
+    this.isHeadingUp = true;
     this.offRouteCounter = 0;
     this.lastProgressIndex = 0;
-    this.onProgressUpdate(0);
+    this.currentStepIndex = 0;
+    this.spokenDistanceThresholds = {};
+
+    if (this.provider === 'maplibre' && this.map) {
+      const markerEl = document.querySelector('#maplibre-car-marker .tesla-car-arrow');
+      if (markerEl) markerEl.style.transform = 'rotate(0deg)';
+      this.map.easeTo({
+        center: [this.currentPosition.lng, this.currentPosition.lat],
+        bearing: this.currentHeading,
+        pitch: 35,
+        padding: { top: 60, bottom: 220, left: 0, right: 0 },
+        zoom: this.navZoom,
+        duration: 500
+      });
+    }
+
     this.speakVoice('Маршрут построен. Поехали!');
   }
 
@@ -1128,21 +1291,24 @@ class TeslaMapEngine {
     this.activeRoute = null;
     this.isNavigating = false;
     this.lastProgressIndex = 0;
-    this.onProgressUpdate(0);
     this.routeCoordinates = [];
     this.alternativeCoordinates = null;
     this.routeSteps = [];
     this.currentStepIndex = 0;
     this.totalDistance = 0;
+    this.specialRoadPoints = [];
 
     if (this.provider === 'maplibre' && this.map) {
+      if (this.map.getLayer('route-traveled-line')) this.map.removeLayer('route-traveled-line');
+      if (this.map.getSource('route-traveled')) this.map.removeSource('route-traveled');
+
       if (this.map.getLayer('route-alt-casing')) this.map.removeLayer('route-alt-casing');
       if (this.map.getLayer('route-alt-line')) this.map.removeLayer('route-alt-line');
       if (this.map.getSource('route-alt')) this.map.removeSource('route-alt');
 
       if (this.map.getLayer('route-casing')) this.map.removeLayer('route-casing');
       if (this.map.getSource('route-full')) this.map.removeSource('route-full');
-      for (let i = 0; i < 8; i++) {
+      for (let i = 0; i < 200; i++) {
         if (this.map.getLayer(`route-seg-${i}`)) this.map.removeLayer(`route-seg-${i}`);
         if (this.map.getSource(`route-seg-${i}`)) this.map.removeSource(`route-seg-${i}`);
       }
@@ -1150,6 +1316,12 @@ class TeslaMapEngine {
         this.destMarker.remove();
         this.destMarker = null;
       }
+
+      this.map.easeTo({
+        pitch: 0,
+        padding: { top: 0, bottom: 0, left: 0, right: 0 },
+        duration: 400
+      });
     } else if (this.provider === 'yandex' && this.map) {
       if (this.routePolyline) this.map.geoObjects.remove(this.routePolyline);
       if (this.destMarker) this.map.geoObjects.remove(this.destMarker);

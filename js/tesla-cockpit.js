@@ -8,12 +8,12 @@ let currentLang = 'ru';
 let activeChargersMarkers = [];
 let chargersVisible = false;
 
-// YouTube Music Playlist
+// YouTube Music Playlist (Verified working YouTube IDs)
 const PLAYLIST = [
-  { title: 'BRUNETTE - ANHETANAM', id: 'm-V84sU0Y3I' },
-  { title: 'K/ES - yellowheart. feat Misho', id: 'aM5Wv12xPqQ' },
-  { title: 'Arkadi Dumikyan - Im Hreshtak', id: 'kJQP7kiw5Fk' },
-  { title: 'Artur Arakelyan - Kyanqis Hamar', id: '2Vv-BfVoq4g' }
+  { title: 'BRUNETTE - ANHETANAM', id: '-o07wiIMd3g' },
+  { title: 'K/ES - yellowheart. feat Misho', id: 'xNW2-ruUlVI' },
+  { title: 'Arkadi Dumikyan - Hreshtakneri qaxaq', id: 'Za4JpfNyHkY' },
+  { title: 'Artur Arakelyan - Kyanqis Imast', id: 'RWoOXqWeBvw' }
 ];
 let currentTrackIndex = 0;
 let isMusicPlaying = false;
@@ -50,6 +50,9 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // 7. Weather & Music Handlers
   initWeatherAndMusic();
+
+  // 8. Developer Mode & In-Car Simulator (?mode=dev)
+  initDevMode();
 });
 
 // 1. Language Management (RU, HY, EN)
@@ -252,15 +255,21 @@ async function updateLiveTrafficBadge() {
   const badge = document.getElementById('traffic-score-badge');
   if (!badge) return;
 
+  const curLat = mapEngine?.currentPosition?.lat;
+  const curLng = mapEngine?.currentPosition?.lng;
+  const query = (curLat && curLng) ? `?lat=${curLat}&lng=${curLng}` : '';
+
   try {
-    const res = await fetch('/api/traffic-yerevan');
+    const res = await fetch(`/api/traffic-yerevan${query}`);
     const data = await res.json();
     if (data && data.success) {
       liveTrafficData = data;
-      badge.textContent = data.score;
+      badge.textContent = data.outsideCity ? '🛣️' : data.score;
       badge.style.background = data.color;
       badge.style.boxShadow = `0 4px 14px ${data.color}90`;
-      badge.title = `Пробки в Ереване: ${data.score} из 10 (${data.hint}) · Яндекс`;
+      badge.title = data.outsideCity
+        ? `Трасса / За городом: ${data.hint}`
+        : `Пробки в Ереване: ${data.score} из 10 (${data.hint}) · Яндекс`;
       return;
     }
   } catch (e) {}
@@ -293,10 +302,37 @@ async function initMap() {
       const recenterBtn = document.getElementById('floating-recenter-btn');
       if (recenterBtn) recenterBtn.classList.remove('hidden');
     },
-    onProgressUpdate: (percent) => {
+    onProgressUpdate: (progress) => {
       const cursor = document.getElementById('prog-car-cursor');
-      if (cursor) {
-        cursor.style.left = `${Math.min(96, Math.max(0, percent))}%`;
+      if (typeof progress === 'object') {
+        if (cursor && progress.percent !== undefined) {
+          cursor.style.left = `${Math.min(96, Math.max(0, progress.percent))}%`;
+        }
+        if (progress.remainingDistance) {
+          const el = document.getElementById('nav-distance');
+          if (el) el.textContent = progress.remainingDistance;
+        }
+        if (progress.remainingDuration) {
+          const el = document.getElementById('nav-duration');
+          if (el) el.textContent = progress.remainingDuration;
+        }
+        if (progress.eta) {
+          const el = document.getElementById('nav-eta');
+          if (el) el.textContent = progress.eta;
+        }
+      } else if (cursor) {
+        cursor.style.left = `${Math.min(96, Math.max(0, progress))}%`;
+      }
+    },
+    onCameraAlert: (alert) => {
+      const badge = document.getElementById('camera-alert-badge');
+      const distEl = document.getElementById('camera-alert-dist');
+      if (!badge) return;
+      if (alert && alert.visible) {
+        if (distEl) distEl.textContent = alert.distance;
+        badge.classList.remove('hidden');
+      } else {
+        badge.classList.add('hidden');
       }
     }
   });
@@ -728,10 +764,13 @@ function renderTrafficProgressBar(segments) {
 function showNavigationHud(route) {
   document.getElementById('hud-maneuver-card').classList.remove('hidden');
   document.getElementById('bottom-nav-bar').classList.remove('hidden');
-  document.getElementById('lane-guidance-pill').classList.remove('hidden');
+  // Keep lane guidance hidden by default unless real lane info is provided
+  document.getElementById('lane-guidance-pill').classList.add('hidden');
 
-  document.getElementById('maneuver-dist').textContent = route.distance;
-  document.getElementById('maneuver-street').textContent = route.name;
+  // Initial step details from route steps
+  const firstStep = (route.steps && route.steps[0]) ? route.steps[0] : null;
+  document.getElementById('maneuver-dist').textContent = firstStep ? (firstStep.distance >= 1000 ? `${(firstStep.distance / 1000).toFixed(1)} км` : `${Math.round(firstStep.distance)} м`) : route.distance;
+  document.getElementById('maneuver-street').textContent = firstStep ? (firstStep.name || firstStep.instruction) : route.name;
 
   document.getElementById('nav-duration').textContent = route.duration;
   document.getElementById('nav-distance').textContent = route.distance;
@@ -747,20 +786,36 @@ function showNavigationHud(route) {
 
 function updateManeuverHud(m) {
   document.getElementById('maneuver-dist').textContent = m.distance;
-  if (m.instruction) {
-    document.getElementById('maneuver-street').textContent = m.instruction;
-  }
+  document.getElementById('maneuver-street').textContent = m.street || m.instruction || 'Двигайтесь прямо';
 
-  // Arrow symbol
+  // Arrow symbol based on modifier / type
   const arrowBox = document.getElementById('maneuver-arrow-box');
-  if (m.modifier && m.modifier.includes('left')) arrowBox.textContent = '↰';
-  else if (m.modifier && m.modifier.includes('right')) arrowBox.textContent = '↱';
-  else if (m.modifier && m.modifier.includes('uturn')) arrowBox.textContent = '↺';
+  const mod = (m.modifier || '').toLowerCase();
+  const type = (m.type || '').toLowerCase();
+  if (type === 'roundabout' || mod.includes('roundabout')) arrowBox.textContent = '🔄';
+  else if (mod.includes('uturn') || mod.includes('u-turn')) arrowBox.textContent = '↺';
+  else if (mod.includes('slight left') || mod.includes('fork left')) arrowBox.textContent = '↖';
+  else if (mod.includes('slight right') || mod.includes('fork right')) arrowBox.textContent = '↗';
+  else if (mod.includes('left')) arrowBox.textContent = '↰';
+  else if (mod.includes('right')) arrowBox.textContent = '↱';
   else arrowBox.textContent = '↑';
 
-  // Distance countdown for camera alert badge
-  const camDist = Math.max(80, (m.distanceMeters || 370) - 40);
-  document.getElementById('camera-alert-dist').textContent = `${camDist} м`;
+  // Update dynamic speed limit circle (60 in city, 90 on highway/outside Yerevan)
+  if (m.speedLimit) {
+    const limitEl = document.getElementById('speed-limit-val');
+    if (limitEl) limitEl.textContent = m.speedLimit;
+  }
+
+  // Real Lane Guidance if present, otherwise remain hidden (no fake lanes)
+  const lanePill = document.getElementById('lane-guidance-pill');
+  if (lanePill) {
+    if (m.lanes && m.lanes.length > 0) {
+      lanePill.innerHTML = m.lanes.map(l => `<span class="lane-arrow ${l.valid ? 'active' : ''}">${l.symbol || '↑'}</span>`).join('');
+      lanePill.classList.remove('hidden');
+    } else {
+      lanePill.classList.add('hidden');
+    }
+  }
 }
 
 function cancelActiveNavigation() {
@@ -855,29 +910,66 @@ function initWeatherAndMusic() {
 
   function playTrackById(videoId, title) {
     if (ytIframe) {
-      ytIframe.src = `https://www.youtube-nocookie.com/embed/${videoId}?autoplay=1&enablejsapi=1`;
+      const origin = window.location.origin || '';
+      ytIframe.src = `https://www.youtube.com/embed/${videoId}?autoplay=1&enablejsapi=1&origin=${encodeURIComponent(origin)}`;
     }
     isMusicPlaying = true;
     if (btnMusicPlay) btnMusicPlay.textContent = '⏸';
   }
 
-  function handleYtSearch() {
+  async function handleYtSearch() {
     const q = ytSearchInput.value.trim();
     if (!q) return;
 
     // Check if query is direct YouTube video ID or URL
-    let videoId = q;
     const urlMatch = q.match(/(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|watch\?v=|watch\?.+&v=))([\w-]{11})/);
     if (urlMatch && urlMatch[1]) {
-      videoId = urlMatch[1];
+      const videoId = urlMatch[1];
       playTrackById(videoId, q);
-    } else {
-      // Use YouTube embed search playlist
-      if (ytIframe) {
-        ytIframe.src = `https://www.youtube-nocookie.com/embed?listType=search&list=${encodeURIComponent(q)}&autoplay=1&enablejsapi=1`;
+      return;
+    }
+
+    if (btnYtSearchGo) btnYtSearchGo.textContent = '⏳';
+    try {
+      const res = await fetch(`/api/yt-search?q=${encodeURIComponent(q)}`);
+      const data = await res.json();
+      if (data.results && data.results.length > 0) {
+        suggestionsList.innerHTML = '';
+        data.results.forEach((track, idx) => {
+          const div = document.createElement('div');
+          div.className = `yt-song-item ${idx === 0 ? 'active' : ''}`;
+          div.dataset.id = track.id;
+          div.dataset.title = track.title;
+
+          const titleSpan = document.createElement('span');
+          titleSpan.textContent = `🎵 ${track.title}`;
+          titleSpan.style.cssText = 'overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 250px;';
+
+          const durSpan = document.createElement('span');
+          durSpan.textContent = track.duration || '';
+
+          div.appendChild(titleSpan);
+          div.appendChild(durSpan);
+
+          div.addEventListener('click', () => {
+            suggestionsList.querySelectorAll('.yt-song-item').forEach(el => el.classList.remove('active'));
+            div.classList.add('active');
+            playTrackById(track.id, track.title);
+          });
+          suggestionsList.appendChild(div);
+        });
+
+        // Update playlist for next/prev navigation
+        PLAYLIST.length = 0;
+        data.results.forEach(t => PLAYLIST.push({ title: t.title, id: t.id }));
+        currentTrackIndex = 0;
+
+        playTrackById(data.results[0].id, data.results[0].title);
       }
-      isMusicPlaying = true;
-      if (btnMusicPlay) btnMusicPlay.textContent = '⏸';
+    } catch (err) {
+      console.warn('YouTube search failed:', err);
+    } finally {
+      if (btnYtSearchGo) btnYtSearchGo.textContent = '🔍';
     }
   }
 
@@ -963,3 +1055,439 @@ async function loadLiveYerevanWeather() {
     console.warn('Weather fetch error:', e);
   }
 }
+
+// 10. Developer Mode & In-Car Road Simulator (?mode=dev)
+function initDevMode() {
+  const urlParams = new URLSearchParams(window.location.search);
+  const isDev = urlParams.get('mode') === 'dev';
+
+  const devPill = document.getElementById('dev-mode-pill');
+  const devPanel = document.getElementById('dev-mode-panel');
+  const btnTogglePanel = document.getElementById('btn-dev-toggle-panel');
+  const btnExit = document.getElementById('btn-dev-exit');
+  const btnClosePanel = document.getElementById('btn-close-dev-panel');
+
+  const tabBtnSim = document.getElementById('tab-btn-sim');
+  const tabBtnDiag = document.getElementById('tab-btn-diag');
+  const tabSim = document.getElementById('dev-tab-sim');
+  const tabDiag = document.getElementById('dev-tab-diag');
+  const logBox = document.getElementById('dev-log-box');
+
+  // Console Log Interceptor for In-Car Tesla Screen
+  function appendDevLog(level, ...args) {
+    if (!logBox) return;
+    const now = new Date();
+    const timeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`;
+    const text = args.map(a => (typeof a === 'object' ? JSON.stringify(a) : String(a))).join(' ');
+
+    const line = document.createElement('div');
+    line.className = `dev-log-line ${level}`;
+    line.innerHTML = `<span>[${timeStr}]</span> <strong>[${level.toUpperCase()}]</strong> ${text}`;
+    logBox.appendChild(line);
+    logBox.scrollTop = logBox.scrollHeight;
+  }
+
+  // Hook into browser console
+  const origLog = console.log;
+  const origWarn = console.warn;
+  const origError = console.error;
+
+  console.log = function(...args) {
+    origLog.apply(console, args);
+    appendDevLog('log', ...args);
+  };
+  console.warn = function(...args) {
+    origWarn.apply(console, args);
+    appendDevLog('warn', ...args);
+  };
+  console.error = function(...args) {
+    origError.apply(console, args);
+    appendDevLog('error', ...args);
+  };
+
+  // Voice Search Button in Search Drawer (#btn-voice-search)
+  const btnVoiceSearch = document.getElementById('btn-voice-search');
+  if (btnVoiceSearch) {
+    const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+    btnVoiceSearch.addEventListener('click', () => {
+      if (!SpeechRec) {
+        alert('Голосовой ввод не поддерживается браузером Tesla. Используйте клавиатуру.');
+        console.warn('SpeechRecognition API not supported in this browser.');
+        return;
+      }
+
+      try {
+        const recognition = new SpeechRec();
+        recognition.lang = window.CURRENT_LANG === 'hy' ? 'hy-AM' : (window.CURRENT_LANG === 'en' ? 'en-US' : 'ru-RU');
+        recognition.interimResults = false;
+        recognition.maxAlternatives = 1;
+
+        btnVoiceSearch.textContent = '🔴';
+        btnVoiceSearch.style.animation = 'pulse 1s infinite';
+
+        recognition.onstart = () => {
+          console.log('[Voice Search] Слушаю голосовую команду...');
+        };
+
+        recognition.onresult = (evt) => {
+          const transcript = evt.results[0][0].transcript;
+          console.log('[Voice Search] Распознано:', transcript);
+          const searchInput = document.getElementById('drawer-search-input');
+          if (searchInput) {
+            searchInput.value = transcript;
+            searchInput.dispatchEvent(new Event('input'));
+          }
+        };
+
+        recognition.onerror = (err) => {
+          console.warn('[Voice Search] Ошибка распознавания:', err.error);
+        };
+
+        recognition.onend = () => {
+          btnVoiceSearch.textContent = '🎤';
+          btnVoiceSearch.style.animation = '';
+        };
+
+        recognition.start();
+      } catch (err) {
+        console.error('[Voice Search] Init error:', err);
+        btnVoiceSearch.textContent = '🎤';
+        btnVoiceSearch.style.animation = '';
+      }
+    });
+  }
+
+  if (!isDev) return;
+
+  // Show Dev Mode UI
+  if (devPill) devPill.classList.remove('hidden');
+  console.log('🛠️ Dev Mode Active: simulator & diagnostics ready.');
+
+  // Exit Dev Mode
+  if (btnExit) {
+    btnExit.addEventListener('click', () => {
+      const url = new URL(window.location.href);
+      url.searchParams.delete('mode');
+      window.location.href = url.toString();
+    });
+  }
+
+  // Toggle Dev Panel
+  if (btnTogglePanel && devPanel) {
+    btnTogglePanel.addEventListener('click', () => {
+      devPanel.classList.toggle('hidden');
+    });
+  }
+  if (btnClosePanel && devPanel) {
+    btnClosePanel.addEventListener('click', () => {
+      devPanel.classList.add('hidden');
+    });
+  }
+
+  // Tab switching
+  if (tabBtnSim && tabBtnDiag) {
+    tabBtnSim.addEventListener('click', () => {
+      tabBtnSim.classList.add('active');
+      tabBtnDiag.classList.remove('active');
+      tabSim.classList.remove('hidden');
+      tabDiag.classList.add('hidden');
+    });
+    tabBtnDiag.addEventListener('click', () => {
+      tabBtnDiag.classList.add('active');
+      tabBtnSim.classList.remove('active');
+      tabDiag.classList.remove('hidden');
+      tabSim.classList.add('hidden');
+    });
+  }
+
+  // Diagnostics Buttons
+  const btnDiagMic = document.getElementById('btn-diag-mic');
+  if (btnDiagMic) {
+    btnDiagMic.addEventListener('click', async () => {
+      console.log('🔍 [Диагностика] Проверка микрофона и прав...');
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        console.error('❌ navigator.mediaDevices.getUserMedia отсутствует в браузере');
+      } else {
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+          console.log('✅ Доступ к микрофону ПОЛУЧЕН успешно!');
+          stream.getTracks().forEach(t => t.stop());
+        } catch (err) {
+          console.error(`❌ Ошибка микрофона: ${err.name} — ${err.message}`);
+          if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+            console.warn('⚠️ Браузер Tesla заблокировал доступ к микрофону. Разрешите доступ в настройках браузера автомобиля.');
+          }
+        }
+      }
+
+      const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (SpeechRec) {
+        console.log('✅ SpeechRecognition API (голосовой ввод) поддерживается');
+      } else {
+        console.warn('⚠️ Web SpeechRecognition API не поддерживается в движке этого браузера');
+      }
+    });
+  }
+
+  const btnDiagTts = document.getElementById('btn-diag-tts');
+  if (btnDiagTts) {
+    btnDiagTts.addEventListener('click', () => {
+      console.log('🔊 [Диагностика] Проверка синтеза речи и звука...');
+      if (!('speechSynthesis' in window)) {
+        console.error('❌ window.speechSynthesis не поддерживается');
+        return;
+      }
+      const voices = window.speechSynthesis.getVoices() || [];
+      console.log(`📋 Установлено системных голосов: ${voices.length}`);
+      const ruVoices = voices.filter(v => v.lang && v.lang.startsWith('ru'));
+      console.log(`🇷🇺 Русских голосов: ${ruVoices.length}`, ruVoices.map(v => v.name));
+
+      if (mapEngine) {
+        mapEngine.playNavChime();
+        mapEngine.speakVoice('Тест голосового оповещения Tesla Navi. Маршрут свободен.');
+        console.log('🗣️ Запущено воспроизведение тестовой фразы');
+      }
+    });
+  }
+
+  const btnDiagYt = document.getElementById('btn-diag-yt');
+  if (btnDiagYt) {
+    btnDiagYt.addEventListener('click', () => {
+      console.log('🎵 [Диагностика] Тестирование YouTube плеера...');
+      const ytIframe = document.getElementById('yt-player-iframe');
+      if (ytIframe) {
+        const testId = PLAYLIST[0].id;
+        const origin = window.location.origin || '';
+        ytIframe.src = `https://www.youtube.com/embed/${testId}?autoplay=1&enablejsapi=1&origin=${encodeURIComponent(origin)}`;
+        console.log(`▶️ Загружен тестовый ролик ${testId} с origin: ${origin}`);
+      } else {
+        console.error('❌ Iframe YouTube не найден');
+      }
+    });
+  }
+
+  const btnDiagClear = document.getElementById('btn-diag-clear');
+  if (btnDiagClear && logBox) {
+    btnDiagClear.addEventListener('click', () => {
+      logBox.innerHTML = '';
+      console.log('🧹 Логи очищены');
+    });
+  }
+
+  // --- Drive Simulator Engine ---
+  let simDistance = 0;
+  let simTotalDist = 1000;
+  let simSpeed = 60;
+  let isSimRunning = false;
+  let simTimer = null;
+  let cumulativeDistances = [];
+
+  const btnSimPlay = document.getElementById('btn-sim-play');
+  const btnSimPause = document.getElementById('btn-sim-pause');
+  const btnSimReset = document.getElementById('btn-sim-reset');
+  const btnSimStepBack = document.getElementById('btn-sim-step-back');
+  const btnSimStepFwd = document.getElementById('btn-sim-step-fwd');
+  const scrubSlider = document.getElementById('sim-scrub-slider');
+  const scrubVal = document.getElementById('sim-scrub-val');
+
+  // Pre-calculate cumulative segment lengths
+  function initSimPolyline(coords) {
+    cumulativeDistances = [0];
+    let total = 0;
+    for (let i = 0; i < coords.length - 1; i++) {
+      const p1 = coords[i];
+      const p2 = coords[i + 1];
+      const d = mapEngine.calculateDistance(p1[1], p1[0], p2[1], p2[0]);
+      total += d;
+      cumulativeDistances.push(total);
+    }
+    simTotalDist = Math.max(10, total);
+    simDistance = 0;
+  }
+
+  // Interpolate position and heading at exact distance along polyline
+  function getPositionAtDistance(dist) {
+    const coords = mapEngine.routeCoordinates;
+    if (!coords || coords.length < 2) return null;
+    const clampedDist = Math.max(0, Math.min(simTotalDist, dist));
+
+    // Find segment
+    let segIdx = 0;
+    for (let i = 0; i < cumulativeDistances.length - 1; i++) {
+      if (clampedDist >= cumulativeDistances[i] && clampedDist <= cumulativeDistances[i + 1]) {
+        segIdx = i;
+        break;
+      }
+    }
+
+    const segStartDist = cumulativeDistances[segIdx];
+    const segEndDist = cumulativeDistances[segIdx + 1] || (segStartDist + 1);
+    const segLen = segEndDist - segStartDist;
+    const t = segLen > 0 ? (clampedDist - segStartDist) / segLen : 0;
+
+    const p1 = coords[segIdx];
+    const p2 = coords[Math.min(coords.length - 1, segIdx + 1)];
+
+    const lng = p1[0] + (p2[0] - p1[0]) * t;
+    const lat = p1[1] + (p2[1] - p1[1]) * t;
+    const heading = mapEngine.calculateBearing(p1[1], p1[0], p2[1], p2[0]);
+
+    return { lat, lng, heading };
+  }
+
+  function updateSimCar(targetDist) {
+    simDistance = Math.max(0, Math.min(simTotalDist, targetDist));
+    const pt = getPositionAtDistance(simDistance);
+    if (pt && mapEngine) {
+      mapEngine.updateCarPosition(pt.lat, pt.lng, pt.heading, isSimRunning ? simSpeed : 0);
+    }
+
+    const pct = Math.min(100, Math.round((simDistance / simTotalDist) * 100));
+    if (scrubSlider) scrubSlider.value = pct;
+    if (scrubVal) scrubVal.textContent = `${pct}%`;
+  }
+
+  function startSimTicker() {
+    if (simTimer) clearInterval(simTimer);
+    simTimer = setInterval(() => {
+      if (!isSimRunning || !mapEngine || !mapEngine.routeCoordinates || mapEngine.routeCoordinates.length < 2) return;
+
+      const dt = 0.2; // 200ms
+      const stepMeters = (simSpeed / 3.6) * dt;
+      simDistance += stepMeters;
+
+      if (simDistance >= simTotalDist) {
+        simDistance = simTotalDist;
+        isSimRunning = false;
+        btnSimPlay.classList.remove('active');
+        btnSimPause.classList.add('active');
+        console.log('🏁 Симулятор: Маршрут завершен. Прибытие!');
+      }
+
+      updateSimCar(simDistance);
+    }, 200);
+  }
+
+  // Load Preset Routes
+  async function loadPresetRoute(start, dest) {
+    console.log(`🚗 Загрузка симулятора: ${start.name} → ${dest.name}...`);
+    if (!mapEngine) return;
+
+    // Reposition car to start
+    mapEngine.updateCarPosition(start.lat, start.lng, 0, 0);
+
+    // Build route
+    const routeInfo = await mapEngine.buildRouteTo(dest);
+    if (routeInfo) {
+      document.getElementById('route-alternatives-drawer')?.classList.add('hidden');
+      showNavigationHud(routeInfo);
+      mapEngine.startNavigation();
+      initSimPolyline(mapEngine.routeCoordinates);
+      updateSimCar(0);
+      console.log(`✅ Маршрут построен: ${routeInfo.distance}, ${routeInfo.duration}, шагов: ${mapEngine.routeSteps.length}`);
+    }
+  }
+
+  // Preset 1: Yerevan -> Aghveran (User's real road test)
+  const btnAghveran = document.getElementById('btn-sim-route-aghveran');
+  if (btnAghveran) {
+    btnAghveran.addEventListener('click', () => {
+      btnAghveran.classList.add('active');
+      document.getElementById('btn-sim-route-center')?.classList.remove('active');
+      loadPresetRoute(
+        { lat: 40.1915, lng: 44.5150, name: 'Ереван (Каскад)' },
+        { lat: 40.5050, lng: 44.5820, name: 'Park Resort Aghveran' }
+      );
+    });
+  }
+
+  // Preset 2: Cascade -> Republic Square
+  const btnCenter = document.getElementById('btn-sim-route-center');
+  if (btnCenter) {
+    btnCenter.addEventListener('click', () => {
+      btnCenter.classList.add('active');
+      btnAghveran?.classList.remove('active');
+      loadPresetRoute(
+        { lat: 40.1915, lng: 44.5150, name: 'Каскад' },
+        { lat: 40.1776, lng: 44.5125, name: 'Площадь Республики' }
+      );
+    });
+  }
+
+  // Play / Pause / Reset
+  if (btnSimPlay) {
+    btnSimPlay.addEventListener('click', () => {
+      if (!mapEngine.isNavigating && mapEngine.routeCoordinates?.length > 1) {
+        mapEngine.startNavigation();
+      }
+      isSimRunning = true;
+      btnSimPlay.classList.add('active');
+      btnSimPause.classList.remove('active');
+      startSimTicker();
+      console.log(`▶️ Симулятор запущен со скоростью ${simSpeed} км/ч`);
+    });
+  }
+
+  if (btnSimPause) {
+    btnSimPause.addEventListener('click', () => {
+      isSimRunning = false;
+      btnSimPause.classList.add('active');
+      btnSimPlay.classList.remove('active');
+      console.log('⏸️ Симулятор на паузе');
+    });
+  }
+
+  if (btnSimReset) {
+    btnSimReset.addEventListener('click', () => {
+      isSimRunning = false;
+      btnSimPlay.classList.remove('active');
+      btnSimPause.classList.remove('active');
+      updateSimCar(0);
+      console.log('⏹️ Симулятор сброшен в начало маршрута');
+    });
+  }
+
+  if (btnSimStepBack) {
+    btnSimStepBack.addEventListener('click', () => {
+      updateSimCar(simDistance - 100);
+    });
+  }
+
+  if (btnSimStepFwd) {
+    btnSimStepFwd.addEventListener('click', () => {
+      updateSimCar(simDistance + 100);
+    });
+  }
+
+  // Speed Presets
+  const speeds = [
+    { id: 'btn-speed-60', speed: 60 },
+    { id: 'btn-speed-90', speed: 90 },
+    { id: 'btn-speed-120', speed: 120 },
+    { id: 'btn-speed-250', speed: 250 }
+  ];
+
+  speeds.forEach(s => {
+    const el = document.getElementById(s.id);
+    if (el) {
+      el.addEventListener('click', () => {
+        speeds.forEach(other => document.getElementById(other.id)?.classList.remove('active'));
+        el.classList.add('active');
+        simSpeed = s.speed;
+        console.log(`⚡ Скорость симулятора установлена: ${simSpeed} км/ч`);
+      });
+    }
+  });
+
+  // Scrub Slider
+  if (scrubSlider) {
+    scrubSlider.addEventListener('input', () => {
+      const pct = parseFloat(scrubSlider.value);
+      const targetDist = (pct / 100) * simTotalDist;
+      updateSimCar(targetDist);
+    });
+  }
+
+  startSimTicker();
+}
+

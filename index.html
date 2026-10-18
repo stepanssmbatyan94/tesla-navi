@@ -3,6 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="referrer" content="strict-origin-when-cross-origin">
   <title>Tesla Navi — In-Car Navigation Cockpit</title>
 
   <!-- Google Fonts: Inter + Noto Sans Armenian (Fixes tofu boxes in Tesla Chromium) -->
@@ -102,6 +103,7 @@
           <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
         </svg>
         <input id="drawer-search-input" class="drawer-search-input" type="text" placeholder="Поиск мест и адресов..." autocomplete="off" />
+        <button id="btn-voice-search" class="card-close-btn" style="width: 30px; height: 30px; font-size: 14px;" title="Голосовой поиск">🎤</button>
       </div>
       <button id="btn-close-search" class="drawer-close-btn" title="Закрыть">✕</button>
     </div>
@@ -274,19 +276,19 @@
         <span id="speed-current" class="current-speed-val">0</span>
         <span class="current-speed-unit">км/ч</span>
       </div>
-      <div class="speed-limit-circle">60</div>
+      <div id="speed-limit-val" class="speed-limit-circle">60</div>
     </div>
 
-    <!-- Top Right Auxiliary Row: Traffic Score Badge (8 баллов) + Sound Toggle Button -->
+    <!-- Top Right Auxiliary Row: Traffic Score Badge + Sound Toggle Button -->
     <div class="top-aux-row">
-      <div id="traffic-score-badge" class="traffic-score-badge" title="Балл пробок: 8 из 10">8</div>
+      <div id="traffic-score-badge" class="traffic-score-badge" title="Балл пробок">2</div>
       <button id="btn-sound-toggle" class="sound-toggle-btn" title="Звук навигатора">🔊</button>
     </div>
 
-    <!-- Traffic Camera / Signal Alert (Counting down distance) -->
-    <div id="camera-alert-badge" class="camera-alert-badge">
+    <!-- Traffic Camera / Signal Alert (Only shown when approaching real camera) -->
+    <div id="camera-alert-badge" class="camera-alert-badge hidden">
       <div class="camera-alert-icon">📷</div>
-      <span id="camera-alert-dist" class="camera-alert-dist">370 м</span>
+      <span id="camera-alert-dist" class="camera-alert-dist">0 м</span>
     </div>
   </div>
 
@@ -294,9 +296,9 @@
   <div id="bottom-nav-bar" class="bottom-nav-bar hidden">
     <div class="nav-metrics-top-row">
       <div class="nav-metrics">
-        <span id="nav-duration" class="nav-metric-duration">17 мин</span>
-        <span id="nav-distance">4 км</span>
-        <span id="nav-eta">18:40</span>
+        <span id="nav-duration" class="nav-metric-duration">0 мин</span>
+        <span id="nav-distance">0 км</span>
+        <span id="nav-eta">--:--</span>
         <span class="nav-battery-badge">🔋 82%</span>
       </div>
       <button id="btn-cancel-nav" class="nav-cancel-btn" title="Отменить маршрут">✕</button>
@@ -307,7 +309,11 @@
       <div class="route-progress-bar">
         <div class="prog-seg green" style="width: 100%; background: #82ea0d;"></div>
       </div>
-      <div id="prog-car-cursor" class="prog-car-cursor" style="left: 0%;">▷</div>
+      <div id="prog-car-cursor" class="prog-car-cursor" style="left: 0%;">
+        <svg viewBox="0 0 16 16" width="14" height="14">
+          <polygon points="3,2 13,8 3,14 6,8" fill="#fde047" stroke="#000" stroke-width="1.5" stroke-linejoin="round"/>
+        </svg>
+      </div>
     </div>
   </div>
 
@@ -408,26 +414,26 @@
 
     <!-- Embedded Video Player Frame -->
     <div class="yt-video-frame">
-      <iframe id="yt-player-iframe" src="https://www.youtube-nocookie.com/embed/m-V84sU0Y3I?autoplay=0&enablejsapi=1" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe>
+      <iframe id="yt-player-iframe" src="https://www.youtube.com/embed/-o07wiIMd3g?autoplay=0&enablejsapi=1" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
     </div>
 
     <!-- Popular Track Suggestions -->
     <div id="yt-suggestions-list" class="yt-suggestions-row">
-      <div class="yt-song-item active" data-id="m-V84sU0Y3I" data-title="BRUNETTE - ANHETANAM">
+      <div class="yt-song-item active" data-id="-o07wiIMd3g" data-title="BRUNETTE - ANHETANAM">
         <span>🎵 BRUNETTE - ANHETANAM</span>
         <span>3:12</span>
       </div>
-      <div class="yt-song-item" data-id="aM5Wv12xPqQ" data-title="K/ES - yellowheart. feat Misho">
+      <div class="yt-song-item" data-id="xNW2-ruUlVI" data-title="K/ES - yellowheart. feat Misho">
         <span>🎵 K/ES - yellowheart (Misho)</span>
         <span>2:55</span>
       </div>
-      <div class="yt-song-item" data-id="kJQP7kiw5Fk" data-title="Arkadi Dumikyan - Im Hreshtak">
-        <span>🎵 Arkadi Dumikyan - Im Hreshtak</span>
-        <span>3:40</span>
+      <div class="yt-song-item" data-id="Za4JpfNyHkY" data-title="Arkadi Dumikyan - Hreshtakneri qaxaq">
+        <span>🎵 Arkadi Dumikyan - Hreshtakneri qaxaq</span>
+        <span>4:18</span>
       </div>
-      <div class="yt-song-item" data-id="2Vv-BfVoq4g" data-title="Artur Arakelyan - Kyanqis Hamar">
-        <span>🎵 Artur Arakelyan - Kyanqis Hamar</span>
-        <span>3:22</span>
+      <div class="yt-song-item" data-id="RWoOXqWeBvw" data-title="Artur Arakelyan - Kyanqis Imast">
+        <span>🎵 Artur Arakelyan - Kyanqis Imast</span>
+        <span>3:45</span>
       </div>
     </div>
 
@@ -482,6 +488,69 @@
       </div>
 
       <button id="btn-pairing-done" class="btn-primary-action" data-i18n="done">Готово</button>
+    </div>
+  </div>
+
+  <!-- 10. Developer Mode Overlay Pill & Control Panel (?mode=dev) -->
+  <div id="dev-mode-pill" class="dev-mode-pill hidden">
+    <span>🛠️ DEV MODE</span>
+    <button id="btn-dev-toggle-panel" class="dev-btn" style="padding: 2px 8px; font-size: 11px;">Панель</button>
+    <button id="btn-dev-exit" class="dev-exit-btn" title="Отключить Dev Mode">✕ Выйти</button>
+  </div>
+
+  <div id="dev-mode-panel" class="dev-mode-panel hidden">
+    <div class="dev-header">
+      <div class="dev-title">
+        <span>🛠️ Tesla Navi Simulator & Diagnostics</span>
+      </div>
+      <div class="dev-tabs">
+        <button id="tab-btn-sim" class="dev-tab-btn active">🚗 Симулятор</button>
+        <button id="tab-btn-diag" class="dev-tab-btn">📋 Диагностика</button>
+        <button id="btn-close-dev-panel" class="card-close-btn" style="width: 24px; height: 24px; font-size: 11px;">✕</button>
+      </div>
+    </div>
+
+    <!-- Tab 1: Simulator Controls -->
+    <div id="dev-tab-sim" class="dev-section">
+      <div class="dev-row">
+        <span class="dev-label">Маршрут:</span>
+        <button id="btn-sim-route-aghveran" class="dev-btn primary">Ереван → Aghveran</button>
+        <button id="btn-sim-route-center" class="dev-btn">Каскад → Пл. Республики</button>
+      </div>
+
+      <div class="dev-row">
+        <span class="dev-label">Движение:</span>
+        <button id="btn-sim-play" class="dev-btn active">▶ Поехать</button>
+        <button id="btn-sim-pause" class="dev-btn">⏸ Пауза</button>
+        <button id="btn-sim-reset" class="dev-btn">⏹ Сброс</button>
+        <button id="btn-sim-step-back" class="dev-btn">⏪ -100м</button>
+        <button id="btn-sim-step-fwd" class="dev-btn">⏩ +100м</button>
+      </div>
+
+      <div class="dev-row">
+        <span class="dev-label">Скорость:</span>
+        <button id="btn-speed-60" class="dev-btn active">60 км/ч</button>
+        <button id="btn-speed-90" class="dev-btn">90 км/ч</button>
+        <button id="btn-speed-120" class="dev-btn">120 км/ч</button>
+        <button id="btn-speed-250" class="dev-btn">250 км/ч (Быстро)</button>
+      </div>
+
+      <div class="dev-row">
+        <span class="dev-label">Позиция:</span>
+        <input id="sim-scrub-slider" class="dev-slider" type="range" min="0" max="100" value="0" step="0.5" />
+        <span id="sim-scrub-val" style="font-size: 12px; font-family: var(--font-mono); min-width: 45px;">0%</span>
+      </div>
+    </div>
+
+    <!-- Tab 2: Diagnostics & Logs -->
+    <div id="dev-tab-diag" class="dev-section hidden">
+      <div class="dev-row">
+        <button id="btn-diag-mic" class="dev-btn">🎤 Тест микрофона</button>
+        <button id="btn-diag-tts" class="dev-btn">🔊 Тест звука / подсказки</button>
+        <button id="btn-diag-yt" class="dev-btn">🎵 Тест YouTube</button>
+        <button id="btn-diag-clear" class="dev-btn">🧹 Очистить</button>
+      </div>
+      <div id="dev-log-box" class="dev-log-box"></div>
     </div>
   </div>
 
