@@ -428,6 +428,115 @@ html, body {
   text-overflow: ellipsis;
 }
 
+.commute-right-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.commute-edit-btn {
+  background: transparent;
+  border: none;
+  font-size: 13px;
+  cursor: pointer;
+  padding: 3px 6px;
+  border-radius: 8px;
+  opacity: 0.65;
+  transition: all 0.15s ease;
+}
+
+.commute-edit-btn:hover {
+  opacity: 1;
+  background: #e2e8f0;
+  transform: scale(1.08);
+}
+
+.commute-add-badge {
+  font-size: 11px;
+  font-weight: 700;
+  color: #2563eb;
+  background: #eff6ff;
+  border-radius: 8px;
+  padding: 2px 7px;
+}
+
+/* Quick Favorites Bar inside Search Drawer */
+.commute-favorites-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  padding: 10px 14px;
+  cursor: pointer;
+  transition: all 0.18s ease;
+}
+
+.commute-favorites-bar:hover {
+  background: #f1f5f9;
+  border-color: #2563eb;
+  transform: translateY(-1px);
+}
+
+.fav-bar-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.fav-star-icon {
+  font-size: 16px;
+}
+
+.fav-bar-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: #111827;
+}
+
+.fav-count-pill {
+  font-size: 11px;
+  font-weight: 700;
+  color: #3b82f6;
+  background: #eff6ff;
+  border-radius: 10px;
+  padding: 1px 8px;
+}
+
+.fav-bar-right {
+  display: flex;
+  align-items: center;
+}
+
+.fav-chevron {
+  font-size: 20px;
+  line-height: 1;
+  color: #94a3b8;
+  font-weight: 600;
+}
+
+/* Star button on Search Results */
+.item-star-btn {
+  background: transparent;
+  border: none;
+  font-size: 16px;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 6px;
+  color: #cbd5e1;
+  transition: color 0.15s ease, transform 0.15s ease;
+}
+
+.item-star-btn:hover {
+  transform: scale(1.2);
+  color: #f59e0b;
+}
+
+.item-star-btn.starred {
+  color: #f59e0b;
+}
+
 /* Category Chips Row */
 .drawer-chips-row {
   display: flex;
@@ -532,6 +641,262 @@ html, body {
   font-family: var(--font-mono);
   flex: none;
   margin-left: 8px;
+}
+
+/* ==========================================================================
+   3.5. My Places Drawer (Mapsev Screenshot 1 Architecture)
+   ========================================================================== */
+.my-places-drawer {
+  position: absolute;
+  top: 16px;
+  left: 16px;
+  width: 440px;
+  max-width: 92vw;
+  max-height: calc(100vh - 32px);
+  z-index: 70;
+  background: #ffffff;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 24px;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.12), 0 2px 8px rgba(0, 0, 0, 0.04);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  transition: transform 0.32s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.24s ease;
+  transform: translateX(0);
+  opacity: 1;
+}
+
+.my-places-drawer.hidden {
+  transform: translateX(-120%);
+  opacity: 0;
+  pointer-events: none;
+}
+
+.my-places-handle {
+  width: 36px;
+  height: 4px;
+  background: #e2e8f0;
+  border-radius: 2px;
+  margin: 10px auto 4px auto;
+}
+
+.my-places-header {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 16px 14px 16px;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.my-places-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: #111827;
+}
+
+.my-places-header .drawer-close-btn {
+  position: absolute;
+  right: 14px;
+  top: 8px;
+}
+
+.btn-back-places {
+  position: absolute;
+  left: 14px;
+  top: 8px;
+}
+
+.my-places-list {
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  overflow-y: auto;
+}
+
+.my-place-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 14px;
+  border-radius: 16px;
+  background: #ffffff;
+  border: 1px solid transparent;
+  transition: all 0.18s ease;
+  cursor: pointer;
+}
+
+.my-place-card:hover {
+  background: #f8fafc;
+  border-color: #f1f5f9;
+}
+
+.my-place-left {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex: 1;
+  min-width: 0;
+}
+
+.my-place-icon-box {
+  width: 44px;
+  height: 44px;
+  border-radius: 14px;
+  background: #f1f5f9;
+  display: grid;
+  place-items: center;
+  flex: none;
+  color: #334155;
+}
+
+.my-place-icon-box.star-box {
+  background: #fef3c7;
+  color: #d97706;
+}
+
+.my-place-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.my-place-name {
+  font-size: 16px;
+  font-weight: 700;
+  color: #111827;
+}
+
+.my-place-sub {
+  font-size: 13px;
+  color: #64748b;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.my-place-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+}
+
+.my-place-add-link {
+  font-size: 15px;
+  font-weight: 600;
+  color: #2563eb;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px 8px;
+}
+
+.my-place-add-link:hover {
+  text-decoration: underline;
+}
+
+.my-place-action-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: none;
+  background: #f1f5f9;
+  color: #4b5563;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  font-size: 13px;
+  transition: all 0.15s ease;
+}
+
+.my-place-action-btn:hover {
+  background: #e2e8f0;
+  color: #0f172a;
+  transform: scale(1.08);
+}
+
+.my-place-action-btn.route-btn {
+  background: #eff6ff;
+  color: #2563eb;
+}
+.my-place-action-btn.route-btn:hover {
+  background: #dbeafe;
+}
+
+.my-place-action-btn.delete-btn:hover {
+  background: #fee2e2;
+  color: #ef4444;
+}
+
+.my-places-divider {
+  height: 1px;
+  background: #f1f5f9;
+  margin: 6px 12px;
+}
+
+.btn-add-favorite-bar {
+  width: 100%;
+  padding: 12px;
+  background: #eff6ff;
+  border: 1.5px dashed #93c5fd;
+  border-radius: 14px;
+  color: #2563eb;
+  font-size: 14px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  cursor: pointer;
+  transition: all 0.18s ease;
+}
+
+.btn-add-favorite-bar:hover {
+  background: #dbeafe;
+  border-color: #2563eb;
+}
+
+/* Edit Place Modal Styles */
+.btn-quick-gps-pill {
+  width: 100%;
+  padding: 9px 12px;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+  color: #2563eb;
+  font-size: 13px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-quick-gps-pill:hover {
+  background: #eff6ff;
+  border-color: #bfdbfe;
+}
+
+.btn-secondary-delete {
+  flex: 1;
+  height: 48px;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 16px;
+  color: #ef4444;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-secondary-delete:hover {
+  background: #fee2e2;
 }
 
 /* 4. Compact Maneuver HUD Card (Mapsev Light Style) */

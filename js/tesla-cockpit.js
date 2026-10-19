@@ -287,11 +287,76 @@ function updatePairingStatus(connected) {
   }
 }
 
-// Commute Bookmarks Data (Home & Work)
-const COMMUTE_LOCATIONS = {
+// ==========================================================================
+// Saved Places Manager: Home, Work & Favorites (Mapsev & Yandex Architecture)
+// ==========================================================================
+const DEFAULT_SAVED_PLACES = {
   home: { name: 'Дом', address: 'ул. Амиряна, 18', lat: 40.1772, lng: 44.5105 },
-  work: { name: 'Работа', address: 'ул. Акоп Акопян, 3', lat: 40.1982, lng: 44.4928 }
+  work: { name: 'Работа', address: 'ул. Акоп Акопян, 3', lat: 40.1982, lng: 44.4928 },
+  favorites: [
+    { id: 'fav_1', name: 'Dalma Garden Mall', address: 'Цицернакабердское шоссе, 3', lat: 40.1802, lng: 44.4842 },
+    { id: 'fav_2', name: 'Yerevan Mall', address: 'проспект Аршакуняц, 34', lat: 40.1534, lng: 44.5026 }
+  ]
 };
+
+let userSavedPlaces = loadSavedPlaces();
+
+function loadSavedPlaces() {
+  try {
+    const raw = localStorage.getItem('tesla_saved_places');
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      return {
+        home: parsed.home !== undefined ? parsed.home : DEFAULT_SAVED_PLACES.home,
+        work: parsed.work !== undefined ? parsed.work : DEFAULT_SAVED_PLACES.work,
+        favorites: Array.isArray(parsed.favorites) ? parsed.favorites : DEFAULT_SAVED_PLACES.favorites
+      };
+    }
+  } catch (e) {
+    console.warn('Error loading saved places from localStorage:', e);
+  }
+  return JSON.parse(JSON.stringify(DEFAULT_SAVED_PLACES));
+}
+
+function savePlacesToStorage() {
+  try {
+    localStorage.setItem('tesla_saved_places', JSON.stringify(userSavedPlaces));
+  } catch (e) {
+    console.warn('Error saving places to localStorage:', e);
+  }
+  renderAllSavedPlacesUI();
+}
+
+function isLocationInFavorites(lat, lng, name) {
+  if (!userSavedPlaces.favorites) return false;
+  return userSavedPlaces.favorites.some(f => {
+    if (f.lat && f.lng && lat && lng && Math.abs(f.lat - lat) < 0.0003 && Math.abs(f.lng - lng) < 0.0003) return true;
+    if (f.name && name && f.name.toLowerCase() === name.toLowerCase()) return true;
+    return false;
+  });
+}
+
+function toggleFavoritePlace(place) {
+  if (!userSavedPlaces.favorites) userSavedPlaces.favorites = [];
+  const idx = userSavedPlaces.favorites.findIndex(f => {
+    if (f.lat && f.lng && place.lat && place.lng && Math.abs(f.lat - place.lat) < 0.0003 && Math.abs(f.lng - place.lng) < 0.0003) return true;
+    if (f.name && place.name && f.name.toLowerCase() === place.name.toLowerCase()) return true;
+    return false;
+  });
+
+  if (idx >= 0) {
+    userSavedPlaces.favorites.splice(idx, 1);
+  } else {
+    userSavedPlaces.favorites.push({
+      id: 'fav_' + Date.now(),
+      name: place.name || place.title || 'Избранное',
+      address: place.address || place.subtitle || 'Ереван',
+      lat: place.lat,
+      lng: place.lng
+    });
+  }
+  savePlacesToStorage();
+}
 
 let currentRouteInfo = null;
 
@@ -604,21 +669,102 @@ function initToolbarHandlers() {
     });
   }
 
-  // Commute Bookmarks: Home / Work
+  // Commute Bookmarks: Home / Work (Click to Navigate, ✏️ to Edit/Delete)
   const homeBtn = document.getElementById('commute-home');
   const workBtn = document.getElementById('commute-work');
+  const btnEditHome = document.getElementById('btn-edit-home');
+  const btnEditWork = document.getElementById('btn-edit-work');
+  const favBar = document.getElementById('commute-favorites-bar');
+
   if (homeBtn) {
-    homeBtn.addEventListener('click', () => {
-      searchDrawer.classList.add('hidden');
-      startNavigationTo(COMMUTE_LOCATIONS.home);
+    homeBtn.addEventListener('click', (e) => {
+      if (e.target.closest('#btn-edit-home')) return;
+      if (userSavedPlaces.home) {
+        searchDrawer.classList.add('hidden');
+        startNavigationTo(userSavedPlaces.home);
+      } else {
+        openEditPlaceModal('home');
+      }
     });
   }
+
   if (workBtn) {
-    workBtn.addEventListener('click', () => {
-      searchDrawer.classList.add('hidden');
-      startNavigationTo(COMMUTE_LOCATIONS.work);
+    workBtn.addEventListener('click', (e) => {
+      if (e.target.closest('#btn-edit-work')) return;
+      if (userSavedPlaces.work) {
+        searchDrawer.classList.add('hidden');
+        startNavigationTo(userSavedPlaces.work);
+      } else {
+        openEditPlaceModal('work');
+      }
     });
   }
+
+  if (btnEditHome) {
+    btnEditHome.addEventListener('click', (e) => {
+      e.stopPropagation();
+      openEditPlaceModal('home');
+    });
+  }
+
+  if (btnEditWork) {
+    btnEditWork.addEventListener('click', (e) => {
+      e.stopPropagation();
+      openEditPlaceModal('work');
+    });
+  }
+
+  if (favBar) {
+    favBar.addEventListener('click', () => {
+      searchDrawer.classList.add('hidden');
+      openMyPlacesDrawer(true);
+    });
+  }
+
+  // My Places Drawer (Mapsev Screenshot 1)
+  const btnOpenMyPlaces = document.getElementById('btn-open-my-places');
+  const myPlacesDrawer = document.getElementById('my-places-drawer');
+  const btnCloseMyPlaces = document.getElementById('btn-close-my-places');
+  const btnCloseFavView = document.getElementById('btn-close-fav-view');
+  const btnBackToPlaces = document.getElementById('btn-back-to-places');
+  const myPlaceFavRow = document.getElementById('my-place-favorites-row');
+  const btnAddNewFav = document.getElementById('btn-add-new-favorite');
+
+  if (btnOpenMyPlaces) {
+    btnOpenMyPlaces.addEventListener('click', () => {
+      const isHidden = myPlacesDrawer.classList.contains('hidden');
+      if (isHidden) {
+        openMyPlacesDrawer(false);
+      } else {
+        closeMyPlacesDrawer();
+      }
+    });
+  }
+
+  if (btnCloseMyPlaces) btnCloseMyPlaces.addEventListener('click', closeMyPlacesDrawer);
+  if (btnCloseFavView) btnCloseFavView.addEventListener('click', closeMyPlacesDrawer);
+
+  if (myPlaceFavRow) {
+    myPlaceFavRow.addEventListener('click', () => {
+      showMyPlacesView('favorites');
+    });
+  }
+
+  if (btnBackToPlaces) {
+    btnBackToPlaces.addEventListener('click', () => {
+      showMyPlacesView('main');
+    });
+  }
+
+  if (btnAddNewFav) {
+    btnAddNewFav.addEventListener('click', () => {
+      openEditPlaceModal('favorite');
+    });
+  }
+
+  // Initialize modal handlers and render UI
+  initEditPlaceModalHandlers();
+  renderAllSavedPlacesUI();
 
   // Phone Pairing Modal
   const btnOpenPairing = document.getElementById('btn-open-pairing');
@@ -687,16 +833,472 @@ function updateCommuteEtas() {
   if (!mapEngine) return;
   const current = mapEngine.currentPosition;
   ['home', 'work'].forEach(key => {
-    const loc = COMMUTE_LOCATIONS[key];
+    const loc = userSavedPlaces[key];
+    const badge = document.getElementById(`${key}-eta-badge`);
+    if (!loc) {
+      if (badge) {
+        badge.textContent = '+ Задать';
+        badge.className = 'commute-add-badge';
+      }
+      return;
+    }
     const distMeters = mapEngine.calculateDistance(current.lat, current.lng, loc.lat, loc.lng);
     const speedMps = 8.5; // ~30 km/h city average
     const durationMin = Math.max(3, Math.round(distMeters / (speedMps * 60)));
     const distStr = distMeters >= 1000 ? `${(distMeters / 1000).toFixed(1)} км` : `${Math.round(distMeters)} м`;
-    const badge = document.getElementById(`${key}-eta-badge`);
     if (badge) {
-      badge.textContent = `${durationMin} мин · ${distStr}`;
+      badge.textContent = `${durationMin} мин • ${distStr}`;
+      badge.className = 'commute-eta-badge';
     }
   });
+}
+
+function renderAllSavedPlacesUI() {
+  // 1. Update Search Drawer Commute Tiles
+  const homeTitle = document.getElementById('home-title-text');
+  const homeSub = document.getElementById('home-address-sub');
+  const homeBadge = document.getElementById('home-eta-badge');
+  const btnEditHome = document.getElementById('btn-edit-home');
+
+  if (userSavedPlaces.home) {
+    if (homeTitle) homeTitle.textContent = userSavedPlaces.home.name || 'Дом';
+    if (homeSub) {
+      homeSub.textContent = userSavedPlaces.home.address;
+      homeSub.style.color = '#64748b';
+    }
+    if (btnEditHome) btnEditHome.classList.remove('hidden');
+  } else {
+    if (homeTitle) homeTitle.textContent = 'Дом';
+    if (homeSub) {
+      homeSub.textContent = '+ Нажмите, чтобы задать адрес';
+      homeSub.style.color = '#94a3b8';
+    }
+    if (homeBadge) {
+      homeBadge.textContent = '+ Задать';
+      homeBadge.className = 'commute-add-badge';
+    }
+    if (btnEditHome) btnEditHome.classList.add('hidden');
+  }
+
+  const workTitle = document.getElementById('work-title-text');
+  const workSub = document.getElementById('work-address-sub');
+  const workBadge = document.getElementById('work-eta-badge');
+  const btnEditWork = document.getElementById('btn-edit-work');
+
+  if (userSavedPlaces.work) {
+    if (workTitle) workTitle.textContent = userSavedPlaces.work.name || 'Работа';
+    if (workSub) {
+      workSub.textContent = userSavedPlaces.work.address;
+      workSub.style.color = '#64748b';
+    }
+    if (btnEditWork) btnEditWork.classList.remove('hidden');
+  } else {
+    if (workTitle) workTitle.textContent = 'Работа';
+    if (workSub) {
+      workSub.textContent = '+ Нажмите, чтобы задать адрес';
+      workSub.style.color = '#94a3b8';
+    }
+    if (workBadge) {
+      workBadge.textContent = '+ Задать';
+      workBadge.className = 'commute-add-badge';
+    }
+    if (btnEditWork) btnEditWork.classList.add('hidden');
+  }
+
+  const favCount = (userSavedPlaces.favorites || []).length;
+  const favBadge = document.getElementById('fav-count-badge');
+  if (favBadge) favBadge.textContent = favCount;
+
+  // 2. Update "My places" Drawer (Screenshot 1)
+  const myHomeSub = document.getElementById('my-places-home-sub');
+  const myHomeActions = document.getElementById('my-places-home-actions');
+  if (myHomeSub && myHomeActions) {
+    if (userSavedPlaces.home) {
+      myHomeSub.textContent = userSavedPlaces.home.address;
+      myHomeActions.innerHTML = `
+        <button class="my-place-action-btn route-btn" id="btn-my-home-route" title="Маршрут">🚗</button>
+        <button class="my-place-action-btn" id="btn-my-home-edit" title="Изменить">✏️</button>
+        <button class="my-place-action-btn delete-btn" id="btn-my-home-del" title="Удалить">🗑️</button>
+      `;
+      document.getElementById('btn-my-home-route')?.addEventListener('click', (e) => {
+        e.stopPropagation();
+        closeMyPlacesDrawer();
+        startNavigationTo(userSavedPlaces.home);
+      });
+      document.getElementById('btn-my-home-edit')?.addEventListener('click', (e) => {
+        e.stopPropagation();
+        openEditPlaceModal('home');
+      });
+      document.getElementById('btn-my-home-del')?.addEventListener('click', (e) => {
+        e.stopPropagation();
+        userSavedPlaces.home = null;
+        savePlacesToStorage();
+      });
+    } else {
+      myHomeSub.textContent = 'Не задан';
+      myHomeActions.innerHTML = `<button class="my-place-add-link" id="btn-my-home-add">Add</button>`;
+      document.getElementById('btn-my-home-add')?.addEventListener('click', (e) => {
+        e.stopPropagation();
+        openEditPlaceModal('home');
+      });
+    }
+  }
+
+  const myWorkSub = document.getElementById('my-places-work-sub');
+  const myWorkActions = document.getElementById('my-places-work-actions');
+  if (myWorkSub && myWorkActions) {
+    if (userSavedPlaces.work) {
+      myWorkSub.textContent = userSavedPlaces.work.address;
+      myWorkActions.innerHTML = `
+        <button class="my-place-action-btn route-btn" id="btn-my-work-route" title="Маршрут">🚗</button>
+        <button class="my-place-action-btn" id="btn-my-work-edit" title="Изменить">✏️</button>
+        <button class="my-place-action-btn delete-btn" id="btn-my-work-del" title="Удалить">🗑️</button>
+      `;
+      document.getElementById('btn-my-work-route')?.addEventListener('click', (e) => {
+        e.stopPropagation();
+        closeMyPlacesDrawer();
+        startNavigationTo(userSavedPlaces.work);
+      });
+      document.getElementById('btn-my-work-edit')?.addEventListener('click', (e) => {
+        e.stopPropagation();
+        openEditPlaceModal('work');
+      });
+      document.getElementById('btn-my-work-del')?.addEventListener('click', (e) => {
+        e.stopPropagation();
+        userSavedPlaces.work = null;
+        savePlacesToStorage();
+      });
+    } else {
+      myWorkSub.textContent = 'Не задан';
+      myWorkActions.innerHTML = `<button class="my-place-add-link" id="btn-my-work-add">Add</button>`;
+      document.getElementById('btn-my-work-add')?.addEventListener('click', (e) => {
+        e.stopPropagation();
+        openEditPlaceModal('work');
+      });
+    }
+  }
+
+  const myFavSub = document.getElementById('my-places-fav-subtitle');
+  if (myFavSub) {
+    myFavSub.textContent = `${favCount} places`;
+  }
+
+  // 3. Render Favorites Subview List
+  renderFavoritesList();
+
+  // 4. Update live ETAs
+  updateCommuteEtas();
+}
+
+function renderFavoritesList() {
+  const container = document.getElementById('favorites-list-container');
+  if (!container) return;
+  container.innerHTML = '';
+
+  const favs = userSavedPlaces.favorites || [];
+  if (favs.length === 0) {
+    container.innerHTML = `
+      <div style="padding: 30px 16px; text-align: center; color: #94a3b8;">
+        <div style="font-size: 36px; margin-bottom: 8px;">⭐</div>
+        <div style="font-size: 15px; font-weight: 700; color: #111827;">Нет избранных мест</div>
+        <div style="font-size: 13px; margin-top: 4px;">Нажмите кнопку выше или звездочку в поиске, чтобы добавить место</div>
+      </div>
+    `;
+    return;
+  }
+
+  const cur = mapEngine ? mapEngine.currentPosition : { lat: 40.1776, lng: 44.5125 };
+
+  favs.forEach((fav) => {
+    const distMeters = (mapEngine && fav.lat && fav.lng)
+      ? mapEngine.calculateDistance(cur.lat, cur.lng, fav.lat, fav.lng)
+      : null;
+    const distStr = distMeters != null
+      ? (distMeters >= 1000 ? `${(distMeters / 1000).toFixed(1)} км` : `${Math.round(distMeters)} м`)
+      : '';
+
+    const card = document.createElement('div');
+    card.className = 'my-place-card';
+    card.innerHTML = `
+      <div class="my-place-left">
+        <div class="my-place-icon-box star-box">⭐</div>
+        <div class="my-place-info">
+          <div class="my-place-name">${fav.name}</div>
+          <div class="my-place-sub">${fav.address || ''}${distStr ? ' • ' + distStr : ''}</div>
+        </div>
+      </div>
+      <div class="my-place-actions">
+        <button class="my-place-action-btn route-btn" title="Поехать">🚗</button>
+        <button class="my-place-action-btn delete-btn" title="Удалить">✕</button>
+      </div>
+    `;
+
+    card.addEventListener('click', () => {
+      closeMyPlacesDrawer();
+      startNavigationTo({ name: fav.name, lat: fav.lat, lng: fav.lng });
+    });
+
+    card.querySelector('.route-btn')?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      closeMyPlacesDrawer();
+      startNavigationTo({ name: fav.name, lat: fav.lat, lng: fav.lng });
+    });
+
+    card.querySelector('.delete-btn')?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const idx = userSavedPlaces.favorites.findIndex(f => f.id === fav.id);
+      if (idx >= 0) {
+        userSavedPlaces.favorites.splice(idx, 1);
+        savePlacesToStorage();
+      }
+    });
+
+    container.appendChild(card);
+  });
+}
+
+function openMyPlacesDrawer(showFavorites = false) {
+  const drawer = document.getElementById('my-places-drawer');
+  const btn = document.getElementById('btn-open-my-places');
+  if (!drawer) return;
+
+  document.getElementById('search-drawer')?.classList.add('hidden');
+  document.getElementById('route-alternatives-drawer')?.classList.add('hidden');
+
+  renderAllSavedPlacesUI();
+  showMyPlacesView(showFavorites ? 'favorites' : 'main');
+
+  drawer.classList.remove('hidden');
+  if (btn) btn.classList.add('active');
+}
+
+function closeMyPlacesDrawer() {
+  const drawer = document.getElementById('my-places-drawer');
+  const btn = document.getElementById('btn-open-my-places');
+  if (drawer) drawer.classList.add('hidden');
+  if (btn) btn.classList.remove('active');
+}
+
+function showMyPlacesView(viewName) {
+  const mainView = document.getElementById('my-places-main-view');
+  const favView = document.getElementById('my-places-fav-view');
+  if (!mainView || !favView) return;
+
+  if (viewName === 'favorites') {
+    mainView.classList.add('hidden');
+    favView.classList.remove('hidden');
+  } else {
+    mainView.classList.remove('hidden');
+    favView.classList.add('hidden');
+  }
+}
+
+let currentEditTarget = null; // { type: 'home' | 'work' | 'favorite', place: {...}, selectedLocation: { lat, lng, address } }
+
+function openEditPlaceModal(targetType, existingPlace = null) {
+  currentEditTarget = {
+    type: targetType,
+    place: existingPlace || (targetType === 'home' ? userSavedPlaces.home : (targetType === 'work' ? userSavedPlaces.work : null)),
+    selectedLocation: null
+  };
+
+  const modal = document.getElementById('edit-place-modal');
+  const titleEl = document.getElementById('edit-place-modal-title');
+  const nameWrap = document.getElementById('edit-place-name-wrap');
+  const nameInput = document.getElementById('edit-place-name-input');
+  const addrInput = document.getElementById('edit-place-address-input');
+  const delBtn = document.getElementById('btn-delete-place');
+  const suggsContainer = document.getElementById('edit-place-suggestions');
+
+  if (!modal) return;
+  if (suggsContainer) suggsContainer.innerHTML = '';
+
+  const isFav = targetType === 'favorite';
+  const hasExisting = !!currentEditTarget.place;
+
+  if (nameWrap) nameWrap.classList.toggle('hidden', !isFav);
+
+  if (targetType === 'home') {
+    titleEl.textContent = hasExisting ? 'Настройка адреса: Дом 🏠' : 'Добавить адрес: Дом 🏠';
+    addrInput.value = currentEditTarget.place?.address || '';
+  } else if (targetType === 'work') {
+    titleEl.textContent = hasExisting ? 'Настройка адреса: Работа 💼' : 'Добавить адрес: Работа 💼';
+    addrInput.value = currentEditTarget.place?.address || '';
+  } else {
+    titleEl.textContent = hasExisting ? 'Изменить избранное ⭐' : 'Добавить в избранное ⭐';
+    nameInput.value = currentEditTarget.place?.name || '';
+    addrInput.value = currentEditTarget.place?.address || '';
+  }
+
+  if (currentEditTarget.place) {
+    currentEditTarget.selectedLocation = {
+      lat: currentEditTarget.place.lat,
+      lng: currentEditTarget.place.lng,
+      address: currentEditTarget.place.address
+    };
+  }
+
+  if (delBtn) delBtn.classList.toggle('hidden', !hasExisting);
+
+  modal.classList.remove('hidden');
+  setTimeout(() => addrInput.focus(), 150);
+}
+
+function initEditPlaceModalHandlers() {
+  const modal = document.getElementById('edit-place-modal');
+  const closeBtn = document.getElementById('btn-close-edit-place-x');
+  const addrInput = document.getElementById('edit-place-address-input');
+  const nameInput = document.getElementById('edit-place-name-input');
+  const suggsContainer = document.getElementById('edit-place-suggestions');
+  const btnCurrentGps = document.getElementById('btn-use-current-gps-location');
+  const btnSave = document.getElementById('btn-save-place');
+  const btnDelete = document.getElementById('btn-delete-place');
+
+  if (!modal) return;
+
+  if (closeBtn) closeBtn.addEventListener('click', () => modal.classList.add('hidden'));
+
+  // Live geocoder search for edit modal
+  let editDebounce = null;
+  if (addrInput) {
+    addrInput.addEventListener('input', () => {
+      clearTimeout(editDebounce);
+      const query = addrInput.value.trim();
+      if (query.length < 2) {
+        if (suggsContainer) suggsContainer.innerHTML = '';
+        return;
+      }
+
+      editDebounce = setTimeout(async () => {
+        try {
+          const cur = mapEngine ? mapEngine.currentPosition : { lat: 40.1776, lng: 44.5125 };
+          const res = await fetch(`/api/geocode?q=${encodeURIComponent(query)}&lat=${cur.lat}&lng=${cur.lng}`);
+          const items = await res.json();
+          if (suggsContainer) {
+            suggsContainer.innerHTML = '';
+            if (items && items.length > 0) {
+              items.forEach(it => {
+                const title = it.title || query;
+                const subtitle = it.subtitle || 'Ереван, Армения';
+                const el = document.createElement('div');
+                el.className = 'drawer-list-item';
+                el.innerHTML = `
+                  <div class="item-left">
+                    <div class="item-icon">📍</div>
+                    <div>
+                      <div class="item-title">${title}</div>
+                      <div class="item-subtitle">${subtitle}</div>
+                    </div>
+                  </div>
+                `;
+                el.addEventListener('click', () => {
+                  currentEditTarget.selectedLocation = {
+                    lat: it.lat,
+                    lng: it.lng,
+                    address: title + (subtitle ? `, ${subtitle}` : '')
+                  };
+                  addrInput.value = currentEditTarget.selectedLocation.address;
+                  suggsContainer.innerHTML = '';
+                });
+                suggsContainer.appendChild(el);
+              });
+            }
+          }
+        } catch (err) {
+          console.warn('Edit place geocode error:', err);
+        }
+      }, 200);
+    });
+  }
+
+  // Use current car GPS location
+  if (btnCurrentGps) {
+    btnCurrentGps.addEventListener('click', () => {
+      const cur = mapEngine ? mapEngine.currentPosition : { lat: 40.1776, lng: 44.5125 };
+      const currentAddr = `Ереван (${Number(cur.lat).toFixed(4)}, ${Number(cur.lng).toFixed(4)})`;
+      currentEditTarget.selectedLocation = {
+        lat: cur.lat,
+        lng: cur.lng,
+        address: currentAddr
+      };
+      if (addrInput) addrInput.value = currentAddr;
+      if (suggsContainer) suggsContainer.innerHTML = '';
+    });
+  }
+
+  // Save place
+  if (btnSave) {
+    btnSave.addEventListener('click', () => {
+      if (!currentEditTarget) return;
+
+      const addrVal = addrInput.value.trim();
+      if (!addrVal) {
+        alert('Пожалуйста, введите адрес');
+        return;
+      }
+
+      const loc = currentEditTarget.selectedLocation || {
+        lat: mapEngine?.currentPosition?.lat || 40.1776,
+        lng: mapEngine?.currentPosition?.lng || 44.5125,
+        address: addrVal
+      };
+
+      if (currentEditTarget.type === 'home') {
+        userSavedPlaces.home = {
+          name: 'Дом',
+          address: addrVal,
+          lat: loc.lat,
+          lng: loc.lng
+        };
+      } else if (currentEditTarget.type === 'work') {
+        userSavedPlaces.work = {
+          name: 'Работа',
+          address: addrVal,
+          lat: loc.lat,
+          lng: loc.lng
+        };
+      } else if (currentEditTarget.type === 'favorite') {
+        const customName = nameInput.value.trim() || addrVal.split(',')[0] || 'Избранное';
+        if (currentEditTarget.place) {
+          currentEditTarget.place.name = customName;
+          currentEditTarget.place.address = addrVal;
+          currentEditTarget.place.lat = loc.lat;
+          currentEditTarget.place.lng = loc.lng;
+        } else {
+          if (!userSavedPlaces.favorites) userSavedPlaces.favorites = [];
+          userSavedPlaces.favorites.push({
+            id: 'fav_' + Date.now(),
+            name: customName,
+            address: addrVal,
+            lat: loc.lat,
+            lng: loc.lng
+          });
+        }
+      }
+
+      savePlacesToStorage();
+      modal.classList.add('hidden');
+    });
+  }
+
+  // Delete place
+  if (btnDelete) {
+    btnDelete.addEventListener('click', () => {
+      if (!currentEditTarget) return;
+
+      if (currentEditTarget.type === 'home') {
+        userSavedPlaces.home = null;
+      } else if (currentEditTarget.type === 'work') {
+        userSavedPlaces.work = null;
+      } else if (currentEditTarget.type === 'favorite' && currentEditTarget.place) {
+        const idx = userSavedPlaces.favorites.findIndex(f => f.id === currentEditTarget.place.id);
+        if (idx >= 0) userSavedPlaces.favorites.splice(idx, 1);
+      }
+
+      savePlacesToStorage();
+      modal.classList.add('hidden');
+    });
+  }
 }
 
 // 6. Search & Autocomplete Handlers
@@ -737,6 +1339,7 @@ function initSearchHandlers() {
             const distMeters = mapEngine ? mapEngine.calculateDistance(cur.lat, cur.lng, lat, lng) : 1000;
             const distStr = distMeters >= 1000 ? `${(distMeters / 1000).toFixed(1)} км` : `${Math.round(distMeters)} м`;
 
+            const isStarred = isLocationInFavorites(lat, lng, title);
             const item = document.createElement('div');
             item.className = 'drawer-list-item';
             item.innerHTML = `
@@ -747,10 +1350,26 @@ function initSearchHandlers() {
                   <div class="item-subtitle">${subtitle}</div>
                 </div>
               </div>
-              <div class="item-dist">${distStr}</div>
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <div class="item-dist">${distStr}</div>
+                <button class="item-star-btn ${isStarred ? 'starred' : ''}" title="${isStarred ? 'Удалить из избранного' : 'Добавить в избранное'}">
+                  ${isStarred ? '⭐' : '☆'}
+                </button>
+              </div>
             `;
 
-            item.addEventListener('click', () => {
+            const starBtn = item.querySelector('.item-star-btn');
+            starBtn?.addEventListener('click', (e) => {
+              e.stopPropagation();
+              toggleFavoritePlace({ name: title, address: subtitle, lat, lng });
+              const starredNow = isLocationInFavorites(lat, lng, title);
+              starBtn.classList.toggle('starred', starredNow);
+              starBtn.textContent = starredNow ? '⭐' : '☆';
+              starBtn.title = starredNow ? 'Удалить из избранного' : 'Добавить в избранное';
+            });
+
+            item.addEventListener('click', (e) => {
+              if (e.target.closest('.item-star-btn')) return;
               searchDrawer.classList.add('hidden');
               startNavigationTo({ name: title, lat, lng });
             });
@@ -764,12 +1383,39 @@ function initSearchHandlers() {
     }, 200);
   });
 
-  // Click on default history items
-  document.querySelectorAll('.drawer-list-item').forEach(item => {
-    item.addEventListener('click', () => {
-      const lat = parseFloat(item.dataset.lat);
-      const lng = parseFloat(item.dataset.lng);
-      const name = item.dataset.name;
+  // Click on default history items with star favorite support
+  document.querySelectorAll('#search-results-list .drawer-list-item').forEach(item => {
+    const lat = parseFloat(item.dataset.lat);
+    const lng = parseFloat(item.dataset.lng);
+    const name = item.dataset.name;
+    const isStarred = isLocationInFavorites(lat, lng, name);
+
+    // Add star button to history item
+    const distEl = item.querySelector('.item-dist');
+    if (distEl && !item.querySelector('.item-star-btn')) {
+      const starBtn = document.createElement('button');
+      starBtn.className = `item-star-btn ${isStarred ? 'starred' : ''}`;
+      starBtn.textContent = isStarred ? '⭐' : '☆';
+      starBtn.title = isStarred ? 'Удалить из избранного' : 'Добавить в избранное';
+      starBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        toggleFavoritePlace({ name, address: 'Yerevan, Armenia', lat, lng });
+        const starredNow = isLocationInFavorites(lat, lng, name);
+        starBtn.classList.toggle('starred', starredNow);
+        starBtn.textContent = starredNow ? '⭐' : '☆';
+      });
+
+      const wrap = document.createElement('div');
+      wrap.style.display = 'flex';
+      wrap.style.alignItems = 'center';
+      wrap.style.gap = '8px';
+      distEl.parentNode.insertBefore(wrap, distEl);
+      wrap.appendChild(distEl);
+      wrap.appendChild(starBtn);
+    }
+
+    item.addEventListener('click', (e) => {
+      if (e.target.closest('.item-star-btn')) return;
       if (lat && lng) {
         searchDrawer.classList.add('hidden');
         startNavigationTo({ name, lat, lng });

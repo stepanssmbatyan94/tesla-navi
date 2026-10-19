@@ -55,6 +55,13 @@
       </svg>
     </button>
 
+    <!-- My Places Button (Home, Work, Favorites - Mapsev Screenshot 1 Style) -->
+    <button id="btn-open-my-places" class="tool-btn" title="Мои места (Дом, Работа, Избранное)">
+      <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path>
+      </svg>
+    </button>
+
     <!-- Weather Button -->
     <button id="btn-open-weather" class="tool-btn" title="Погода в Ереване">
       <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.5">
@@ -126,15 +133,18 @@
     </div>
 
     <div class="drawer-body">
-      <!-- Quick Commute Bookmarks: Home / Work with Live ETAs (Yandex Style) -->
+      <!-- Quick Commute Bookmarks: Home / Work with Live ETAs (Mapsev & Yandex Style) -->
       <div class="commute-tiles-container">
         <div id="commute-home" class="commute-tile-item" data-type="home">
           <div class="commute-top-row">
             <div class="commute-icon-title">
               <span>🏠</span>
-              <span>Дом</span>
+              <span id="home-title-text">Дом</span>
             </div>
-            <span id="home-eta-badge" class="commute-eta-badge">12 мин</span>
+            <div class="commute-right-actions">
+              <span id="home-eta-badge" class="commute-eta-badge">12 мин</span>
+              <button class="commute-edit-btn" id="btn-edit-home" title="Настроить Дом">✏️</button>
+            </div>
           </div>
           <div id="home-address-sub" class="commute-address-sub">ул. Амиряна, 18</div>
         </div>
@@ -143,11 +153,26 @@
           <div class="commute-top-row">
             <div class="commute-icon-title">
               <span>💼</span>
-              <span>Работа</span>
+              <span id="work-title-text">Работа</span>
             </div>
-            <span id="work-eta-badge" class="commute-eta-badge">19 мин</span>
+            <div class="commute-right-actions">
+              <span id="work-eta-badge" class="commute-eta-badge">19 мин</span>
+              <button class="commute-edit-btn" id="btn-edit-work" title="Настроить Работу">✏️</button>
+            </div>
           </div>
           <div id="work-address-sub" class="commute-address-sub">ул. Акоп Акопян, 3</div>
+        </div>
+      </div>
+
+      <!-- Quick Favorites Bar -->
+      <div id="commute-favorites-bar" class="commute-favorites-bar" title="Посмотреть избранные места">
+        <div class="fav-bar-left">
+          <span class="fav-star-icon">⭐</span>
+          <span class="fav-bar-title">Избранное</span>
+          <span id="fav-count-badge" class="fav-count-pill">0</span>
+        </div>
+        <div class="fav-bar-right">
+          <span class="fav-chevron">›</span>
         </div>
       </div>
 
@@ -211,6 +236,103 @@
             <div class="item-dist">2.3 км</div>
           </div>
         </div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- 2.5 Sliding "My Places" Drawer (Mapsev Screenshot 1 Architecture) -->
+  <aside id="my-places-drawer" class="my-places-drawer hidden">
+    <div class="my-places-handle"></div>
+
+    <!-- Main View: Home, Work, Favorites entry -->
+    <div id="my-places-main-view" class="my-places-view">
+      <div class="my-places-header">
+        <div class="my-places-title" id="my-places-heading">My places</div>
+        <button id="btn-close-my-places" class="drawer-close-btn" title="Закрыть">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+
+      <div class="my-places-list">
+        <!-- Home Row -->
+        <div class="my-place-card" id="my-place-home-row">
+          <div class="my-place-left">
+            <div class="my-place-icon-box">
+              <svg viewBox="0 0 24 24" width="22" height="22" fill="#475569">
+                <path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/>
+              </svg>
+            </div>
+            <div class="my-place-info">
+              <div class="my-place-name">Home</div>
+              <div id="my-places-home-sub" class="my-place-sub">ул. Амиряна, 18</div>
+            </div>
+          </div>
+          <div class="my-place-actions" id="my-places-home-actions">
+            <!-- Dynamic: Add button OR Route + Edit + Delete -->
+          </div>
+        </div>
+
+        <!-- Work Row -->
+        <div class="my-place-card" id="my-place-work-row">
+          <div class="my-place-left">
+            <div class="my-place-icon-box">
+              <svg viewBox="0 0 24 24" width="22" height="22" fill="#475569">
+                <path d="M20 6h-4V4c0-1.11-.89-2-2-2h-4c-1.11 0-2 .89-2 2v2H4c-1.11 0-1.99.89-1.99 2L2 19c0 1.11.89 2 2 2h16c1.11 0 2-.89 2-2V8c0-1.11-.89-2-2-2zm-6 0h-4V4h4v2z"/>
+              </svg>
+            </div>
+            <div class="my-place-info">
+              <div class="my-place-name">Work</div>
+              <div id="my-places-work-sub" class="my-place-sub">ул. Акоп Акопян, 3</div>
+            </div>
+          </div>
+          <div class="my-place-actions" id="my-places-work-actions">
+            <!-- Dynamic: Add button OR Route + Edit + Delete -->
+          </div>
+        </div>
+
+        <div class="my-places-divider"></div>
+
+        <!-- Favorites Row -->
+        <div class="my-place-card my-place-nav-card" id="my-place-favorites-row">
+          <div class="my-place-left">
+            <div class="my-place-icon-box star-box">
+              <svg viewBox="0 0 24 24" width="22" height="22" fill="#d97706">
+                <path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/>
+              </svg>
+            </div>
+            <div class="my-place-info">
+              <div class="my-place-name">Favorites</div>
+              <div id="my-places-fav-subtitle" class="my-place-sub">0 places</div>
+            </div>
+          </div>
+          <div class="my-place-actions">
+            <span class="fav-chevron" style="font-size: 22px;">›</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Sub-View: Favorites Detailed List -->
+    <div id="my-places-fav-view" class="my-places-view hidden">
+      <div class="my-places-header">
+        <button id="btn-back-to-places" class="drawer-close-btn btn-back-places" title="Назад">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="15 18 9 12 15 6"/></svg>
+        </button>
+        <div class="my-places-title">Favorites</div>
+        <button id="btn-close-fav-view" class="drawer-close-btn" title="Закрыть">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+
+      <div style="padding: 12px 14px 4px 14px;">
+        <button id="btn-add-new-favorite" class="btn-add-favorite-bar">
+          <span style="font-size: 18px; line-height: 1;">+</span>
+          <span>Добавить место в избранное</span>
+        </button>
+      </div>
+
+      <div id="favorites-list-container" class="my-places-list" style="padding-top: 4px;">
+        <!-- Dynamically rendered -->
       </div>
     </div>
   </aside>
@@ -378,6 +500,47 @@
   </div>
 
   <!-- 6. Compact Modals -->
+
+  <!-- Modal: Add / Edit Saved Place (Home, Work, or Custom Favorite) -->
+  <div id="edit-place-modal" class="modal-overlay hidden">
+    <div class="compact-card" style="width: 440px;">
+      <div class="card-top-row">
+        <div id="edit-place-modal-title" class="card-title">Настройка места</div>
+        <button id="btn-close-edit-place-x" class="card-close-btn" title="Закрыть">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: 12px;">
+        <!-- Custom name for favorites (hidden when editing Home or Work) -->
+        <div id="edit-place-name-wrap" class="drawer-search-wrap hidden">
+          <span style="font-size: 16px;">🏷️</span>
+          <input id="edit-place-name-input" class="drawer-search-input" type="text" placeholder="Название (например: Спортзал, Дача, Мама...)" autocomplete="off" />
+        </div>
+
+        <!-- Address Search input with live geocoder -->
+        <div class="drawer-search-wrap">
+          <span style="font-size: 16px;">📍</span>
+          <input id="edit-place-address-input" class="drawer-search-input" type="text" placeholder="Введите адрес или место в Ереване..." autocomplete="off" />
+          <button id="btn-clear-place-input" class="card-close-btn hidden" style="width: 24px; height: 24px; font-size: 11px;">✕</button>
+        </div>
+
+        <!-- Quick Current Location button -->
+        <button id="btn-use-current-gps-location" class="btn-quick-gps-pill" type="button">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#2563eb" stroke-width="2.5" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><circle cx="12" cy="12" r="9"/></svg>
+          <span>Использовать текущее местоположение машины</span>
+        </button>
+
+        <!-- Address Suggestions List -->
+        <div id="edit-place-suggestions" class="drawer-list" style="max-height: 160px; overflow-y: auto;"></div>
+      </div>
+
+      <div style="display: flex; gap: 10px; margin-top: 6px;">
+        <button id="btn-delete-place" class="btn-secondary-delete hidden" type="button">Удалить</button>
+        <button id="btn-save-place" class="btn-primary-action" type="button">Сохранить</button>
+      </div>
+    </div>
+  </div>
 
   <!-- Arrival Modal (IMG_3661) -->
   <div id="arrival-modal" class="modal-overlay hidden">
