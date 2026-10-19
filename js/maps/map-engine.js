@@ -26,6 +26,8 @@ class TeslaMapEngine {
 
     this.currentPosition = { lat: this.center.lat, lng: this.center.lng, heading: 0, speed: 0 };
     this.currentHeading = 0;
+    this.currentSegIndex = 0;
+    this.isUserPinching = false;
     this.lastRawPosition = null;
     this.routeCoordinates = [];
     this.offRouteCounter = 0;
@@ -332,14 +334,96 @@ class TeslaMapEngine {
           this.trafficLayer.showTraffic();
         } catch (e) {}
 
-        const handleYandexUserPan = () => {
-          this.followCar = false;
-          const recenterBtn = document.getElementById('floating-recenter-btn');
-          if (recenterBtn) recenterBtn.classList.remove('hidden');
-          if (this.onUserPan) this.onUserPan();
-          this.resetAutoFollowTimer();
-        };
-        this.map.events.add(['mousedown', 'multitouchstart', 'wheel'], handleYandexUserPan);
+        try {
+          this.map.behaviors.enable(['drag', 'multiTouch', 'scrollZoom', 'dblClickZoom']);
+        } catch (e) {}
+
+        const containerEl = document.getElementById(this.containerId);
+        this.isUserPinching = false;
+        let touchStartPos = null;
+        let pinchTimeout = null;
+
+        if (containerEl) {
+          containerEl.addEventListener('touchstart', (e) => {
+            if (e.touches.length >= 2) {
+              this.isUserPinching = true;
+              if (pinchTimeout) clearTimeout(pinchTimeout);
+            } else if (e.touches.length === 1) {
+              touchStartPos = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+            }
+          }, { passive: true });
+
+          containerEl.addEventListener('touchmove', (e) => {
+            if (e.touches.length >= 2) {
+              this.isUserPinching = true;
+            } else if (e.touches.length === 1 && touchStartPos && !this.isUserPinching) {
+              const dx = e.touches[0].clientX - touchStartPos.x;
+              const dy = e.touches[0].clientY - touchStartPos.y;
+              if (Math.hypot(dx, dy) > 20) {
+                // User intentionally dragged map with 1 finger to pan away
+                this.followCar = false;
+                const recenterBtn = document.getElementById('floating-recenter-btn');
+                if (recenterBtn) recenterBtn.classList.remove('hidden');
+                if (this.onUserPan) this.onUserPan();
+                this.resetAutoFollowTimer();
+              }
+            }
+          }, { passive: true });
+
+          containerEl.addEventListener('touchend', (e) => {
+            if (e.touches.length === 0) {
+              touchStartPos = null;
+              if (this.isUserPinching) {
+                pinchTimeout = setTimeout(() => {
+                  this.isUserPinching = false;
+                  // Re-lock center on vehicle immediately after pinch release
+                  if (this.followCar && this.currentPosition && this.map) {
+                    this.map.setCenter([this.currentPosition.lat, this.currentPosition.lng], this.navZoom, { duration: 0, checkZoomRange: false });
+                  }
+                }, 200);
+              }
+            } else if (e.touches.length === 1 && this.isUserPinching) {
+              touchStartPos = null;
+            }
+          }, { passive: true });
+
+          let mouseDownPos = null;
+          containerEl.addEventListener('mousedown', (e) => {
+            if (e.button === 0) {
+              mouseDownPos = { x: e.clientX, y: e.clientY };
+            }
+          }, { passive: true });
+
+          containerEl.addEventListener('mousemove', (e) => {
+            if (mouseDownPos && e.buttons === 1) {
+              const dx = e.clientX - mouseDownPos.x;
+              const dy = e.clientY - mouseDownPos.y;
+              if (Math.hypot(dx, dy) > 20) {
+                this.followCar = false;
+                const recenterBtn = document.getElementById('floating-recenter-btn');
+                if (recenterBtn) recenterBtn.classList.remove('hidden');
+                if (this.onUserPan) this.onUserPan();
+                this.resetAutoFollowTimer();
+              }
+            }
+          }, { passive: true });
+
+          window.addEventListener('mouseup', () => {
+            mouseDownPos = null;
+          }, { passive: true });
+        }
+
+        // Update navZoom when user zooms with pinch or scroll gestures
+        this.map.events.add('boundschange', (e) => {
+          const newZ = e.get('newZoom');
+          if (newZ !== undefined && Math.abs(newZ - this.navZoom) > 0.05) {
+            this.navZoom = newZ;
+            const recenterBtn = document.getElementById('floating-recenter-btn');
+            if (recenterBtn && Math.abs(this.navZoom - (CONFIG.navigationZoom || 16.5)) > 0.3) {
+              recenterBtn.classList.remove('hidden');
+            }
+          }
+        });
 
         const CarLayout = window.ymaps.templateLayoutFactory.createClass(
           `<div id="yandex-car-marker" class="tesla-3d-car-marker" style="transform: translate(-50%, -50%);">
@@ -419,6 +503,7 @@ class TeslaMapEngine {
   // Recenter map back onto vehicle & reset zoom to default
   recenter() {
     this.followCar = true;
+    this.isUserPinching = false;
     this.navZoom = CONFIG.navigationZoom || 16.5;
     if (this.autoFollowTimer) {
       clearTimeout(this.autoFollowTimer);
@@ -483,7 +568,11 @@ class TeslaMapEngine {
       }
     } else if (this.provider === 'yandex' && this.map) {
       this.navZoom = Math.min(18, Math.round(this.navZoom + 0.1) + 1);
-      this.map.setZoom(this.navZoom);
+      if (this.currentPosition) {
+        this.map.setCenter([this.currentPosition.lat, this.currentPosition.lng], this.navZoom, { duration: 0 });
+      } else {
+        this.map.setZoom(this.navZoom, { duration: 0 });
+      }
     } else if (this.map && typeof this.map.zoomIn === 'function') {
       this.map.zoomIn();
     }
@@ -513,7 +602,11 @@ class TeslaMapEngine {
       }
     } else if (this.provider === 'yandex' && this.map) {
       this.navZoom = Math.max(4, Math.round(this.navZoom - 0.1) - 1);
-      this.map.setZoom(this.navZoom);
+      if (this.currentPosition) {
+        this.map.setCenter([this.currentPosition.lat, this.currentPosition.lng], this.navZoom, { duration: 0 });
+      } else {
+        this.map.setZoom(this.navZoom, { duration: 0 });
+      }
     } else if (this.map && typeof this.map.zoomOut === 'function') {
       this.map.zoomOut();
     }
@@ -691,7 +784,7 @@ class TeslaMapEngine {
       };
     }
 
-    return { snapped: false, lat, lng, bearing: null, dist: minDistance };
+    return { snapped: false, lat, lng, bearing: null, dist: minDistance, segIndex: bestSegIndex };
   }
 
   // Primary Position Update Handler with Movement Bearing & Road Snapping
@@ -722,6 +815,9 @@ class TeslaMapEngine {
     if (this.activeRoute && this.routeCoordinates && this.routeCoordinates.length >= 2) {
       const snap = this.snapToActiveRoute(lat, lng);
       distToRoute = snap.dist;
+      if (snap.segIndex != null) {
+        this.currentSegIndex = snap.segIndex;
+      }
       if (snap.snapped) {
         displayLat = snap.lat;
         displayLng = snap.lng;
@@ -818,12 +914,14 @@ class TeslaMapEngine {
       }
 
       if (this.followCar) {
-        const now = performance.now();
-        // High-frequency 30fps lockstep update (35ms throttle) with duration: 0
-        // Keeps map and car marker in lockstep sync, eliminating jerky 3.5m step jumps
-        if (!this.lastYandexCenterTime || (now - this.lastYandexCenterTime >= 35)) {
-          this.lastYandexCenterTime = now;
-          this.map.setCenter([displayLat, displayLng], undefined, { duration: 0 });
+        if (!this.isUserPinching) {
+          const now = performance.now();
+          // High-frequency 30fps lockstep update (35ms throttle) with duration: 0
+          // Keeps map and car marker in lockstep sync, eliminating jerky 3.5m step jumps
+          if (!this.lastYandexCenterTime || (now - this.lastYandexCenterTime >= 35)) {
+            this.lastYandexCenterTime = now;
+            this.map.setCenter([displayLat, displayLng], this.navZoom, { duration: 0, checkZoomRange: false });
+          }
         }
       }
     } else if (this.carMarker && window.L && this.provider === 'osm') {
@@ -884,15 +982,19 @@ class TeslaMapEngine {
         }
       }
       const prevProgressIdx = this.lastProgressIndex || 0;
-      this.lastProgressIndex = Math.max(prevProgressIdx, closestIdx);
+      const currentSeg = (this.currentSegIndex != null) ? this.currentSegIndex : Math.max(0, closestIdx - 1);
+      this.lastProgressIndex = Math.max(prevProgressIdx, currentSeg);
 
-      // 2. Update traveled route line on MapLibre GL only when progress advances (throttled)
+      // 2. Update traveled route line on MapLibre GL
+      // Traveled route line must strictly end AT the vehicle position [currentLng, currentLat]:
+      // Slicing 0..currentSeg + 1 includes only vertices 0..currentSeg (all passed vertices behind the car).
+      // Vertex currentSeg + 1 (the upcoming vertex ahead of the car) is NEVER included!
       const now = performance.now();
-      if (this.provider === 'maplibre' && this.map && (this.lastProgressIndex > prevProgressIdx || !this.lastTraveledUpdate || (now - this.lastTraveledUpdate > 350))) {
+      if (this.provider === 'maplibre' && this.map && (this.lastProgressIndex > prevProgressIdx || !this.lastTraveledUpdate || (now - this.lastTraveledUpdate > 120))) {
         this.lastTraveledUpdate = now;
         const traveledSource = this.map.getSource('route-traveled');
         if (traveledSource) {
-          const traveledCoords = this.routeCoordinates.slice(0, this.lastProgressIndex + 1);
+          const traveledCoords = this.routeCoordinates.slice(0, currentSeg + 1);
           traveledCoords.push([currentLng, currentLat]);
           traveledSource.setData({
             type: 'Feature',
