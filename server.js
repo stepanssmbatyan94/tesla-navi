@@ -414,18 +414,26 @@ async function fetchYandexSuggestResults(q, userLng = 44.5125, userLat = 40.1776
               else if (modifier === 'roundabout') instruction = 'Круговое движение';
               else if (streetName) instruction = `Двигайтесь по ${streetName}`;
 
-              // Determine speed limit for this section
-              let speedLimit = 60;
-              const isHwy = /highway|трасса|шоссе|\b[MH]-\d+/i.test(streetName);
+              // Determine speed limit for this section (ПДД РА + знаки магистралей)
+              let speedLimit = 60; // Стандарт по ПДД Армении в черте населенных пунктов
+              const streetLower = (streetName || '').toLowerCase();
+              const isNorthSouthExp = /север-юг|north-south|\bm-1\b|\bm-2\b/i.test(streetLower);
+              const isHwy = /highway|трасса|шоссе|\bh-\d+|\bm-\d+/i.test(streetLower);
+              const isFastAvenue = /исаков|isakov|сараландж|saralanj|багреванд|bagrevand|давиташен|davitashen/i.test(streetLower);
               const loc = (sec.edgePoints && sec.edgePoints[0]) ? sec.edgePoints[0] : null;
-              if (isHwy) {
-                speedLimit = 90;
+
+              if (isNorthSouthExp) {
+                speedLimit = 110; // Скоростная автомагистраль Север-Юг (Севан, Арташат)
+              } else if (isHwy) {
+                speedLimit = 90; // Загородная трасса / шоссе по ПДД РА
+              } else if (isFastAvenue) {
+                speedLimit = 70; // Специальные городские магистрали Еревана со знаками 70
               } else if (loc) {
                 // Check distance from Yerevan center (40.1772, 44.5105)
                 const dLat = (loc[1] - 40.1772) * 111;
                 const dLng = (loc[0] - 44.5105) * 85;
                 const distCenter = Math.sqrt(dLat * dLat + dLng * dLng);
-                if (distCenter > 14) speedLimit = 90;
+                if (distCenter > 14) speedLimit = 90; // За пределами Еревана — трасса 90
               }
 
               return {
@@ -486,25 +494,66 @@ async function fetchYandexSuggestResults(q, userLng = 44.5125, userLat = 40.1776
     return;
   }
 
-  // API 3: /api/traffic-yerevan (Live Official Yandex Traffic Score for Yerevan, Region 10262)
+  // API 3: /api/traffic-yerevan (Live Official Yandex Traffic Score for Armenia)
   if (pathname === '/api/traffic-yerevan') {
     const qLat = parseFloat(parsedUrl.searchParams.get('lat'));
     const qLng = parseFloat(parsedUrl.searchParams.get('lng'));
+
+    // Armenian cities directory
+    const armeniaCities = [
+      { name: 'Ереван', lat: 40.1772, lng: 44.5105, radius: 18, isYerevan: true },
+      { name: 'Гюмри', lat: 40.7894, lng: 43.8475, radius: 10 },
+      { name: 'Ванадзор', lat: 40.8128, lng: 44.4883, radius: 8 },
+      { name: 'Эчмиадзин', lat: 40.1656, lng: 44.2936, radius: 6 },
+      { name: 'Абовян', lat: 40.2741, lng: 44.6264, radius: 5 },
+      { name: 'Дилижан', lat: 40.7410, lng: 44.8638, radius: 6 },
+      { name: 'Севан', lat: 40.5546, lng: 44.9547, radius: 6 },
+      { name: 'Цахкадзор', lat: 40.5317, lng: 44.7175, radius: 5 },
+      { name: 'Армавир', lat: 40.1542, lng: 44.0381, radius: 6 },
+      { name: 'Капан', lat: 39.2075, lng: 46.4058, radius: 6 }
+    ];
+
     if (!isNaN(qLat) && !isNaN(qLng)) {
-      const dLat = (qLat - 40.1772) * 111;
-      const dLng = (qLng - 44.5105) * 85;
-      const distKm = Math.sqrt(dLat * dLat + dLng * dLng);
-      if (distKm > 18) {
+      let currentCity = null;
+      for (const city of armeniaCities) {
+        const dLat = (qLat - city.lat) * 111;
+        const dLng = (qLng - city.lng) * 85;
+        const distKm = Math.sqrt(dLat * dLat + dLng * dLng);
+        if (distKm <= city.radius) {
+          currentCity = city;
+          break;
+        }
+      }
+
+      if (!currentCity) {
+        // Outside known cities -> Highway
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({
           success: true,
           outsideCity: true,
-          score: 1,
+          city: 'Трасса',
+          score: '🛣️',
           icon: 'green',
           color: '#22c55e',
           hint: 'Трасса свободна',
           time: '',
           source: 'highway'
+        }));
+        return;
+      } else if (!currentCity.isYerevan) {
+        // Other Armenian city: Yandex publishes 1-10 numerical traffic index only for Yerevan (10262).
+        // For other cities, motion is fluid and free-flowing.
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({
+          success: true,
+          outsideCity: false,
+          city: currentCity.name,
+          score: 'OK',
+          icon: 'green',
+          color: '#22c55e',
+          hint: `${currentCity.name}: дороги свободны`,
+          time: '',
+          source: 'regional'
         }));
         return;
       }
@@ -540,6 +589,7 @@ async function fetchYandexSuggestResults(q, userLng = 44.5125, userLat = 40.1776
 
       const data = {
         success: true,
+        city: 'Ереван',
         score: level,
         icon,
         color,

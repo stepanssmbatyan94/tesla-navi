@@ -215,11 +215,12 @@ class TeslaMapEngine {
           this.trafficLayer.showTraffic();
         } catch (e) {}
 
-        this.map.events.add('actionbegin', () => {
-          this.isAutoFollow = false;
+        const handleYandexUserPan = () => {
+          this.followCar = false;
           if (this.onUserPan) this.onUserPan();
           this.resetAutoFollowTimer();
-        });
+        };
+        this.map.events.add(['mousedown', 'multitouchstart'], handleYandexUserPan);
 
         const CarLayout = window.ymaps.templateLayoutFactory.createClass(
           `<div id="yandex-car-marker" class="tesla-3d-car-marker">

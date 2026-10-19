@@ -267,9 +267,13 @@ async function updateLiveTrafficBadge() {
       badge.textContent = data.outsideCity ? '🛣️' : data.score;
       badge.style.background = data.color;
       badge.style.boxShadow = `0 4px 14px ${data.color}90`;
-      badge.title = data.outsideCity
-        ? `Трасса / За городом: ${data.hint}`
-        : `Пробки в Ереване: ${data.score} из 10 (${data.hint}) · Яндекс`;
+      if (data.outsideCity) {
+        badge.title = `Трасса / За городом: ${data.hint}`;
+      } else if (data.city && data.city !== 'Ереван') {
+        badge.title = `${data.city}: ${data.hint}`;
+      } else {
+        badge.title = `Пробки в Ереване: ${data.score} из 10 (${data.hint}) · Яндекс`;
+      }
       return;
     }
   } catch (e) {}
@@ -822,6 +826,8 @@ function cancelActiveNavigation() {
   document.getElementById('hud-maneuver-card').classList.add('hidden');
   document.getElementById('bottom-nav-bar').classList.add('hidden');
   document.getElementById('lane-guidance-pill').classList.add('hidden');
+  const camBadge = document.getElementById('camera-alert-badge');
+  if (camBadge) camBadge.classList.add('hidden');
   const altDrawer = document.getElementById('route-alternatives-drawer');
   if (altDrawer) altDrawer.classList.add('hidden');
   selectedDestination = null;
@@ -1157,7 +1163,11 @@ function initDevMode() {
     });
   }
 
-  if (!isDev) return;
+  if (!isDev) {
+    if (devPill) devPill.classList.add('hidden');
+    if (devPanel) devPanel.classList.add('hidden');
+    return;
+  }
 
   // Show Dev Mode UI
   if (devPill) devPill.classList.remove('hidden');
@@ -1166,9 +1176,21 @@ function initDevMode() {
   // Exit Dev Mode
   if (btnExit) {
     btnExit.addEventListener('click', () => {
+      // 1. Terminate simulation ticker
+      isSimRunning = false;
+      if (simTimer) {
+        clearInterval(simTimer);
+        simTimer = null;
+      }
+      // 2. Stop and clear any active simulated navigation
+      cancelActiveNavigation();
+      // 3. Immediately hide dev UI elements
+      if (devPill) devPill.classList.add('hidden');
+      if (devPanel) devPanel.classList.add('hidden');
+      // 4. Hard-navigate to clean URL without ?mode=dev
       const url = new URL(window.location.href);
       url.searchParams.delete('mode');
-      window.location.href = url.toString();
+      window.location.href = url.pathname + (url.search ? url.search : '');
     });
   }
 
@@ -1292,6 +1314,7 @@ function initDevMode() {
 
   // Pre-calculate cumulative segment lengths
   function initSimPolyline(coords) {
+    if (!coords || coords.length < 2) return;
     cumulativeDistances = [0];
     let total = 0;
     for (let i = 0; i < coords.length - 1; i++) {
@@ -1302,13 +1325,15 @@ function initDevMode() {
       cumulativeDistances.push(total);
     }
     simTotalDist = Math.max(10, total);
-    simDistance = 0;
   }
 
   // Interpolate position and heading at exact distance along polyline
   function getPositionAtDistance(dist) {
     const coords = mapEngine.routeCoordinates;
     if (!coords || coords.length < 2) return null;
+    if (!cumulativeDistances || cumulativeDistances.length !== coords.length) {
+      initSimPolyline(coords);
+    }
     const clampedDist = Math.max(0, Math.min(simTotalDist, dist));
 
     // Find segment
@@ -1320,14 +1345,15 @@ function initDevMode() {
       }
     }
 
-    const segStartDist = cumulativeDistances[segIdx];
+    const segStartDist = cumulativeDistances[segIdx] || 0;
     const segEndDist = cumulativeDistances[segIdx + 1] || (segStartDist + 1);
-    const segLen = segEndDist - segStartDist;
-    const t = segLen > 0 ? (clampedDist - segStartDist) / segLen : 0;
+    const segLen = Math.max(0.001, segEndDist - segStartDist);
+    const t = Math.max(0, Math.min(1, (clampedDist - segStartDist) / segLen));
 
     const p1 = coords[segIdx];
     const p2 = coords[Math.min(coords.length - 1, segIdx + 1)];
 
+    // coords is [lng, lat]
     const lng = p1[0] + (p2[0] - p1[0]) * t;
     const lat = p1[1] + (p2[1] - p1[1]) * t;
     const heading = mapEngine.calculateBearing(p1[1], p1[0], p2[1], p2[0]);
@@ -1369,7 +1395,7 @@ function initDevMode() {
   }
 
   // Load Preset Routes
-  async function loadPresetRoute(start, dest) {
+  async function loadPresetRoute(start, dest, autoPlay = true) {
     console.log(`🚗 Загрузка симулятора: ${start.name} → ${dest.name}...`);
     if (!mapEngine) return;
 
@@ -1378,13 +1404,22 @@ function initDevMode() {
 
     // Build route
     const routeInfo = await mapEngine.buildRouteTo(dest);
-    if (routeInfo) {
+    if (routeInfo && mapEngine.routeCoordinates && mapEngine.routeCoordinates.length > 1) {
       document.getElementById('route-alternatives-drawer')?.classList.add('hidden');
       showNavigationHud(routeInfo);
       mapEngine.startNavigation();
       initSimPolyline(mapEngine.routeCoordinates);
+      simDistance = 0;
       updateSimCar(0);
+      if (autoPlay) {
+        isSimRunning = true;
+        btnSimPlay.classList.add('active');
+        btnSimPause.classList.remove('active');
+        startSimTicker();
+      }
       console.log(`✅ Маршрут построен: ${routeInfo.distance}, ${routeInfo.duration}, шагов: ${mapEngine.routeSteps.length}`);
+    } else {
+      console.error('❌ Не удалось построить маршрут для симулятора');
     }
   }
 
@@ -1396,7 +1431,8 @@ function initDevMode() {
       document.getElementById('btn-sim-route-center')?.classList.remove('active');
       loadPresetRoute(
         { lat: 40.1915, lng: 44.5150, name: 'Ереван (Каскад)' },
-        { lat: 40.5050, lng: 44.5820, name: 'Park Resort Aghveran' }
+        { lat: 40.5050, lng: 44.5820, name: 'Park Resort Aghveran' },
+        true
       );
     });
   }
@@ -1409,15 +1445,25 @@ function initDevMode() {
       btnAghveran?.classList.remove('active');
       loadPresetRoute(
         { lat: 40.1915, lng: 44.5150, name: 'Каскад' },
-        { lat: 40.1776, lng: 44.5125, name: 'Площадь Республики' }
+        { lat: 40.1776, lng: 44.5125, name: 'Площадь Республики' },
+        true
       );
     });
   }
 
   // Play / Pause / Reset
   if (btnSimPlay) {
-    btnSimPlay.addEventListener('click', () => {
-      if (!mapEngine.isNavigating && mapEngine.routeCoordinates?.length > 1) {
+    btnSimPlay.addEventListener('click', async () => {
+      if (!mapEngine.routeCoordinates || mapEngine.routeCoordinates.length < 2) {
+        console.log('🚗 Запуск маршрута по умолчанию: Ереван → Aghveran...');
+        await loadPresetRoute(
+          { lat: 40.1915, lng: 44.5150, name: 'Ереван (Каскад)' },
+          { lat: 40.5050, lng: 44.5820, name: 'Park Resort Aghveran' },
+          true
+        );
+        return;
+      }
+      if (!mapEngine.isNavigating) {
         mapEngine.startNavigation();
       }
       isSimRunning = true;
@@ -1488,6 +1534,15 @@ function initDevMode() {
     });
   }
 
-  startSimTicker();
+  // Auto-init preset route ready on Dev Mode startup
+  setTimeout(() => {
+    if (isDev && (!mapEngine?.routeCoordinates || mapEngine.routeCoordinates.length < 2)) {
+      loadPresetRoute(
+        { lat: 40.1915, lng: 44.5150, name: 'Ереван (Каскад)' },
+        { lat: 40.5050, lng: 44.5820, name: 'Park Resort Aghveran' },
+        false
+      );
+    }
+  }, 1000);
 }
 

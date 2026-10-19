@@ -41,6 +41,17 @@ html, body {
   color: var(--text-primary);
 }
 
+/* Universal Hidden Utility (Strict display: none) */
+.hidden,
+.lane-guidance-pill.hidden,
+.camera-alert-badge.hidden,
+.dev-mode-pill.hidden,
+.dev-mode-panel.hidden,
+.hud-maneuver-card.hidden,
+.bottom-nav-bar.hidden {
+  display: none !important;
+}
+
 /* 1. Fullscreen Map Viewport */
 #map-container {
   position: absolute;

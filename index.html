@@ -262,12 +262,8 @@
     </div>
   </div>
 
-  <!-- Lane Guidance Pill on Road (IMG_3650 / IMG_3652) -->
-  <div id="lane-guidance-pill" class="lane-guidance-pill hidden">
-    <span class="lane-arrow active">↑</span>
-    <span class="lane-arrow active">↑</span>
-    <span class="lane-arrow">↱</span>
-  </div>
+  <!-- Lane Guidance Pill on Road (Only populated when real intersection lane data exists) -->
+  <div id="lane-guidance-pill" class="lane-guidance-pill hidden"></div>
 
   <!-- 4. Speedometer & Speed Limit HUD + Yandex Traffic Score & Sound Toggle -->
   <div class="speed-limit-hud">
@@ -288,7 +284,7 @@
     <!-- Traffic Camera / Signal Alert (Only shown when approaching real camera) -->
     <div id="camera-alert-badge" class="camera-alert-badge hidden">
       <div class="camera-alert-icon">📷</div>
-      <span id="camera-alert-dist" class="camera-alert-dist">0 м</span>
+      <span id="camera-alert-dist" class="camera-alert-dist"></span>
     </div>
   </div>
 
