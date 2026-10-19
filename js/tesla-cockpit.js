@@ -1483,8 +1483,10 @@ function initDevMode() {
 
       if (mapEngine) {
         mapEngine.playNavChime();
-        mapEngine.speakVoice('Тест голосового оповещения Tesla Navi. Маршрут свободен.');
-        console.log('🗣️ Запущено воспроизведение через динамики автомобиля');
+        const lang = window.CURRENT_LANG || 'ru';
+        const dict = I18N[lang] || I18N.ru;
+        mapEngine.speakVoice(dict.voiceTest || 'Tesla Navi voice test. Route is clear.');
+        console.log(`🗣️ Запущено воспроизведение на языке [${lang}] через динамики автомобиля`);
       }
     });
   }

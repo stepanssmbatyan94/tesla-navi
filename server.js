@@ -15,8 +15,13 @@ try {
 // In-memory cache for synthesized neural audio (fast 0ms repeats)
 const ttsAudioCache = new Map();
 
-async function synthesizeNeuralSpeech(text, voiceChoice = 'svetlana') {
-  const voice = (voiceChoice === 'dmitry') ? 'ru-RU-DmitryNeural' : 'ru-RU-SvetlanaNeural';
+async function synthesizeNeuralSpeech(text, voiceChoice = 'auto', lang = 'ru') {
+  let voice;
+  if (lang === 'en') {
+    voice = (voiceChoice === 'male' || voiceChoice === 'andrew' || voiceChoice === 'dmitry') ? 'en-US-AndrewNeural' : 'en-US-AvaNeural';
+  } else {
+    voice = (voiceChoice === 'male' || voiceChoice === 'dmitry') ? 'ru-RU-DmitryNeural' : 'ru-RU-SvetlanaNeural';
+  }
   const cacheKey = `${voice}:${text}`;
   if (ttsAudioCache.has(cacheKey)) {
     return ttsAudioCache.get(cacheKey);
@@ -305,10 +310,11 @@ async function fetchYandexSuggestResults(q, userLng = 44.5125, userLat = 40.1776
     return;
   }
 
-  // API 1.5: /api/tts (Human-Like Neural Voice Synthesizer - Svetlana / Dmitry)
+  // API 1.5: /api/tts (Human-Like Neural Voice Synthesizer - Russian & English)
   if (pathname === '/api/tts') {
     const text = (parsedUrl.searchParams.get('text') || '').trim();
-    const voice = (parsedUrl.searchParams.get('voice') || 'svetlana').trim();
+    const lang = (parsedUrl.searchParams.get('lang') || 'ru').trim().toLowerCase();
+    const voice = (parsedUrl.searchParams.get('voice') || 'auto').trim();
     if (!text) {
       res.writeHead(400, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ error: 'Text required' }));
@@ -316,7 +322,7 @@ async function fetchYandexSuggestResults(q, userLng = 44.5125, userLat = 40.1776
     }
 
     try {
-      const audioBuf = await synthesizeNeuralSpeech(text, voice);
+      const audioBuf = await synthesizeNeuralSpeech(text, voice, lang);
       res.writeHead(200, {
         'Content-Type': 'audio/mpeg',
         'Content-Length': audioBuf.byteLength,
@@ -831,7 +837,7 @@ server.listen(PORT, () => {
   console.log(`📱 Phone Remote: http://localhost:${PORT}/phone?code=DEMO12`);
 
   // Pre-warm neural audio cache in background for instant 0ms response
-  const PREWARM_PHRASES = [
+  const PREWARM_RU = [
     'Маршрут построен. Поехали!',
     'Вы прибыли в пункт назначения',
     'Перестраиваю маршрут',
@@ -842,12 +848,28 @@ server.listen(PORT, () => {
     'Двигайтесь прямо',
     'Тест голосового оповещения Tesla Navi. Маршрут свободен.'
   ];
+  const PREWARM_EN = [
+    'Route calculated. Let us go!',
+    'You have arrived at your destination',
+    'Rerouting',
+    'Turn right',
+    'Turn left',
+    'Keep right',
+    'Keep left',
+    'Continue straight',
+    'Tesla Navi voice test. Route is clear.'
+  ];
   setTimeout(async () => {
-    for (const p of PREWARM_PHRASES) {
+    for (const p of PREWARM_RU) {
       try {
-        await synthesizeNeuralSpeech(p, 'svetlana');
+        await synthesizeNeuralSpeech(p, 'svetlana', 'ru');
       } catch (e) {}
     }
-    console.log('🎙️ Neural Voice Cache pre-warmed for instant playback');
+    for (const p of PREWARM_EN) {
+      try {
+        await synthesizeNeuralSpeech(p, 'ava', 'en');
+      } catch (e) {}
+    }
+    console.log('🎙️ Neural Voice Cache pre-warmed for instant RU & EN playback');
   }, 1500);
 });

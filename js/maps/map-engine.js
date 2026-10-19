@@ -1097,7 +1097,9 @@ class TeslaMapEngine {
 
     // Destination Arrival
     if (distToDest < 25) {
-      this.speakVoice('Вы прибыли в пункт назначения');
+      const lang = window.CURRENT_LANG || 'ru';
+      const dict = I18N[lang] || I18N.ru;
+      this.speakVoice(dict.voiceArrived || 'Вы прибыли в пункт назначения');
       this.onArrival(dest);
       this.cancelRoute();
       return;
@@ -1144,13 +1146,21 @@ class TeslaMapEngine {
         lanes: activeStep.lanes || null
       });
 
-      // Voice announcements at 250m and 50m (Yandex Navigator phraseology)
+      // Voice announcements at 250m and 50m (localized phraseology)
       if (this.voiceEnabled) {
         if (activeDist <= 260 && activeDist >= 200 && !this.spokenDistanceThresholds['250']) {
           this.spokenDistanceThresholds['250'] = true;
+          const lang = window.CURRENT_LANG || 'ru';
           const turnText = this.getTurnSpeech(activeStep.modifier);
-          const streetText = activeStep.name ? ` на ${activeStep.name}` : '';
-          this.speakVoice(`Через 250 метров ${turnText.toLowerCase()}${streetText}`);
+          let phrase = '';
+          if (lang === 'en') {
+            const streetText = activeStep.name ? ` onto ${activeStep.name}` : '';
+            phrase = `In 250 meters ${turnText.toLowerCase()}${streetText}`;
+          } else {
+            const streetText = activeStep.name ? ` на ${activeStep.name}` : '';
+            phrase = `Через 250 метров ${turnText.toLowerCase()}${streetText}`;
+          }
+          this.speakVoice(phrase);
         } else if (activeDist <= 70 && activeDist >= 30 && !this.spokenDistanceThresholds['50']) {
           this.spokenDistanceThresholds['50'] = true;
           this.speakVoice(this.getTurnSpeech(activeStep.modifier));
@@ -1188,7 +1198,9 @@ class TeslaMapEngine {
     if (!this.activeRoute || !this.activeRoute.destination || this.isRerouting) return;
     this.isRerouting = true;
     console.log('[MapEngine] Deviated from route. Recalculating from current road...');
-    this.speakVoice('Перестраиваю маршрут');
+    const lang = window.CURRENT_LANG || 'ru';
+    const dict = I18N[lang] || I18N.ru;
+    this.speakVoice(dict.voiceRerouting || 'Перестраиваю маршрут');
 
     try {
       const dest = this.activeRoute.destination;
@@ -1270,7 +1282,8 @@ class TeslaMapEngine {
           try { this.currentAudioVoice.pause(); } catch (e) {}
           this.currentAudioVoice = null;
         }
-        const audio = new Audio(`/api/tts?text=${encodeURIComponent(text)}&voice=svetlana`);
+        const lang = window.CURRENT_LANG || 'ru';
+        const audio = new Audio(`/api/tts?text=${encodeURIComponent(text)}&lang=${lang}`);
         audio.volume = 1.0;
         this.currentAudioVoice = audio;
         audio.play().catch(e => {
@@ -1735,7 +1748,9 @@ class TeslaMapEngine {
       });
     }
 
-    this.speakVoice('Маршрут построен. Поехали!');
+    const lang = window.CURRENT_LANG || 'ru';
+    const dict = I18N[lang] || I18N.ru;
+    this.speakVoice(dict.voiceStart || 'Маршрут построен. Поехали!');
   }
 
   cancelRoute() {
