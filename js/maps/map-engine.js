@@ -1218,85 +1218,67 @@ class TeslaMapEngine {
     return dict.voiceStraight;
   }
 
-  // Authentic High-Tech Navigation Audio Chime (880Hz -> 1320Hz ping)
+  // Authentic Navigation Audio Chime (/sounds/nav-chime.wav with Web Audio fallback)
   playNavChime() {
     try {
-      const AudioCtx = window.AudioContext || window.webkitAudioContext;
-      if (!AudioCtx) return;
-      if (!this.audioCtx) this.audioCtx = new AudioCtx();
-      if (this.audioCtx.state === 'suspended') this.audioCtx.resume();
+      if (!this.chimeAudio) {
+        this.chimeAudio = new Audio('/sounds/nav-chime.wav');
+        this.chimeAudio.volume = 0.85;
+      }
+      this.chimeAudio.currentTime = 0;
+      const playPromise = this.chimeAudio.play();
+      if (playPromise && playPromise.catch) {
+        playPromise.catch(() => {
+          // Web Audio fallback if media element is delayed
+          try {
+            const AudioCtx = window.AudioContext || window.webkitAudioContext;
+            if (!AudioCtx) return;
+            if (!this.audioCtx) this.audioCtx = new AudioCtx();
+            if (this.audioCtx.state === 'suspended') this.audioCtx.resume();
 
-      const ctx = this.audioCtx;
-      const now = ctx.currentTime;
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
+            const ctx = this.audioCtx;
+            const now = ctx.currentTime;
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
 
-      osc.type = 'sine';
-      osc.frequency.setValueAtTime(880, now);
-      osc.frequency.exponentialRampToValueAtTime(1320, now + 0.07);
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(1046.5, now);
+            osc.frequency.exponentialRampToValueAtTime(1318.5, now + 0.08);
 
-      gain.gain.setValueAtTime(0.0001, now);
-      gain.gain.exponentialRampToValueAtTime(0.18, now + 0.02);
-      gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.25);
+            gain.gain.setValueAtTime(0.0001, now);
+            gain.gain.exponentialRampToValueAtTime(0.2, now + 0.02);
+            gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.25);
 
-      osc.connect(gain);
-      gain.connect(ctx.destination);
+            osc.connect(gain);
+            gain.connect(ctx.destination);
 
-      osc.start(now);
-      osc.stop(now + 0.26);
+            osc.start(now);
+            osc.stop(now + 0.26);
+          } catch (e) {}
+        });
+      }
     } catch (e) {}
   }
 
-  // Select the highest-quality Russian natural female voice (like Yandex Alisa / Siri Milena)
-  getBestRussianVoice() {
-    if (!('speechSynthesis' in window)) return null;
-    const voices = window.speechSynthesis.getVoices() || [];
-    const alisa = voices.find(v => /alisa|yandex/i.test(v.name));
-    if (alisa) return alisa;
-    const milena = voices.find(v => /milena|katya/i.test(v.name));
-    if (milena) return milena;
-    const neural = voices.find(v => /svetlana|dariya|irina/i.test(v.name));
-    if (neural) return neural;
-    const google = voices.find(v => /google.*(рус|ru)/i.test(v.name));
-    if (google) return google;
-    return voices.find(v => v.lang && v.lang.startsWith('ru')) || null;
-  }
-
-  // Voice output matching Yandex Navigator audio cues (with Tesla OS fallback when system voices = 0)
+  // Strictly use our studio audio stream (/api/tts) for authentic, high-quality voice guidance
   speakVoice(text) {
     if (!this.voiceEnabled) return;
     try {
       this.playNavChime();
       setTimeout(() => {
-        // 1. Check if browser has native Russian voices installed
-        const hasNativeRussianVoice = ('speechSynthesis' in window) &&
-          window.speechSynthesis.getVoices().some(v => v.lang && v.lang.startsWith('ru'));
-
-        if (hasNativeRussianVoice) {
-          window.speechSynthesis.cancel();
-          const utterance = new SpeechSynthesisUtterance(text);
-          const voice = this.getBestRussianVoice();
-          if (voice) utterance.voice = voice;
-          utterance.lang = 'ru-RU';
-          utterance.rate = 1.02;
-          utterance.pitch = 1.04;
-          window.speechSynthesis.speak(utterance);
-        } else {
-          // 2. Tesla OS / Embedded Linux fallback: Native TTS voices = 0
-          // Stream studio-quality Russian voice from /api/tts via HTML5 Audio through Tesla car speakers
-          if (this.currentAudioVoice) {
-            try { this.currentAudioVoice.pause(); } catch (e) {}
-            this.currentAudioVoice = null;
-          }
-          const audio = new Audio(`/api/tts?text=${encodeURIComponent(text)}&lang=ru`);
-          this.currentAudioVoice = audio;
-          audio.play().catch(e => {
-            console.warn('Audio TTS playback error:', e);
-          });
+        if (this.currentAudioVoice) {
+          try { this.currentAudioVoice.pause(); } catch (e) {}
+          this.currentAudioVoice = null;
         }
-      }, 130);
+        const audio = new Audio(`/api/tts?text=${encodeURIComponent(text)}&lang=ru`);
+        audio.volume = 1.0;
+        this.currentAudioVoice = audio;
+        audio.play().catch(e => {
+          console.warn('Audio TTS playback error:', e);
+        });
+      }, 220);
     } catch (e) {
-      console.warn('SpeechSynthesis error:', e);
+      console.warn('Voice playback error:', e);
     }
   }
 

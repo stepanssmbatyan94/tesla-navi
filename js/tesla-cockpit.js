@@ -30,6 +30,21 @@ const EV_CHARGERS = [
 document.addEventListener('DOMContentLoaded', async () => {
   console.log('🚗 Initializing Tesla Navi Automotive Cockpit...');
 
+  // Universal Audio Pipeline Unlock for Tesla Browser Autoplay Policy
+  const unlockAudioPipeline = () => {
+    try {
+      if (mapEngine) mapEngine.playNavChime();
+      const silentAudio = new Audio('data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA');
+      silentAudio.play().catch(() => {});
+    } catch (e) {}
+    window.removeEventListener('pointerdown', unlockAudioPipeline);
+    window.removeEventListener('touchstart', unlockAudioPipeline);
+    window.removeEventListener('click', unlockAudioPipeline);
+  };
+  window.addEventListener('pointerdown', unlockAudioPipeline, { once: true, passive: true });
+  window.addEventListener('touchstart', unlockAudioPipeline, { once: true, passive: true });
+  window.addEventListener('click', unlockAudioPipeline, { once: true, passive: true });
+
   // 1. Language Setup
   initLanguage();
 
@@ -1447,19 +1462,13 @@ function initDevMode() {
   const btnDiagTts = document.getElementById('btn-diag-tts');
   if (btnDiagTts) {
     btnDiagTts.addEventListener('click', () => {
-      console.log('🔊 [Диагностика] Проверка синтеза речи и звука...');
-      const voices = ('speechSynthesis' in window) ? (window.speechSynthesis.getVoices() || []) : [];
-      console.log(`📋 Установлено системных голосов в ОС: ${voices.length}`);
-      const ruVoices = voices.filter(v => v.lang && v.lang.startsWith('ru'));
-      console.log(`🇷🇺 Русских голосов: ${ruVoices.length}`, ruVoices.map(v => v.name));
-      if (ruVoices.length === 0) {
-        console.log('⚡ В Tesla OS нет встроенных голосов -> активирован серверный аудио-поток /api/tts (MP3 через динамики Теслы)');
-      }
+      console.log('🔊 [Диагностика] Проверка нашего звука и голосовых подсказок...');
+      console.log('⚡ Навигатор строго использует наш аудиопоток (/api/tts) и фирменный чиме (/sounds/nav-chime.wav)');
 
       if (mapEngine) {
         mapEngine.playNavChime();
         mapEngine.speakVoice('Тест голосового оповещения Tesla Navi. Маршрут свободен.');
-        console.log('🗣️ Воспроизведение тестовой фразы через аудиосистему автомобиля');
+        console.log('🗣️ Запущено воспроизведение через динамики автомобиля');
       }
     });
   }
