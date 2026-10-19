@@ -1274,7 +1274,7 @@ class TeslaMapEngine {
   }
 
   // Strictly use our studio audio stream (/api/tts) for authentic, high-quality voice guidance
-  speakVoice(text) {
+  speakVoice(text, forcedVoice) {
     if (!this.voiceEnabled) return;
     try {
       this.playNavChime();
@@ -1284,7 +1284,8 @@ class TeslaMapEngine {
           this.currentAudioVoice = null;
         }
         const lang = window.CURRENT_LANG || 'ru';
-        const audio = new Audio(`/api/tts?text=${encodeURIComponent(text)}&lang=${lang}`);
+        const voice = forcedVoice || localStorage.getItem('tesla_navi_voice') || (lang === 'en' ? 'ava' : 'svetlana');
+        const audio = new Audio(`/api/tts?text=${encodeURIComponent(text)}&lang=${lang}&voice=${encodeURIComponent(voice)}&v=neural_v2`);
         audio.volume = 1.0;
         this.currentAudioVoice = audio;
         audio.play().catch(e => {

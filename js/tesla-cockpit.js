@@ -49,8 +49,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   window.addEventListener('touchstart', unlockAudioPipeline, { once: true, passive: true });
   window.addEventListener('click', unlockAudioPipeline, { once: true, passive: true });
 
-  // 1. Language Setup
+  // 1. Language Setup & Voice Selector
   initLanguage();
+  initVoiceSelector();
 
   // 2. Direct In-Car Tesla Geolocation
   initTeslaCarGps();
@@ -104,6 +105,46 @@ function applyLanguage(lang) {
   const searchInput = document.getElementById('drawer-search-input');
   if (searchInput && dict.searchPlaceholder) {
     searchInput.placeholder = dict.searchPlaceholder;
+  }
+}
+
+// 1.5 Voice Management (Svetlana 👩 / Dmitry 👨)
+function initVoiceSelector() {
+  let currentVoice = localStorage.getItem('tesla_navi_voice') || 'svetlana';
+  window.CURRENT_VOICE = currentVoice;
+  updateVoiceIndicator(currentVoice);
+
+  const voiceBtn = document.getElementById('btn-voice-toggle');
+  if (voiceBtn) {
+    voiceBtn.addEventListener('click', () => {
+      currentVoice = (currentVoice === 'svetlana') ? 'dmitry' : 'svetlana';
+      localStorage.setItem('tesla_navi_voice', currentVoice);
+      window.CURRENT_VOICE = currentVoice;
+      updateVoiceIndicator(currentVoice);
+
+      if (mapEngine) {
+        const lang = window.CURRENT_LANG || 'ru';
+        if (lang === 'en') {
+          const phrase = currentVoice === 'dmitry'
+            ? 'Voice switched to Andrew'
+            : 'Voice switched to Ava';
+          mapEngine.speakVoice(phrase, currentVoice);
+        } else {
+          const phrase = currentVoice === 'dmitry'
+            ? 'Голос изменён на Дмитрий. Приятной дороги!'
+            : 'Голос изменён на Светлана. Приятной дороги!';
+          mapEngine.speakVoice(phrase, currentVoice);
+        }
+      }
+    });
+  }
+}
+
+function updateVoiceIndicator(voice) {
+  const ind = document.getElementById('voice-indicator');
+  if (ind) {
+    ind.textContent = voice === 'dmitry' ? '👨' : '👩';
+    ind.title = voice === 'dmitry' ? 'Голос: Дмитрий (Мужской)' : 'Голос: Светлана (Женский)';
   }
 }
 
@@ -1475,18 +1516,38 @@ function initDevMode() {
     });
   }
 
-  const btnDiagTts = document.getElementById('btn-diag-tts');
-  if (btnDiagTts) {
-    btnDiagTts.addEventListener('click', () => {
-      console.log('🔊 [Диагностика] Проверка нашего звука и голосовых подсказок...');
-      console.log('⚡ Навигатор строго использует наш аудиопоток (/api/tts) и фирменный чиме (/sounds/nav-chime.wav)');
-
+  const btnDiagTtsSvetlana = document.getElementById('btn-diag-tts-svetlana');
+  if (btnDiagTtsSvetlana) {
+    btnDiagTtsSvetlana.addEventListener('click', () => {
+      console.log('👩 [Диагностика] Воспроизведение голоса: Светлана (ru-RU-SvetlanaNeural)...');
       if (mapEngine) {
         mapEngine.playNavChime();
-        const lang = window.CURRENT_LANG || 'ru';
-        const dict = I18N[lang] || I18N.ru;
-        mapEngine.speakVoice(dict.voiceTest || 'Tesla Navi voice test. Route is clear.');
-        console.log(`🗣️ Запущено воспроизведение на языке [${lang}] через динамики автомобиля`);
+        mapEngine.speakVoice('Здравствуйте! Я Светлана, ваш голосовой навигатор в Tesla Navi. Маршрут свободен, приятной дороги!', 'svetlana');
+        console.log('🗣️ Запущена фраза самопрезентации Светланы');
+      }
+    });
+  }
+
+  const btnDiagTtsDmitry = document.getElementById('btn-diag-tts-dmitry');
+  if (btnDiagTtsDmitry) {
+    btnDiagTtsDmitry.addEventListener('click', () => {
+      console.log('👨 [Диагностика] Воспроизведение голоса: Дмитрий (ru-RU-DmitryNeural)...');
+      if (mapEngine) {
+        mapEngine.playNavChime();
+        mapEngine.speakVoice('Здравствуйте! Я Дмитрий, ваш голосовой навигатор в Tesla Navi. Маршрут свободен, приятной дороги!', 'dmitry');
+        console.log('🗣️ Запущена фраза самопрезентации Дмитрия');
+      }
+    });
+  }
+
+  const btnDiagTtsEn = document.getElementById('btn-diag-tts-en');
+  if (btnDiagTtsEn) {
+    btnDiagTtsEn.addEventListener('click', () => {
+      console.log('🇺🇸 [Диагностика] Воспроизведение голоса: Ava (en-US-AvaNeural)...');
+      if (mapEngine) {
+        mapEngine.playNavChime();
+        mapEngine.speakVoice('Hello! I am Ava, your Tesla Navi voice assistant. The route is clear, have a safe trip!', 'ava');
+        console.log('🗣️ Запущена фраза самопрезентации Ava (EN)');
       }
     });
   }

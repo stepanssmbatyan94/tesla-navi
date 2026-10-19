@@ -76,6 +76,11 @@
       <span id="lang-indicator" class="tool-lang-badge">RU</span>
     </button>
 
+    <!-- Voice Toggle Button: Svetlana 👩 / Dmitry 👨 -->
+    <button id="btn-voice-toggle" class="tool-btn" title="Голос навигатора (Светлана 👩 / Дмитрий 👨)">
+      <span id="voice-indicator" class="tool-lang-badge" style="font-size: 14px;">👩</span>
+    </button>
+
     <!-- Map Engine Toggle: 3D Vector (MapLibre) vs Yandex Live Traffic (Яндекс) -->
     <button id="btn-toggle-provider" class="tool-btn" title="Переключить карту: 3D Vector / Яндекс.Пробки">
       <span id="provider-indicator" class="tool-lang-badge" style="font-size: 11px; font-weight: 800; color: #38bdf8;">3D</span>
@@ -602,9 +607,11 @@
 
     <!-- Tab 2: Diagnostics & Logs -->
     <div id="dev-tab-diag" class="dev-section hidden">
-      <div class="dev-row">
+      <div class="dev-row" style="flex-wrap: wrap; gap: 6px;">
+        <button id="btn-diag-tts-svetlana" class="dev-btn active" style="border-color: #38bdf8; color: #38bdf8;">👩 Тест: Светлана</button>
+        <button id="btn-diag-tts-dmitry" class="dev-btn" style="border-color: #22c55e; color: #22c55e;">👨 Тест: Дмитрий</button>
+        <button id="btn-diag-tts-en" class="dev-btn">🇺🇸 Test: Ava (EN)</button>
         <button id="btn-diag-mic" class="dev-btn">🎤 Тест микрофона</button>
-        <button id="btn-diag-tts" class="dev-btn">🔊 Тест звука / подсказки</button>
         <button id="btn-diag-yt" class="dev-btn">🎵 Тест YouTube</button>
         <button id="btn-diag-clear" class="dev-btn">🧹 Очистить</button>
       </div>
