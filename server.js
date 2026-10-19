@@ -338,9 +338,13 @@ async function fetchYandexSuggestResults(q, userLng = 44.5125, userLat = 40.1776
     return;
   }
 
-// Authentic Armenian Voice Pack Matcher (Neural Piper Gor model)
-function getArmenianAudio(text) {
+// Authentic Armenian Voice Pack Matcher (Neural Piper Gor & Suzie)
+function getArmenianAudio(text, voiceChoice = 'suzie') {
   const t = (text || '').toLowerCase().trim();
+  const v = (voiceChoice || '').toLowerCase();
+  const isMale = (v === 'gor' || v === 'male' || v === 'dmitry');
+  const folder = isMale ? 'gor' : 'suzie';
+
   let file = 'welcome.mp3';
 
   if (t.includes('կառուցված') || t.includes('գնացինք') || t === 'route_start') {
@@ -375,11 +379,14 @@ function getArmenianAudio(text) {
     file = 'speed_limit.mp3';
   } else if (t.includes('ընտրված') || t === 'voice_switched') {
     file = 'voice_switched.mp3';
-  } else if (t.includes('գոռն եմ') || t.includes('բարև') || t === 'welcome') {
+  } else if (t.includes('սյուզի') || t.includes('գոռն') || t.includes('բարև') || t === 'welcome') {
     file = 'welcome.mp3';
   }
 
-  const filePath = path.join(__dirname, 'sounds', 'hy', file);
+  let filePath = path.join(__dirname, 'sounds', 'hy', folder, file);
+  if (!fs.existsSync(filePath)) {
+    filePath = path.join(__dirname, 'sounds', 'hy', file);
+  }
   if (fs.existsSync(filePath)) {
     return fs.readFileSync(filePath);
   }
@@ -397,9 +404,9 @@ function getArmenianAudio(text) {
       return;
     }
 
-    // Armenian: High fidelity native Piper Gor audio pack
-    if (lang === 'hy' || voice === 'gor') {
-      const armenianBuf = getArmenianAudio(text);
+    // Armenian: High fidelity native Piper Suzie (Female) & Gor (Male) audio pack
+    if (lang === 'hy' || voice === 'gor' || voice === 'suzie') {
+      const armenianBuf = getArmenianAudio(text, voice);
       if (armenianBuf) {
         res.writeHead(200, {
           'Content-Type': 'audio/mpeg',

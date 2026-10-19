@@ -93,13 +93,14 @@ function initLanguage() {
 
     if (mapEngine) {
       if (currentLang === 'hy') {
-        mapEngine.speakVoice('welcome', 'gor');
+        const isMale = (window.CURRENT_VOICE === 'male' || window.CURRENT_VOICE === 'dmitry' || window.CURRENT_VOICE === 'gor');
+        mapEngine.speakVoice('welcome', isMale ? 'gor' : 'suzie');
       } else if (currentLang === 'en') {
         mapEngine.speakVoice('Voice navigation switched to Ava.', 'ava');
       } else {
         const v = window.CURRENT_VOICE || 'svetlana';
-        const msg = v === 'dmitry' ? 'Голос изменён на Дмитрий.' : 'Голос изменён на Светлана.';
-        mapEngine.speakVoice(msg, v);
+        const msg = (v === 'male' || v === 'dmitry') ? 'Голос изменён на Дмитрий.' : 'Голос изменён на Светлана.';
+        mapEngine.speakVoice(msg, (v === 'male' || v === 'dmitry') ? 'dmitry' : 'svetlana');
       }
     }
   });
@@ -119,42 +120,39 @@ function applyLanguage(lang) {
     searchInput.placeholder = dict.searchPlaceholder;
   }
 
-  updateVoiceIndicator(window.CURRENT_VOICE || 'svetlana');
+  updateVoiceIndicator(window.CURRENT_VOICE || 'female');
 }
 
-// 1.5 Voice Management (Svetlana 👩 / Dmitry 👨 / Gor 🇦🇲)
+// 1.5 Voice Management (Female 👩 / Male 👨 across RU, HY, EN)
 function initVoiceSelector() {
-  let currentVoice = localStorage.getItem('tesla_navi_voice') || 'svetlana';
+  let currentVoice = localStorage.getItem('tesla_navi_voice') || 'female';
   window.CURRENT_VOICE = currentVoice;
   updateVoiceIndicator(currentVoice);
 
   const voiceBtn = document.getElementById('btn-voice-toggle');
   if (voiceBtn) {
     voiceBtn.addEventListener('click', () => {
-      const lang = window.CURRENT_LANG || 'ru';
-      if (lang === 'hy') {
-        // In Armenian mode, announce voice confirmation
-        if (mapEngine) {
-          mapEngine.speakVoice('voice_switched', 'gor');
-        }
-        return;
-      }
-      currentVoice = (currentVoice === 'svetlana') ? 'dmitry' : 'svetlana';
+      const isCurrentlyFemale = (currentVoice === 'female' || currentVoice === 'svetlana' || currentVoice === 'suzie' || currentVoice === 'ava');
+      currentVoice = isCurrentlyFemale ? 'male' : 'female';
       localStorage.setItem('tesla_navi_voice', currentVoice);
       window.CURRENT_VOICE = currentVoice;
       updateVoiceIndicator(currentVoice);
 
       if (mapEngine) {
-        if (lang === 'en') {
-          const phrase = currentVoice === 'dmitry'
+        const lang = window.CURRENT_LANG || 'ru';
+        if (lang === 'hy') {
+          const v = currentVoice === 'male' ? 'gor' : 'suzie';
+          mapEngine.speakVoice('voice_switched', v);
+        } else if (lang === 'en') {
+          const phrase = currentVoice === 'male'
             ? 'Voice switched to Andrew'
             : 'Voice switched to Ava';
-          mapEngine.speakVoice(phrase, currentVoice);
+          mapEngine.speakVoice(phrase, currentVoice === 'male' ? 'andrew' : 'ava');
         } else {
-          const phrase = currentVoice === 'dmitry'
+          const phrase = currentVoice === 'male'
             ? 'Голос изменён на Дмитрий. Приятной дороги!'
             : 'Голос изменён на Светлана. Приятной дороги!';
-          mapEngine.speakVoice(phrase, currentVoice);
+          mapEngine.speakVoice(phrase, currentVoice === 'male' ? 'dmitry' : 'svetlana');
         }
       }
     });
@@ -164,16 +162,17 @@ function initVoiceSelector() {
 function updateVoiceIndicator(voice) {
   const ind = document.getElementById('voice-indicator');
   if (ind) {
+    const isMale = (voice === 'male' || voice === 'dmitry' || voice === 'gor' || voice === 'andrew');
     const lang = window.CURRENT_LANG || 'ru';
     if (lang === 'hy') {
-      ind.textContent = '🇦🇲';
-      ind.title = 'Ձայն: Գոռ (Հայերեն)';
+      ind.textContent = isMale ? '👨 Գոռ' : '👩 Սյուզի';
+      ind.title = isMale ? 'Ձայն: Գոռ (Տղամարդու)' : 'Ձայն: Սյուզի (Կանացի)';
     } else if (lang === 'en') {
-      ind.textContent = voice === 'dmitry' ? '👨 EN' : '👩 EN';
-      ind.title = voice === 'dmitry' ? 'Voice: Andrew (Male)' : 'Voice: Ava (Female)';
+      ind.textContent = isMale ? '👨 EN' : '👩 EN';
+      ind.title = isMale ? 'Voice: Andrew (Male)' : 'Voice: Ava (Female)';
     } else {
-      ind.textContent = voice === 'dmitry' ? '👨' : '👩';
-      ind.title = voice === 'dmitry' ? 'Голос: Дмитрий (Мужской)' : 'Голос: Светлана (Женский)';
+      ind.textContent = isMale ? '👨' : '👩';
+      ind.title = isMale ? 'Голос: Дмитрий (Мужской)' : 'Голос: Светлана (Женский)';
     }
   }
 }
@@ -1570,10 +1569,22 @@ function initDevMode() {
     });
   }
 
-  const btnDiagTtsHy = document.getElementById('btn-diag-tts-hy');
-  if (btnDiagTtsHy) {
-    btnDiagTtsHy.addEventListener('click', () => {
-      console.log('🇦🇲 [Диагностика] Воспроизведение армянского голоса: Գոռ (Gor)...');
+  const btnDiagTtsSuzie = document.getElementById('btn-diag-tts-suzie');
+  if (btnDiagTtsSuzie) {
+    btnDiagTtsSuzie.addEventListener('click', () => {
+      console.log('👩 [Диагностика] Воспроизведение армянского голоса: Սյուզի (Suzie)...');
+      if (mapEngine) {
+        mapEngine.playNavChime();
+        mapEngine.speakVoice('welcome', 'suzie');
+        console.log('🗣️ Запущена фраза самопрезентации Սյուզի (Հայերեն)');
+      }
+    });
+  }
+
+  const btnDiagTtsGor = document.getElementById('btn-diag-tts-gor');
+  if (btnDiagTtsGor) {
+    btnDiagTtsGor.addEventListener('click', () => {
+      console.log('👨 [Диагностика] Воспроизведение армянского голоса: Գոռ (Gor)...');
       if (mapEngine) {
         mapEngine.playNavChime();
         mapEngine.speakVoice('welcome', 'gor');

@@ -1289,7 +1289,13 @@ class TeslaMapEngine {
           this.currentAudioVoice = null;
         }
         const lang = window.CURRENT_LANG || 'ru';
-        const voice = forcedVoice || localStorage.getItem('tesla_navi_voice') || (lang === 'en' ? 'ava' : (lang === 'hy' ? 'gor' : 'svetlana'));
+        const savedVoice = localStorage.getItem('tesla_navi_voice') || 'female';
+        const isMale = (savedVoice === 'male' || savedVoice === 'dmitry' || savedVoice === 'gor' || savedVoice === 'andrew');
+        let defaultVoice = 'svetlana';
+        if (lang === 'hy') defaultVoice = isMale ? 'gor' : 'suzie';
+        else if (lang === 'en') defaultVoice = isMale ? 'andrew' : 'ava';
+        else defaultVoice = isMale ? 'dmitry' : 'svetlana';
+        const voice = forcedVoice || defaultVoice;
         const audio = new Audio(`/api/tts?text=${encodeURIComponent(text)}&lang=${lang}&voice=${encodeURIComponent(voice)}&v=neural_v2`);
         audio.volume = 1.0;
         this.currentAudioVoice = audio;
