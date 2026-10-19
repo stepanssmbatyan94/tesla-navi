@@ -338,6 +338,54 @@ async function fetchYandexSuggestResults(q, userLng = 44.5125, userLat = 40.1776
     return;
   }
 
+// Authentic Armenian Voice Pack Matcher (Neural Piper Gor model)
+function getArmenianAudio(text) {
+  const t = (text || '').toLowerCase().trim();
+  let file = 'welcome.mp3';
+
+  if (t.includes('կառուցված') || t.includes('գնացինք') || t === 'route_start') {
+    file = 'route_start.mp3';
+  } else if ((t.includes('ձախ') && (t.includes('250') || t.includes('հիսուն'))) || t === 'dist_250_left') {
+    file = 'dist_250_left.mp3';
+  } else if ((t.includes('աջ') && (t.includes('250') || t.includes('հիսուն'))) || t === 'dist_250_right') {
+    file = 'dist_250_right.mp3';
+  } else if ((t.includes('ուղիղ') && (t.includes('250') || t.includes('հիսուն'))) || t === 'dist_250_straight') {
+    file = 'dist_250_straight.mp3';
+  } else if ((t.includes('ձախ') && (t.includes('500') || t.includes('հարյուր'))) || t === 'dist_500_left') {
+    file = 'dist_500_left.mp3';
+  } else if ((t.includes('աջ') && (t.includes('500') || t.includes('հարյուր'))) || t === 'dist_500_right') {
+    file = 'dist_500_right.mp3';
+  } else if (t.includes('ձախ') || t === 'turn_left') {
+    file = 'turn_left.mp3';
+  } else if (t.includes('աջ') || t === 'turn_right') {
+    file = 'turn_right.mp3';
+  } else if (t.includes('պահեք ձախ') || t === 'keep_left') {
+    file = 'keep_left.mp3';
+  } else if (t.includes('պահեք աջ') || t === 'keep_right') {
+    file = 'keep_right.mp3';
+  } else if (t.includes('ուղիղ') || t === 'straight') {
+    file = 'straight.mp3';
+  } else if (t.includes('վերահաշվարկ') || t === 'rerouting') {
+    file = 'rerouting.mp3';
+  } else if (t.includes('հասել եք') || t.includes('նպատակակետ') || t === 'arrived') {
+    file = 'arrived.mp3';
+  } else if (t.includes('տեսախցիկ') || t === 'camera_ahead') {
+    file = 'camera_ahead.mp3';
+  } else if (t.includes('արագություն') || t === 'speed_limit') {
+    file = 'speed_limit.mp3';
+  } else if (t.includes('ընտրված') || t === 'voice_switched') {
+    file = 'voice_switched.mp3';
+  } else if (t.includes('գոռն եմ') || t.includes('բարև') || t === 'welcome') {
+    file = 'welcome.mp3';
+  }
+
+  const filePath = path.join(__dirname, 'sounds', 'hy', file);
+  if (fs.existsSync(filePath)) {
+    return fs.readFileSync(filePath);
+  }
+  return null;
+}
+
   // API 1.5: /api/tts (STRICTLY Neural Studio Voice Synthesizer - 100% Non-Robotic)
   if (pathname === '/api/tts') {
     const text = (parsedUrl.searchParams.get('text') || '').trim();
@@ -347,6 +395,21 @@ async function fetchYandexSuggestResults(q, userLng = 44.5125, userLat = 40.1776
       res.writeHead(400, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ error: 'Text required' }));
       return;
+    }
+
+    // Armenian: High fidelity native Piper Gor audio pack
+    if (lang === 'hy' || voice === 'gor') {
+      const armenianBuf = getArmenianAudio(text);
+      if (armenianBuf) {
+        res.writeHead(200, {
+          'Content-Type': 'audio/mpeg',
+          'Content-Length': armenianBuf.byteLength,
+          'Cache-Control': 'public, max-age=86400',
+          'Access-Control-Allow-Origin': '*'
+        });
+        res.end(armenianBuf);
+        return;
+      }
     }
 
     try {

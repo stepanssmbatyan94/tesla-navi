@@ -90,6 +90,18 @@ function initLanguage() {
     localStorage.setItem('tesla_navi_lang', currentLang);
     window.CURRENT_LANG = currentLang;
     applyLanguage(currentLang);
+
+    if (mapEngine) {
+      if (currentLang === 'hy') {
+        mapEngine.speakVoice('welcome', 'gor');
+      } else if (currentLang === 'en') {
+        mapEngine.speakVoice('Voice navigation switched to Ava.', 'ava');
+      } else {
+        const v = window.CURRENT_VOICE || 'svetlana';
+        const msg = v === 'dmitry' ? 'Голос изменён на Дмитрий.' : 'Голос изменён на Светлана.';
+        mapEngine.speakVoice(msg, v);
+      }
+    }
   });
 }
 
@@ -106,9 +118,11 @@ function applyLanguage(lang) {
   if (searchInput && dict.searchPlaceholder) {
     searchInput.placeholder = dict.searchPlaceholder;
   }
+
+  updateVoiceIndicator(window.CURRENT_VOICE || 'svetlana');
 }
 
-// 1.5 Voice Management (Svetlana 👩 / Dmitry 👨)
+// 1.5 Voice Management (Svetlana 👩 / Dmitry 👨 / Gor 🇦🇲)
 function initVoiceSelector() {
   let currentVoice = localStorage.getItem('tesla_navi_voice') || 'svetlana';
   window.CURRENT_VOICE = currentVoice;
@@ -117,13 +131,20 @@ function initVoiceSelector() {
   const voiceBtn = document.getElementById('btn-voice-toggle');
   if (voiceBtn) {
     voiceBtn.addEventListener('click', () => {
+      const lang = window.CURRENT_LANG || 'ru';
+      if (lang === 'hy') {
+        // In Armenian mode, announce voice confirmation
+        if (mapEngine) {
+          mapEngine.speakVoice('voice_switched', 'gor');
+        }
+        return;
+      }
       currentVoice = (currentVoice === 'svetlana') ? 'dmitry' : 'svetlana';
       localStorage.setItem('tesla_navi_voice', currentVoice);
       window.CURRENT_VOICE = currentVoice;
       updateVoiceIndicator(currentVoice);
 
       if (mapEngine) {
-        const lang = window.CURRENT_LANG || 'ru';
         if (lang === 'en') {
           const phrase = currentVoice === 'dmitry'
             ? 'Voice switched to Andrew'
@@ -143,8 +164,17 @@ function initVoiceSelector() {
 function updateVoiceIndicator(voice) {
   const ind = document.getElementById('voice-indicator');
   if (ind) {
-    ind.textContent = voice === 'dmitry' ? '👨' : '👩';
-    ind.title = voice === 'dmitry' ? 'Голос: Дмитрий (Мужской)' : 'Голос: Светлана (Женский)';
+    const lang = window.CURRENT_LANG || 'ru';
+    if (lang === 'hy') {
+      ind.textContent = '🇦🇲';
+      ind.title = 'Ձայն: Գոռ (Հայերեն)';
+    } else if (lang === 'en') {
+      ind.textContent = voice === 'dmitry' ? '👨 EN' : '👩 EN';
+      ind.title = voice === 'dmitry' ? 'Voice: Andrew (Male)' : 'Voice: Ava (Female)';
+    } else {
+      ind.textContent = voice === 'dmitry' ? '👨' : '👩';
+      ind.title = voice === 'dmitry' ? 'Голос: Дмитрий (Мужской)' : 'Голос: Светлана (Женский)';
+    }
   }
 }
 
@@ -1536,6 +1566,18 @@ function initDevMode() {
         mapEngine.playNavChime();
         mapEngine.speakVoice('Здравствуйте! Я Дмитрий, ваш голосовой навигатор в Tesla Navi. Маршрут свободен, приятной дороги!', 'dmitry');
         console.log('🗣️ Запущена фраза самопрезентации Дмитрия');
+      }
+    });
+  }
+
+  const btnDiagTtsHy = document.getElementById('btn-diag-tts-hy');
+  if (btnDiagTtsHy) {
+    btnDiagTtsHy.addEventListener('click', () => {
+      console.log('🇦🇲 [Диагностика] Воспроизведение армянского голоса: Գոռ (Gor)...');
+      if (mapEngine) {
+        mapEngine.playNavChime();
+        mapEngine.speakVoice('welcome', 'gor');
+        console.log('🗣️ Запущена фраза самопрезентации Գոռ (Հայերեն)');
       }
     });
   }

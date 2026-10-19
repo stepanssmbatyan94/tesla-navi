@@ -1157,6 +1157,11 @@ class TeslaMapEngine {
           if (lang === 'en') {
             const streetText = activeStep.name ? ` onto ${activeStep.name}` : '';
             phrase = `In 250 meters ${turnText.toLowerCase()}${streetText}`;
+          } else if (lang === 'hy') {
+            const mod = (activeStep.modifier || '').toLowerCase();
+            if (mod.includes('left')) phrase = 'dist_250_left';
+            else if (mod.includes('right')) phrase = 'dist_250_right';
+            else phrase = 'dist_250_straight';
           } else {
             const streetText = activeStep.name ? ` на ${activeStep.name}` : '';
             phrase = `Через 250 метров ${turnText.toLowerCase()}${streetText}`;
@@ -1284,7 +1289,7 @@ class TeslaMapEngine {
           this.currentAudioVoice = null;
         }
         const lang = window.CURRENT_LANG || 'ru';
-        const voice = forcedVoice || localStorage.getItem('tesla_navi_voice') || (lang === 'en' ? 'ava' : 'svetlana');
+        const voice = forcedVoice || localStorage.getItem('tesla_navi_voice') || (lang === 'en' ? 'ava' : (lang === 'hy' ? 'gor' : 'svetlana'));
         const audio = new Audio(`/api/tts?text=${encodeURIComponent(text)}&lang=${lang}&voice=${encodeURIComponent(voice)}&v=neural_v2`);
         audio.volume = 1.0;
         this.currentAudioVoice = audio;
