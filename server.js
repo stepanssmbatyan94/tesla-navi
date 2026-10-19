@@ -39,7 +39,7 @@ async function synthesizeNeuralSpeech(text, voiceChoice = 'auto', lang = 'ru') {
     const chunks = [];
     const timeout = setTimeout(() => {
       reject(new Error('TTS timeout'));
-    }, 7000);
+    }, 12000);
 
     audioStream.on('data', chunk => chunks.push(chunk));
     audioStream.on('end', () => {
@@ -55,6 +55,16 @@ async function synthesizeNeuralSpeech(text, voiceChoice = 'auto', lang = 'ru') {
       reject(err);
     });
   });
+}
+
+// Guaranteed Neural TTS with single retry - NEVER fall back to robotic legacy voices
+async function getOrSynthesizeSpeech(text, voiceChoice = 'auto', lang = 'ru') {
+  try {
+    return await synthesizeNeuralSpeech(text, voiceChoice, lang);
+  } catch (err) {
+    console.warn('[NeuralTTS] Initial attempt failed, retrying once...', err.message);
+    return await synthesizeNeuralSpeech(text, voiceChoice, lang);
+  }
 }
 
 const PORT = process.env.PORT || 3000;
@@ -310,7 +320,7 @@ async function fetchYandexSuggestResults(q, userLng = 44.5125, userLat = 40.1776
     return;
   }
 
-  // API 1.5: /api/tts (Human-Like Neural Voice Synthesizer - Russian & English)
+  // API 1.5: /api/tts (STRICTLY Neural Studio Voice Synthesizer - 100% Non-Robotic)
   if (pathname === '/api/tts') {
     const text = (parsedUrl.searchParams.get('text') || '').trim();
     const lang = (parsedUrl.searchParams.get('lang') || 'ru').trim().toLowerCase();
@@ -322,7 +332,7 @@ async function fetchYandexSuggestResults(q, userLng = 44.5125, userLat = 40.1776
     }
 
     try {
-      const audioBuf = await synthesizeNeuralSpeech(text, voice, lang);
+      const audioBuf = await getOrSynthesizeSpeech(text, voice, lang);
       res.writeHead(200, {
         'Content-Type': 'audio/mpeg',
         'Content-Length': audioBuf.byteLength,
@@ -332,34 +342,10 @@ async function fetchYandexSuggestResults(q, userLng = 44.5125, userLat = 40.1776
       res.end(audioBuf);
       return;
     } catch (neuralErr) {
-      console.warn('Neural TTS warning, falling back to Google TTS:', neuralErr.message);
-      try {
-        const ttsUrl = `https://translate.google.com/translate_tts?ie=UTF-8&q=${encodeURIComponent(text)}&tl=ru&client=tw-ob`;
-        const ttsRes = await fetch(ttsUrl, {
-          headers: {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-          }
-        });
-
-        if (!ttsRes.ok) {
-          throw new Error(`TTS provider responded with status ${ttsRes.status}`);
-        }
-
-        const audioBuf = await ttsRes.arrayBuffer();
-        res.writeHead(200, {
-          'Content-Type': 'audio/mpeg',
-          'Content-Length': audioBuf.byteLength,
-          'Cache-Control': 'public, max-age=86400',
-          'Access-Control-Allow-Origin': '*'
-        });
-        res.end(Buffer.from(audioBuf));
-        return;
-      } catch (fbErr) {
-        console.warn('TTS proxy fallback error:', fbErr.message);
-        res.writeHead(500, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ error: fbErr.message }));
-        return;
-      }
+      console.error('[NeuralTTS] Fatal synthesis error:', neuralErr.message);
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Neural synthesis failed', details: neuralErr.message }));
+      return;
     }
   }
 

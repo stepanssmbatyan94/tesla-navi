@@ -725,8 +725,9 @@ class TeslaMapEngine {
   // Toggle Voice Sound On/Off
   toggleVoice() {
     this.voiceEnabled = !this.voiceEnabled;
-    if (!this.voiceEnabled && 'speechSynthesis' in window) {
-      window.speechSynthesis.cancel();
+    if (!this.voiceEnabled && this.currentAudioVoice) {
+      try { this.currentAudioVoice.pause(); } catch (e) {}
+      this.currentAudioVoice = null;
     }
     return this.voiceEnabled;
   }
