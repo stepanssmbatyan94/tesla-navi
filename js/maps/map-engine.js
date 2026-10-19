@@ -67,10 +67,11 @@ class TeslaMapEngine {
     this.startMotionExtrapolator();
   }
 
-  // Get interpolated coordinate and bearing at distance along route polyline
-  getPositionAtDistance(distMeters) {
+  // Get interpolated coordinate and smooth lookahead bearing at distance along route polyline
+  getPositionAtDistance(distMeters, lookaheadMeters = 24) {
     if (!this.routeCoordinates || this.routeCoordinates.length < 2 || !this.routeCumulativeDistances) return null;
-    const clampedDist = Math.max(0, Math.min(this.totalRouteMeters || 1000, distMeters));
+    const totalDist = this.totalRouteMeters || this.routeCumulativeDistances[this.routeCumulativeDistances.length - 1] || 1000;
+    const clampedDist = Math.max(0, Math.min(totalDist, distMeters));
 
     let segIdx = 0;
     for (let i = 0; i < this.routeCumulativeDistances.length - 1; i++) {
@@ -90,7 +91,28 @@ class TeslaMapEngine {
 
     const lng = p1[0] + (p2[0] - p1[0]) * t;
     const lat = p1[1] + (p2[1] - p1[1]) * t;
-    const heading = this.calculateBearing(p1[1], p1[0], p2[1], p2[0]);
+
+    // Lookahead point along polyline for smooth curve anticipation
+    const aheadDist = Math.min(totalDist, clampedDist + lookaheadMeters);
+    let aheadSegIdx = segIdx;
+    for (let i = segIdx; i < this.routeCumulativeDistances.length - 1; i++) {
+      if (aheadDist >= this.routeCumulativeDistances[i] && aheadDist <= this.routeCumulativeDistances[i + 1]) {
+        aheadSegIdx = i;
+        break;
+      }
+    }
+    const aheadStart = this.routeCumulativeDistances[aheadSegIdx] || 0;
+    const aheadEnd = this.routeCumulativeDistances[aheadSegIdx + 1] || (aheadStart + 1);
+    const aheadT = Math.max(0, Math.min(1, (aheadDist - aheadStart) / Math.max(0.001, aheadEnd - aheadStart)));
+    const ap1 = this.routeCoordinates[aheadSegIdx];
+    const ap2 = this.routeCoordinates[Math.min(this.routeCoordinates.length - 1, aheadSegIdx + 1)];
+    const aheadLng = ap1[0] + (ap2[0] - ap1[0]) * aheadT;
+    const aheadLat = ap1[1] + (ap2[1] - ap1[1]) * aheadT;
+
+    let heading = this.calculateBearing(p1[1], p1[0], p2[1], p2[0]);
+    if (aheadDist > clampedDist + 0.5) {
+      heading = this.calculateBearing(lat, lng, aheadLat, aheadLng);
+    }
 
     return { lat, lng, heading };
   }
@@ -153,14 +175,35 @@ class TeslaMapEngine {
       this.map.doubleClickZoom.enable();
       this.map.touchPitch.enable();
 
+      // Persistent navigation padding so all zoom and camera operations anchor directly on the vehicle
+      this.navPadding = { top: Math.round(window.innerHeight * 0.28), bottom: 0, left: 0, right: 0 };
+      try {
+        this.map.setPadding(this.navPadding);
+      } catch (e) {}
+
+      window.addEventListener('resize', () => {
+        if (this.map && typeof this.map.setPadding === 'function') {
+          this.navPadding = { top: Math.round(window.innerHeight * 0.28), bottom: 0, left: 0, right: 0 };
+          this.map.setPadding(this.navPadding);
+        }
+      });
+
       // Detect manual user touch/drag ONLY from genuine user drag gestures (ignore programmatic easeTo/jumpTo)
       const handleUserPan = (e) => {
         if (!e || !e.originalEvent) return; // Programmatic camera animations must never disable car follow!
         this.followCar = false;
-        this.onUserPan();
+        const recenterBtn = document.getElementById('floating-recenter-btn');
+        if (recenterBtn) recenterBtn.classList.remove('hidden');
+        if (this.onUserPan) this.onUserPan();
         this.resetAutoFollowTimer();
       };
       this.map.on('dragstart', handleUserPan);
+      this.map.on('zoomstart', (e) => {
+        if (e && e.originalEvent) {
+          const recenterBtn = document.getElementById('floating-recenter-btn');
+          if (recenterBtn) recenterBtn.classList.remove('hidden');
+        }
+      });
 
       this.map.on('load', () => {
         // Remove/hide bulky 3D extruded building blocks so map stays completely clean & unobstructed
@@ -291,6 +334,8 @@ class TeslaMapEngine {
 
         const handleYandexUserPan = () => {
           this.followCar = false;
+          const recenterBtn = document.getElementById('floating-recenter-btn');
+          if (recenterBtn) recenterBtn.classList.remove('hidden');
           if (this.onUserPan) this.onUserPan();
           this.resetAutoFollowTimer();
         };
@@ -371,9 +416,10 @@ class TeslaMapEngine {
     });
   }
 
-  // Recenter map back onto vehicle & re-enable auto-follow
+  // Recenter map back onto vehicle & reset zoom to default
   recenter() {
     this.followCar = true;
+    this.navZoom = CONFIG.navigationZoom || 16.5;
     if (this.autoFollowTimer) {
       clearTimeout(this.autoFollowTimer);
       this.autoFollowTimer = null;
@@ -382,6 +428,10 @@ class TeslaMapEngine {
     if (recenterBtn) recenterBtn.classList.add('hidden');
 
     const targetHeading = this.currentHeading || (this.currentPosition && this.currentPosition.heading) || 0;
+    const pad = this.isHeadingUp
+      ? { top: Math.round(window.innerHeight * 0.28), bottom: 0, left: 0, right: 0 }
+      : { top: 0, bottom: 0, left: 0, right: 0 };
+
     if (this.provider === 'maplibre' && this.map) {
       const markerEl = document.querySelector('#maplibre-car-marker .tesla-car-arrow');
       if (this.isHeadingUp && markerEl) {
@@ -392,8 +442,8 @@ class TeslaMapEngine {
         zoom: this.navZoom,
         bearing: this.isHeadingUp ? targetHeading : 0,
         pitch: this.isNavigating ? 35 : 0,
-        padding: this.isHeadingUp ? { top: 220, bottom: 0, left: 0, right: 0 } : { top: 0, bottom: 0, left: 0, right: 0 },
-        duration: 500
+        padding: pad,
+        duration: 400
       });
     } else if (this.provider === 'yandex' && this.map) {
       this.map.setCenter([this.currentPosition.lat, this.currentPosition.lng], this.navZoom, { duration: 400 });
@@ -402,37 +452,79 @@ class TeslaMapEngine {
     }
   }
 
-  // Auto-follow recovery: if user pans, resume tracking after 6 seconds of inactivity
+  // Clear auto-follow recovery timer (recenter button stays visible until user clicks it)
   resetAutoFollowTimer() {
     if (this.autoFollowTimer) {
       clearTimeout(this.autoFollowTimer);
+      this.autoFollowTimer = null;
     }
-    this.autoFollowTimer = setTimeout(() => {
-      this.recenter();
-    }, 6000);
   }
 
-  // Zoom In map (maintains car tracking while adjusting magnification)
+  // Zoom In map (anchored strictly on vehicle position with perspective padding)
   zoomIn() {
+    const recenterBtn = document.getElementById('floating-recenter-btn');
+    if (recenterBtn) recenterBtn.classList.remove('hidden');
+
+    const pad = this.isHeadingUp
+      ? { top: Math.round(window.innerHeight * 0.28), bottom: 0, left: 0, right: 0 }
+      : { top: 0, bottom: 0, left: 0, right: 0 };
+
     if (this.provider === 'maplibre' && this.map) {
-      this.navZoom = Math.min(19, Math.round((this.map.getZoom() || this.navZoom) + 1));
-      this.map.jumpTo({ zoom: this.navZoom });
+      this.navZoom = Math.min(19, (this.map.getZoom() || this.navZoom) + 1);
+      if (this.currentPosition) {
+        this.map.easeTo({
+          center: [this.currentPosition.lng, this.currentPosition.lat],
+          zoom: this.navZoom,
+          bearing: this.isHeadingUp ? this.currentHeading : 0,
+          pitch: this.isHeadingUp ? 35 : 0,
+          padding: pad,
+          duration: 250
+        });
+      } else {
+        this.map.zoomTo(this.navZoom, { duration: 250 });
+      }
     } else if (this.provider === 'yandex' && this.map) {
       this.navZoom = Math.min(18, Math.round(this.map.getZoom() + 1));
-      this.map.setZoom(this.navZoom);
+      if (this.currentPosition) {
+        this.map.setCenter([this.currentPosition.lat, this.currentPosition.lng], this.navZoom, { duration: 250 });
+      } else {
+        this.map.setZoom(this.navZoom, { duration: 250 });
+      }
     } else if (this.map && typeof this.map.zoomIn === 'function') {
       this.map.zoomIn();
     }
   }
 
-  // Zoom Out map (maintains car tracking while adjusting magnification)
+  // Zoom Out map (anchored strictly on vehicle position with perspective padding)
   zoomOut() {
+    const recenterBtn = document.getElementById('floating-recenter-btn');
+    if (recenterBtn) recenterBtn.classList.remove('hidden');
+
+    const pad = this.isHeadingUp
+      ? { top: Math.round(window.innerHeight * 0.28), bottom: 0, left: 0, right: 0 }
+      : { top: 0, bottom: 0, left: 0, right: 0 };
+
     if (this.provider === 'maplibre' && this.map) {
-      this.navZoom = Math.max(3, Math.round((this.map.getZoom() || this.navZoom) - 1));
-      this.map.jumpTo({ zoom: this.navZoom });
+      this.navZoom = Math.max(3, (this.map.getZoom() || this.navZoom) - 1);
+      if (this.currentPosition) {
+        this.map.easeTo({
+          center: [this.currentPosition.lng, this.currentPosition.lat],
+          zoom: this.navZoom,
+          bearing: this.isHeadingUp ? this.currentHeading : 0,
+          pitch: this.isHeadingUp ? 35 : 0,
+          padding: pad,
+          duration: 250
+        });
+      } else {
+        this.map.zoomTo(this.navZoom, { duration: 250 });
+      }
     } else if (this.provider === 'yandex' && this.map) {
       this.navZoom = Math.max(4, Math.round(this.map.getZoom() - 1));
-      this.map.setZoom(this.navZoom);
+      if (this.currentPosition) {
+        this.map.setCenter([this.currentPosition.lat, this.currentPosition.lng], this.navZoom, { duration: 250 });
+      } else {
+        this.map.setZoom(this.navZoom, { duration: 250 });
+      }
     } else if (this.map && typeof this.map.zoomOut === 'function') {
       this.map.zoomOut();
     }
@@ -587,11 +679,24 @@ class TeslaMapEngine {
 
     // If within 40m of road centerline -> snap to road
     if (minDistance <= 40) {
+      let roadBearing = bestBearing;
+      if (this.routeCumulativeDistances && this.totalRouteMeters) {
+        const segDist = this.routeCumulativeDistances[bestSegIndex] || 0;
+        const segLen = (this.routeCumulativeDistances[bestSegIndex + 1] || (segDist + 1)) - segDist;
+        const p1 = this.routeCoordinates[bestSegIndex];
+        const p2 = this.routeCoordinates[bestSegIndex + 1];
+        const projT = this.projectPointToSegment(lng, lat, p1[0], p1[1], p2[0], p2[1]).t;
+        const snappedDist = segDist + (projT * segLen);
+        const aheadPt = this.getPositionAtDistance(snappedDist + 24);
+        if (aheadPt) {
+          roadBearing = this.calculateBearing(bestPoint.lat, bestPoint.lng, aheadPt.lat, aheadPt.lng);
+        }
+      }
       return {
         snapped: true,
         lat: bestPoint.lat,
         lng: bestPoint.lng,
-        bearing: bestBearing,
+        bearing: roadBearing,
         dist: minDistance,
         segIndex: bestSegIndex
       };
@@ -645,9 +750,15 @@ class TeslaMapEngine {
       }
     }
 
-    // 3. Smooth Heading
-    const smoothFactor = window.IS_SIMULATOR_RUNNING ? 0.6 : 0.35;
-    this.currentHeading = this.smoothAngle(this.currentHeading, targetHeading, smoothFactor);
+    // 3. Smooth Heading with Inertial Angular Rate Limiting
+    const angleDiff = ((targetHeading - this.currentHeading) % 360 + 540) % 360 - 180;
+    const smoothFactor = window.IS_SIMULATOR_RUNNING ? 0.09 : 0.08;
+    let delta = angleDiff * smoothFactor;
+    // Physical angular velocity clamp: maximum 1.25 degrees per frame (~75 deg/sec at 60fps)
+    const maxAngularStep = 1.25;
+    if (delta > maxAngularStep) delta = maxAngularStep;
+    if (delta < -maxAngularStep) delta = -maxAngularStep;
+    this.currentHeading = (this.currentHeading + delta + 360) % 360;
     this.currentPosition = {
       lat: displayLat,
       lng: displayLng,
@@ -671,11 +782,12 @@ class TeslaMapEngine {
         }
 
         if (this.followCar) {
+          const navPadding = { top: Math.round(window.innerHeight * 0.28), bottom: 0, left: 0, right: 0 };
           this.map.jumpTo({
             center: [displayLng, displayLat],
             bearing: this.currentHeading,
             pitch: 35,
-            padding: { top: 220, bottom: 0, left: 0, right: 0 }
+            padding: navPadding
           });
         }
       } else {
@@ -701,13 +813,13 @@ class TeslaMapEngine {
 
       if (this.isHeadingUp) {
         // Counteract container rotation so arrow points ALWAYS STRAIGHT UP (0° relative to screen)
-        if (markerEl) markerEl.style.transform = `rotate(${Math.round(this.currentHeading)}deg)`;
+        if (markerEl) markerEl.style.transform = `rotate(${this.currentHeading.toFixed(1)}deg)`;
         if (container) {
           container.classList.add('yandex-rotate');
-          container.style.transform = `rotate(${-Math.round(this.currentHeading)}deg)`;
+          container.style.transform = `rotate(${-this.currentHeading.toFixed(1)}deg)`;
         }
       } else {
-        if (markerEl) markerEl.style.transform = `rotate(${Math.round(this.currentHeading)}deg)`;
+        if (markerEl) markerEl.style.transform = `rotate(${this.currentHeading.toFixed(1)}deg)`;
         if (container) {
           container.classList.remove('yandex-rotate');
           container.style.transform = 'none';
@@ -717,15 +829,15 @@ class TeslaMapEngine {
       if (this.followCar) {
         const curZoom = this.map.getZoom();
         const now = performance.now();
-        const distFromLastCenter = this.lastYandexCenterPos
-          ? this.calculateDistance(this.lastYandexCenterPos.lat, this.lastYandexCenterPos.lng, displayLat, displayLng)
-          : Infinity;
-
-        // Throttle Yandex setCenter to avoid flooding internal tile queue (prevents freezing)
-        if (!this.lastYandexCenterTime || (distFromLastCenter > 3.5 && (now - this.lastYandexCenterTime > 350))) {
+        // Smooth continuous panning for Yandex Maps (no jerky step snapping)
+        if (!this.lastYandexCenterTime || (now - this.lastYandexCenterTime > 180)) {
           this.lastYandexCenterTime = now;
-          this.lastYandexCenterPos = { lat: displayLat, lng: displayLng };
-          this.map.setCenter([displayLat, displayLng], this.isNavigating && curZoom < 14 ? this.navZoom : curZoom, { duration: 0 });
+          this.map.panTo([displayLat, displayLng], {
+            flying: false,
+            duration: 200,
+            delay: 0,
+            timingFunction: 'linear'
+          });
         }
       }
     } else if (this.carMarker && window.L && this.provider === 'osm') {

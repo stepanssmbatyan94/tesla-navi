@@ -1507,9 +1507,14 @@ function initDevMode() {
     simTotalDist = Math.max(10, total);
   }
 
-  // Interpolate position and heading at exact distance along polyline
+  // Interpolate position and heading at exact distance along polyline with lookahead curve anticipation
   function getPositionAtDistance(dist) {
-    const coords = mapEngine.routeCoordinates;
+    if (mapEngine && typeof mapEngine.getPositionAtDistance === 'function') {
+      const pt = mapEngine.getPositionAtDistance(dist, 24);
+      if (pt) return pt;
+    }
+
+    const coords = mapEngine?.routeCoordinates;
     if (!coords || coords.length < 2) return null;
     if (!cumulativeDistances || cumulativeDistances.length !== coords.length) {
       initSimPolyline(coords);
@@ -1536,7 +1541,28 @@ function initDevMode() {
     // coords is [lng, lat]
     const lng = p1[0] + (p2[0] - p1[0]) * t;
     const lat = p1[1] + (p2[1] - p1[1]) * t;
-    const heading = mapEngine.calculateBearing(p1[1], p1[0], p2[1], p2[0]);
+
+    // Lookahead for curve anticipation
+    const aheadDist = Math.min(simTotalDist, clampedDist + 24);
+    let aheadSegIdx = segIdx;
+    for (let i = segIdx; i < cumulativeDistances.length - 1; i++) {
+      if (aheadDist >= cumulativeDistances[i] && aheadDist <= cumulativeDistances[i + 1]) {
+        aheadSegIdx = i;
+        break;
+      }
+    }
+    const aheadStart = cumulativeDistances[aheadSegIdx] || 0;
+    const aheadEnd = cumulativeDistances[aheadSegIdx + 1] || (aheadStart + 1);
+    const aheadT = Math.max(0, Math.min(1, (aheadDist - aheadStart) / Math.max(0.001, aheadEnd - aheadStart)));
+    const ap1 = coords[aheadSegIdx];
+    const ap2 = coords[Math.min(coords.length - 1, aheadSegIdx + 1)];
+    const aheadLng = ap1[0] + (ap2[0] - ap1[0]) * aheadT;
+    const aheadLat = ap1[1] + (ap2[1] - ap1[1]) * aheadT;
+
+    let heading = mapEngine.calculateBearing(p1[1], p1[0], p2[1], p2[0]);
+    if (aheadDist > clampedDist + 0.5) {
+      heading = mapEngine.calculateBearing(lat, lng, aheadLat, aheadLng);
+    }
 
     return { lat, lng, heading };
   }
