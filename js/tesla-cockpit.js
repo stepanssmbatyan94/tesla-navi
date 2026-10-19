@@ -1448,19 +1448,18 @@ function initDevMode() {
   if (btnDiagTts) {
     btnDiagTts.addEventListener('click', () => {
       console.log('🔊 [Диагностика] Проверка синтеза речи и звука...');
-      if (!('speechSynthesis' in window)) {
-        console.error('❌ window.speechSynthesis не поддерживается');
-        return;
-      }
-      const voices = window.speechSynthesis.getVoices() || [];
-      console.log(`📋 Установлено системных голосов: ${voices.length}`);
+      const voices = ('speechSynthesis' in window) ? (window.speechSynthesis.getVoices() || []) : [];
+      console.log(`📋 Установлено системных голосов в ОС: ${voices.length}`);
       const ruVoices = voices.filter(v => v.lang && v.lang.startsWith('ru'));
       console.log(`🇷🇺 Русских голосов: ${ruVoices.length}`, ruVoices.map(v => v.name));
+      if (ruVoices.length === 0) {
+        console.log('⚡ В Tesla OS нет встроенных голосов -> активирован серверный аудио-поток /api/tts (MP3 через динамики Теслы)');
+      }
 
       if (mapEngine) {
         mapEngine.playNavChime();
         mapEngine.speakVoice('Тест голосового оповещения Tesla Navi. Маршрут свободен.');
-        console.log('🗣️ Запущено воспроизведение тестовой фразы');
+        console.log('🗣️ Воспроизведение тестовой фразы через аудиосистему автомобиля');
       }
     });
   }

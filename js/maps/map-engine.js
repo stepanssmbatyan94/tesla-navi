@@ -1262,20 +1262,38 @@ class TeslaMapEngine {
     return voices.find(v => v.lang && v.lang.startsWith('ru')) || null;
   }
 
-  // Voice output matching Yandex Navigator audio cues
+  // Voice output matching Yandex Navigator audio cues (with Tesla OS fallback when system voices = 0)
   speakVoice(text) {
-    if (!this.voiceEnabled || !('speechSynthesis' in window)) return;
+    if (!this.voiceEnabled) return;
     try {
       this.playNavChime();
       setTimeout(() => {
-        window.speechSynthesis.cancel();
-        const utterance = new SpeechSynthesisUtterance(text);
-        const voice = this.getBestRussianVoice();
-        if (voice) utterance.voice = voice;
-        utterance.lang = 'ru-RU';
-        utterance.rate = 1.02;
-        utterance.pitch = 1.04;
-        window.speechSynthesis.speak(utterance);
+        // 1. Check if browser has native Russian voices installed
+        const hasNativeRussianVoice = ('speechSynthesis' in window) &&
+          window.speechSynthesis.getVoices().some(v => v.lang && v.lang.startsWith('ru'));
+
+        if (hasNativeRussianVoice) {
+          window.speechSynthesis.cancel();
+          const utterance = new SpeechSynthesisUtterance(text);
+          const voice = this.getBestRussianVoice();
+          if (voice) utterance.voice = voice;
+          utterance.lang = 'ru-RU';
+          utterance.rate = 1.02;
+          utterance.pitch = 1.04;
+          window.speechSynthesis.speak(utterance);
+        } else {
+          // 2. Tesla OS / Embedded Linux fallback: Native TTS voices = 0
+          // Stream studio-quality Russian voice from /api/tts via HTML5 Audio through Tesla car speakers
+          if (this.currentAudioVoice) {
+            try { this.currentAudioVoice.pause(); } catch (e) {}
+            this.currentAudioVoice = null;
+          }
+          const audio = new Audio(`/api/tts?text=${encodeURIComponent(text)}&lang=ru`);
+          this.currentAudioVoice = audio;
+          audio.play().catch(e => {
+            console.warn('Audio TTS playback error:', e);
+          });
+        }
       }, 130);
     } catch (e) {
       console.warn('SpeechSynthesis error:', e);

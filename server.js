@@ -253,6 +253,45 @@ async function fetchYandexSuggestResults(q, userLng = 44.5125, userLat = 40.1776
     return;
   }
 
+  // API 1.5: /api/tts (Audio Voice Synthesizer for Tesla Browser when system voices count is 0)
+  if (pathname === '/api/tts') {
+    const text = (parsedUrl.searchParams.get('text') || '').trim();
+    const lang = (parsedUrl.searchParams.get('lang') || 'ru').trim();
+    if (!text) {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Text required' }));
+      return;
+    }
+
+    try {
+      const ttsUrl = `https://translate.google.com/translate_tts?ie=UTF-8&q=${encodeURIComponent(text)}&tl=${encodeURIComponent(lang)}&client=tw-ob`;
+      const ttsRes = await fetch(ttsUrl, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+        }
+      });
+
+      if (!ttsRes.ok) {
+        throw new Error(`TTS provider responded with status ${ttsRes.status}`);
+      }
+
+      const audioBuf = await ttsRes.arrayBuffer();
+      res.writeHead(200, {
+        'Content-Type': 'audio/mpeg',
+        'Content-Length': audioBuf.byteLength,
+        'Cache-Control': 'public, max-age=86400',
+        'Access-Control-Allow-Origin': '*'
+      });
+      res.end(Buffer.from(audioBuf));
+      return;
+    } catch (ttsErr) {
+      console.warn('TTS proxy error:', ttsErr.message);
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: ttsErr.message }));
+      return;
+    }
+  }
+
   // API 2: /api/geocode (Authentic Yandex Maps search suggestions + village/province resolution)
   if (pathname === '/api/geocode') {
     const q = (parsedUrl.searchParams.get('q') || '').trim();
