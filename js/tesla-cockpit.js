@@ -307,8 +307,8 @@ function loadSavedPlaces() {
     if (raw) {
       const parsed = JSON.parse(raw);
       return {
-        home: parsed.home !== undefined ? parsed.home : DEFAULT_SAVED_PLACES.home,
-        work: parsed.work !== undefined ? parsed.work : DEFAULT_SAVED_PLACES.work,
+        home: (parsed.home && parsed.home.address) ? parsed.home : DEFAULT_SAVED_PLACES.home,
+        work: (parsed.work && parsed.work.address) ? parsed.work : DEFAULT_SAVED_PLACES.work,
         favorites: Array.isArray(parsed.favorites) ? parsed.favorites : DEFAULT_SAVED_PLACES.favorites
       };
     }
@@ -854,7 +854,12 @@ function updateCommuteEtas() {
 }
 
 function renderAllSavedPlacesUI() {
-  // 1. Update Search Drawer Commute Tiles
+  // 1. Update Search Drawer Commute Tiles (Strict 2-Column Grid: Home & Work always visible)
+  const homeTileEl = document.getElementById('commute-home');
+  const workTileEl = document.getElementById('commute-work');
+  if (homeTileEl) homeTileEl.style.display = 'flex';
+  if (workTileEl) workTileEl.style.display = 'flex';
+
   const homeTitle = document.getElementById('home-title-text');
   const homeSub = document.getElementById('home-address-sub');
   const homeBadge = document.getElementById('home-eta-badge');
@@ -870,14 +875,14 @@ function renderAllSavedPlacesUI() {
   } else {
     if (homeTitle) homeTitle.textContent = 'Дом';
     if (homeSub) {
-      homeSub.textContent = '+ Нажмите, чтобы задать адрес';
+      homeSub.textContent = '+ Задать адрес';
       homeSub.style.color = '#94a3b8';
     }
     if (homeBadge) {
       homeBadge.textContent = '+ Задать';
       homeBadge.className = 'commute-add-badge';
     }
-    if (btnEditHome) btnEditHome.classList.add('hidden');
+    if (btnEditHome) btnEditHome.classList.remove('hidden');
   }
 
   const workTitle = document.getElementById('work-title-text');
@@ -895,14 +900,14 @@ function renderAllSavedPlacesUI() {
   } else {
     if (workTitle) workTitle.textContent = 'Работа';
     if (workSub) {
-      workSub.textContent = '+ Нажмите, чтобы задать адрес';
+      workSub.textContent = '+ Задать адрес';
       workSub.style.color = '#94a3b8';
     }
     if (workBadge) {
       workBadge.textContent = '+ Задать';
       workBadge.className = 'commute-add-badge';
     }
-    if (btnEditWork) btnEditWork.classList.add('hidden');
+    if (btnEditWork) btnEditWork.classList.remove('hidden');
   }
 
   const favCount = (userSavedPlaces.favorites || []).length;
@@ -1250,6 +1255,9 @@ function initEditPlaceModalHandlers() {
           lat: loc.lat,
           lng: loc.lng
         };
+        if (!userSavedPlaces.work) {
+          userSavedPlaces.work = DEFAULT_SAVED_PLACES.work;
+        }
       } else if (currentEditTarget.type === 'work') {
         userSavedPlaces.work = {
           name: 'Работа',
@@ -1257,6 +1265,9 @@ function initEditPlaceModalHandlers() {
           lat: loc.lat,
           lng: loc.lng
         };
+        if (!userSavedPlaces.home) {
+          userSavedPlaces.home = DEFAULT_SAVED_PLACES.home;
+        }
       } else if (currentEditTarget.type === 'favorite') {
         const customName = nameInput.value.trim() || addrVal.split(',')[0] || 'Избранное';
         if (currentEditTarget.place) {

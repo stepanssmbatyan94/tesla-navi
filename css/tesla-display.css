@@ -73,18 +73,18 @@ html, body {
   will-change: transform;
 }
 
-/* 2. Floating Action Toolbar (Bottom-Left Vertical Dock like Mapsev) */
 .floating-toolbar {
   position: absolute;
   left: 20px;
-  bottom: 24px;
+  top: 50%;
+  transform: translateY(-50%);
   z-index: 50;
   display: flex;
   flex-direction: column;
   gap: 8px;
   background: #ffffff;
   border: 1px solid rgba(0, 0, 0, 0.06);
-  border-radius: 22px;
+  border-radius: 24px;
   padding: 8px 6px;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08), 0 1px 3px rgba(0, 0, 0, 0.04);
 }
@@ -143,12 +143,12 @@ html, body {
   letter-spacing: 0.3px;
 }
 
-/* Attached Battery Pill (Mapsev Screenshot 1 Style) */
+/* Attached Battery Pill (Anchored to centered floating toolbar) */
 .dock-battery-pill {
   position: absolute;
-  left: 78px;
-  bottom: 24px;
-  z-index: 49;
+  left: 68px;
+  bottom: 10px;
+  z-index: 51;
   display: flex;
   align-items: center;
   gap: 5px;
@@ -160,6 +160,8 @@ html, body {
   font-size: 13px;
   font-weight: 700;
   color: #16a34a;
+  white-space: nowrap;
+  pointer-events: auto;
 }
 
 .compass-arrow-wrap {
@@ -370,14 +372,17 @@ html, body {
   gap: 16px;
 }
 
-/* Quick Commute Bookmarks: Home / Work with Live ETAs */
+/* Quick Commute Bookmarks: Home / Work with Live ETAs (Strict 2-Column Responsive Grid) */
 .commute-tiles-container {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: 10px;
+  width: 100%;
 }
 
 .commute-tile-item {
+  min-width: 0;
+  overflow: hidden;
   background: #f8fafc;
   border: 1px solid #e2e8f0;
   border-radius: 16px;
@@ -400,6 +405,7 @@ html, body {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  min-width: 0;
 }
 
 .commute-icon-title {
@@ -409,6 +415,7 @@ html, body {
   font-size: 15px;
   font-weight: 700;
   color: #111827;
+  white-space: nowrap;
 }
 
 .commute-eta-badge {
@@ -418,6 +425,7 @@ html, body {
   background: #dcfce7;
   border-radius: 8px;
   padding: 2px 6px;
+  white-space: nowrap;
 }
 
 .commute-address-sub {
@@ -426,6 +434,8 @@ html, body {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  width: 100%;
+  display: block;
 }
 
 .commute-right-actions {
@@ -882,21 +892,63 @@ html, body {
   border-color: #bfdbfe;
 }
 
-.btn-secondary-delete {
-  flex: 1;
+.modal-btn-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 8px;
+  width: 100%;
+}
+
+.btn-secondary-delete,
+.btn-delete-place-action {
   height: 48px;
+  padding: 0 18px;
   background: #fef2f2;
   border: 1px solid #fecaca;
-  border-radius: 16px;
+  border-radius: 14px;
   color: #ef4444;
   font-size: 15px;
   font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  flex: none;
 }
 
-.btn-secondary-delete:hover {
+.btn-secondary-delete:hover,
+.btn-delete-place-action:hover {
   background: #fee2e2;
+  border-color: #f87171;
+  color: #dc2626;
+  transform: translateY(-1px);
+}
+
+.modal-btn-row .btn-primary-action {
+  flex: 1;
+  width: auto;
+  height: 48px;
+  background: #2563eb;
+  border: none;
+  border-radius: 14px;
+  color: #ffffff;
+  font-size: 16px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: 0 4px 14px rgba(37, 99, 235, 0.25);
+}
+
+.modal-btn-row .btn-primary-action:hover {
+  background: #1d4ed8;
+  transform: translateY(-1px);
+  box-shadow: 0 6px 18px rgba(37, 99, 235, 0.35);
 }
 
 /* 4. Compact Maneuver HUD Card (Mapsev Light Style) */
