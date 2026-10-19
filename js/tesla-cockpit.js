@@ -919,10 +919,84 @@ function initWeatherAndMusic() {
     btn.addEventListener('click', () => weatherModal.classList.add('hidden'));
   });
 
-  // YouTube Music & Video Player
+  // Reusable touch & mouse dragging utility for floating automotive cards
+  function makeElementDraggable(element, handleElement) {
+    if (!element) return;
+    const handle = handleElement || element;
+    let isDragging = false;
+    let startX = 0;
+    let startY = 0;
+    let initialLeft = 0;
+    let initialTop = 0;
+
+    handle.addEventListener('pointerdown', (e) => {
+      // Don't drag when touching buttons, inputs, links, or iframe
+      if (e.target.closest('button, input, a, iframe, .card-close-btn, .mini-ctrl-btn, .music-ctrl-btn')) return;
+
+      isDragging = true;
+      try {
+        handle.setPointerCapture(e.pointerId);
+      } catch (err) {}
+      startX = e.clientX;
+      startY = e.clientY;
+
+      const rect = element.getBoundingClientRect();
+      initialLeft = rect.left;
+      initialTop = rect.top;
+
+      element.style.transition = 'none';
+      e.preventDefault();
+    });
+
+    handle.addEventListener('pointermove', (e) => {
+      if (!isDragging) return;
+      const dx = e.clientX - startX;
+      const dy = e.clientY - startY;
+
+      let newLeft = initialLeft + dx;
+      let newTop = initialTop + dy;
+
+      const maxLeft = Math.max(10, window.innerWidth - element.offsetWidth - 10);
+      const maxTop = Math.max(10, window.innerHeight - element.offsetHeight - 10);
+
+      newLeft = Math.max(10, Math.min(maxLeft, newLeft));
+      newTop = Math.max(10, Math.min(maxTop, newTop));
+
+      element.style.left = `${newLeft}px`;
+      element.style.top = `${newTop}px`;
+      element.style.bottom = 'auto';
+      element.style.right = 'auto';
+    });
+
+    const stopDrag = (e) => {
+      if (!isDragging) return;
+      isDragging = false;
+      try {
+        handle.releasePointerCapture(e.pointerId);
+      } catch (err) {}
+      element.style.transition = '';
+    };
+
+    handle.addEventListener('pointerup', stopDrag);
+    handle.addEventListener('pointercancel', stopDrag);
+  }
+
+  // YouTube Music & Video Player (Full Player & Draggable Floating Mini Player)
   const btnMusic = document.getElementById('btn-open-music');
   const ytModal = document.getElementById('youtube-player-modal');
+  const ytHeader = document.getElementById('yt-modal-header');
   const btnCloseMusic = document.getElementById('btn-close-music');
+  const btnMinimizeMusic = document.getElementById('btn-minimize-music');
+
+  const miniPlayer = document.getElementById('music-mini-player');
+  const miniTitle = document.getElementById('mini-player-title');
+  const btnMiniInfoExpand = document.getElementById('btn-mini-info-expand');
+  const btnMiniExpand = document.getElementById('btn-mini-expand');
+  const btnMiniClose = document.getElementById('btn-mini-close');
+  const btnMiniPlay = document.getElementById('btn-mini-play');
+  const btnMiniPrev = document.getElementById('btn-mini-prev');
+  const btnMiniNext = document.getElementById('btn-mini-next');
+
   const btnMusicPlay = document.getElementById('btn-music-play');
   const btnMusicPrev = document.getElementById('btn-music-prev');
   const btnMusicNext = document.getElementById('btn-music-next');
@@ -931,24 +1005,92 @@ function initWeatherAndMusic() {
   const btnYtSearchGo = document.getElementById('btn-yt-search-go');
   const suggestionsList = document.getElementById('yt-suggestions-list');
 
-  btnMusic.addEventListener('click', () => {
-    ytModal.classList.toggle('hidden');
-    btnMusic.classList.toggle('active', !ytModal.classList.contains('hidden'));
-  });
+  // Initialize smooth dragging on both Full Player and Mini Player
+  makeElementDraggable(ytModal, ytHeader);
+  makeElementDraggable(miniPlayer, miniPlayer);
 
-  btnCloseMusic.addEventListener('click', () => {
-    ytModal.classList.add('hidden');
-    btnMusic.classList.remove('active');
-  });
+  function syncMusicState(playing, trackTitle) {
+    isMusicPlaying = playing;
+    const symbol = playing ? '⏸' : '▶';
+    if (btnMusicPlay) btnMusicPlay.textContent = symbol;
+    if (btnMiniPlay) btnMiniPlay.textContent = symbol;
+
+    if (miniPlayer) {
+      miniPlayer.classList.toggle('playing', playing);
+    }
+    if (trackTitle && miniTitle) {
+      miniTitle.textContent = trackTitle;
+    }
+  }
 
   function playTrackById(videoId, title) {
     if (ytIframe) {
       const origin = window.location.origin || '';
       ytIframe.src = `https://www.youtube.com/embed/${videoId}?autoplay=1&enablejsapi=1&origin=${encodeURIComponent(origin)}`;
     }
-    isMusicPlaying = true;
-    if (btnMusicPlay) btnMusicPlay.textContent = '⏸';
+    syncMusicState(true, title || 'YouTube Music');
+    if (btnMusic) btnMusic.classList.add('active');
   }
+
+  function minimizeToMiniPlayer() {
+    ytModal.classList.add('hidden');
+    if (miniPlayer) {
+      miniPlayer.classList.remove('hidden');
+    }
+  }
+
+  function expandToFullPlayer() {
+    if (miniPlayer) miniPlayer.classList.add('hidden');
+    ytModal.classList.remove('hidden');
+    if (btnMusic) btnMusic.classList.add('active');
+  }
+
+  function stopAndCloseAllMusic() {
+    ytModal.classList.add('hidden');
+    if (miniPlayer) miniPlayer.classList.add('hidden');
+    if (ytIframe) {
+      ytIframe.contentWindow.postMessage('{"event":"command","func":"pauseVideo","args":""}', '*');
+    }
+    syncMusicState(false);
+    if (btnMusic) btnMusic.classList.remove('active');
+  }
+
+  // Toggle from sidebar toolbar
+  btnMusic.addEventListener('click', () => {
+    const isModalOpen = !ytModal.classList.contains('hidden');
+    const isMiniOpen = miniPlayer && !miniPlayer.classList.contains('hidden');
+
+    if (!isModalOpen && !isMiniOpen) {
+      expandToFullPlayer();
+    } else if (isModalOpen) {
+      if (isMusicPlaying) {
+        minimizeToMiniPlayer();
+      } else {
+        stopAndCloseAllMusic();
+      }
+    } else {
+      expandToFullPlayer();
+    }
+  });
+
+  // Minimize button click
+  if (btnMinimizeMusic) {
+    btnMinimizeMusic.addEventListener('click', minimizeToMiniPlayer);
+  }
+
+  // Close full player (minimizes to mini-bar if playing so audio keeps going)
+  btnCloseMusic.addEventListener('click', () => {
+    if (isMusicPlaying) {
+      minimizeToMiniPlayer();
+    } else {
+      stopAndCloseAllMusic();
+    }
+  });
+
+  // Mini-player buttons
+  if (btnMiniExpand) btnMiniExpand.addEventListener('click', expandToFullPlayer);
+  if (btnMiniInfoExpand) btnMiniInfoExpand.addEventListener('click', expandToFullPlayer);
+  if (btnMiniClose) btnMiniClose.addEventListener('click', stopAndCloseAllMusic);
 
   async function handleYtSearch() {
     const q = ytSearchInput.value.trim();
@@ -1026,34 +1168,40 @@ function initWeatherAndMusic() {
     });
   }
 
-  function updateTrack() {
-    const track = PLAYLIST[currentTrackIndex];
-    if (isMusicPlaying) {
+  // Unified Play / Pause handler
+  function togglePlayPause() {
+    if (!isMusicPlaying) {
+      const track = PLAYLIST[currentTrackIndex];
       playTrackById(track.id, track.title);
+    } else {
+      syncMusicState(false);
+      if (ytIframe) {
+        ytIframe.contentWindow.postMessage('{"event":"command","func":"pauseVideo","args":""}', '*');
+      }
     }
   }
 
-  btnMusicPlay.addEventListener('click', () => {
-    isMusicPlaying = !isMusicPlaying;
-    btnMusicPlay.textContent = isMusicPlaying ? '⏸' : '▶';
-    if (isMusicPlaying) {
-      updateTrack();
-    } else if (ytIframe) {
-      ytIframe.contentWindow.postMessage('{"event":"command","func":"pauseVideo","args":""}', '*');
-    }
-  });
+  btnMusicPlay.addEventListener('click', togglePlayPause);
+  if (btnMiniPlay) btnMiniPlay.addEventListener('click', togglePlayPause);
 
-  btnMusicNext.addEventListener('click', () => {
+  // Unified Next / Prev handlers
+  function playNextTrack() {
     currentTrackIndex = (currentTrackIndex + 1) % PLAYLIST.length;
-    isMusicPlaying = true;
-    updateTrack();
-  });
+    const track = PLAYLIST[currentTrackIndex];
+    playTrackById(track.id, track.title);
+  }
 
-  btnMusicPrev.addEventListener('click', () => {
+  function playPrevTrack() {
     currentTrackIndex = (currentTrackIndex - 1 + PLAYLIST.length) % PLAYLIST.length;
-    isMusicPlaying = true;
-    updateTrack();
-  });
+    const track = PLAYLIST[currentTrackIndex];
+    playTrackById(track.id, track.title);
+  }
+
+  btnMusicNext.addEventListener('click', playNextTrack);
+  if (btnMiniNext) btnMiniNext.addEventListener('click', playNextTrack);
+
+  btnMusicPrev.addEventListener('click', playPrevTrack);
+  if (btnMiniPrev) btnMiniPrev.addEventListener('click', playPrevTrack);
 }
 
 async function loadLiveYerevanWeather() {

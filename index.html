@@ -393,14 +393,17 @@
     </div>
   </div>
 
-  <!-- YouTube Video / Music Player Modal with Search and Embedded Video Frame -->
+  <!-- YouTube Video / Music Player Modal with Search and Embedded Video Frame (Draggable) -->
   <div id="youtube-player-modal" class="youtube-player-modal hidden">
-    <div class="card-top-row">
+    <div id="yt-modal-header" class="card-top-row yt-drag-header" title="Зажмите и перетащите в любое место экрана">
       <div class="card-title" style="display: flex; align-items: center; gap: 8px;">
         <span style="color: #ef4444; font-size: 20px;">▶</span>
         <span>YouTube Music</span>
       </div>
-      <button id="btn-close-music" class="card-close-btn">✕</button>
+      <div style="display: flex; align-items: center; gap: 6px;">
+        <button id="btn-minimize-music" class="card-close-btn" title="Свернуть в мини-плеер">_</button>
+        <button id="btn-close-music" class="card-close-btn" title="Закрыть">✕</button>
+      </div>
     </div>
 
     <!-- Search Row -->
@@ -438,11 +441,31 @@
       </div>
     </div>
 
-    <!-- Transport Controls -->
+    <!-- Large Touch Transport Controls -->
     <div class="music-controls-row">
-      <button id="btn-music-prev" class="music-ctrl-btn">⏮</button>
-      <button id="btn-music-play" class="music-ctrl-btn music-play-circle">▶</button>
-      <button id="btn-music-next" class="music-ctrl-btn">⏭</button>
+      <button id="btn-music-prev" class="music-ctrl-btn" title="Предыдущий трек">⏮</button>
+      <button id="btn-music-play" class="music-ctrl-btn music-play-circle" title="Воспроизведение / Пауза">▶</button>
+      <button id="btn-music-next" class="music-ctrl-btn" title="Следующий трек">⏭</button>
+    </div>
+  </div>
+
+  <!-- Floating Mini Music Player (Tesla OS / CarPlay Style - Draggable & Expandable) -->
+  <div id="music-mini-player" class="music-mini-player hidden" title="Зажмите и перетащите в любое место экрана">
+    <div class="mini-player-drag-handle" id="btn-mini-info-expand" title="Нажмите, чтобы развернуть плеер">
+      <div class="mini-eq-bars" id="mini-eq-bars">
+        <span></span><span></span><span></span>
+      </div>
+      <div class="mini-player-info">
+        <span id="mini-player-title" class="mini-player-title">YouTube Music</span>
+        <span id="mini-player-sub" class="mini-player-sub">Нажмите для разворота</span>
+      </div>
+    </div>
+    <div class="mini-player-controls">
+      <button id="btn-mini-prev" class="mini-ctrl-btn" title="Предыдущий трек">⏮</button>
+      <button id="btn-mini-play" class="mini-ctrl-btn mini-play-circle" title="Воспроизведение / Пауза">▶</button>
+      <button id="btn-mini-next" class="mini-ctrl-btn" title="Следующий трек">⏭</button>
+      <button id="btn-mini-expand" class="mini-ctrl-btn mini-expand-btn" title="Развернуть окно видео">⤢</button>
+      <button id="btn-mini-close" class="mini-ctrl-btn mini-close-btn" title="Остановить и закрыть">✕</button>
     </div>
   </div>
 
