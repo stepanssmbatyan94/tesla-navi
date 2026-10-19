@@ -67,6 +67,34 @@ class TeslaMapEngine {
     this.startMotionExtrapolator();
   }
 
+  // Get interpolated coordinate and bearing at distance along route polyline
+  getPositionAtDistance(distMeters) {
+    if (!this.routeCoordinates || this.routeCoordinates.length < 2 || !this.routeCumulativeDistances) return null;
+    const clampedDist = Math.max(0, Math.min(this.totalRouteMeters || 1000, distMeters));
+
+    let segIdx = 0;
+    for (let i = 0; i < this.routeCumulativeDistances.length - 1; i++) {
+      if (clampedDist >= this.routeCumulativeDistances[i] && clampedDist <= this.routeCumulativeDistances[i + 1]) {
+        segIdx = i;
+        break;
+      }
+    }
+
+    const segStartDist = this.routeCumulativeDistances[segIdx] || 0;
+    const segEndDist = this.routeCumulativeDistances[segIdx + 1] || (segStartDist + 1);
+    const segLen = Math.max(0.001, segEndDist - segStartDist);
+    const t = Math.max(0, Math.min(1, (clampedDist - segStartDist) / segLen));
+
+    const p1 = this.routeCoordinates[segIdx];
+    const p2 = this.routeCoordinates[Math.min(this.routeCoordinates.length - 1, segIdx + 1)];
+
+    const lng = p1[0] + (p2[0] - p1[0]) * t;
+    const lat = p1[1] + (p2[1] - p1[1]) * t;
+    const heading = this.calculateBearing(p1[1], p1[0], p2[1], p2[0]);
+
+    return { lat, lng, heading };
+  }
+
   // Start continuous 60fps dead-reckoning loop for real-time motion during live driving
   startMotionExtrapolator() {
     if (this.extrapolatorAnimId) return;
@@ -78,17 +106,22 @@ class TeslaMapEngine {
 
       // Only extrapolate during live driving when simulator is NOT active, vehicle speed > 2 km/h, and followCar is true
       if (!window.IS_SIMULATOR_RUNNING && this.currentPosition && this.currentPosition.speed > 2 && this.followCar) {
-        const speedMps = this.currentPosition.speed / 3.6;
-        const distMeters = speedMps * dt;
-        const headingRad = (this.currentHeading * Math.PI) / 180;
-
-        const dLat = (distMeters * Math.cos(headingRad)) / 111111;
-        const dLng = (distMeters * Math.sin(headingRad)) / (111111 * Math.cos((this.currentPosition.lat * Math.PI) / 180));
-
-        const nextLat = this.currentPosition.lat + dLat;
-        const nextLng = this.currentPosition.lng + dLng;
-
-        this.updateCarPosition(nextLat, nextLng, this.currentHeading, this.currentPosition.speed);
+        if (this.activeRoute && this.routeCoordinates && this.routeCoordinates.length > 1 && this.totalRouteMeters) {
+          const speedMps = this.currentPosition.speed / 3.6;
+          const distMeters = speedMps * dt;
+          this.simulatedNavDistance = (this.simulatedNavDistance || 0) + distMeters;
+          const pt = this.getPositionAtDistance(this.simulatedNavDistance);
+          if (pt) {
+            this.updateCarPosition(pt.lat, pt.lng, pt.heading, this.currentPosition.speed, false);
+          }
+        } else if (this.currentPosition) {
+          const speedMps = this.currentPosition.speed / 3.6;
+          const distMeters = speedMps * dt;
+          const headingRad = (this.currentHeading * Math.PI) / 180;
+          const dLat = (distMeters * Math.cos(headingRad)) / 111111;
+          const dLng = (distMeters * Math.sin(headingRad)) / (111111 * Math.cos((this.currentPosition.lat * Math.PI) / 180));
+          this.updateCarPosition(this.currentPosition.lat + dLat, this.currentPosition.lng + dLng, this.currentHeading, this.currentPosition.speed, false);
+        }
       }
 
       this.extrapolatorAnimId = requestAnimationFrame(loop);
@@ -120,16 +153,14 @@ class TeslaMapEngine {
       this.map.doubleClickZoom.enable();
       this.map.touchPitch.enable();
 
-      // Detect manual user touch/pan to show Recenter button & start auto-recenter recovery
-      const handleUserPan = () => {
+      // Detect manual user touch/drag ONLY from genuine user drag gestures (ignore programmatic easeTo/jumpTo)
+      const handleUserPan = (e) => {
+        if (!e || !e.originalEvent) return; // Programmatic camera animations must never disable car follow!
         this.followCar = false;
         this.onUserPan();
         this.resetAutoFollowTimer();
       };
       this.map.on('dragstart', handleUserPan);
-      this.map.on('rotatestart', handleUserPan);
-      this.map.on('zoomstart', handleUserPan);
-      this.map.on('wheel', handleUserPan);
 
       this.map.on('load', () => {
         // Remove/hide bulky 3D extruded building blocks so map stays completely clean & unobstructed
@@ -153,7 +184,7 @@ class TeslaMapEngine {
         el.className = 'tesla-3d-car-marker';
         el.innerHTML = `
           <div class="tesla-car-pulse"></div>
-          <div class="tesla-car-arrow" style="transform: rotate(0deg); transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);">
+          <div class="tesla-car-arrow" style="transform: rotate(0deg); transition: none;">
             <svg viewBox="0 0 54 54" width="50" height="50">
               <defs>
                 <filter id="car-shadow" x="-30%" y="-30%" width="160%" height="160%">
@@ -340,7 +371,7 @@ class TeslaMapEngine {
     const recenterBtn = document.getElementById('floating-recenter-btn');
     if (recenterBtn) recenterBtn.classList.add('hidden');
 
-    const targetHeading = this.currentHeading || this.currentPosition.heading || 0;
+    const targetHeading = this.currentHeading || (this.currentPosition && this.currentPosition.heading) || 0;
     if (this.provider === 'maplibre' && this.map) {
       const markerEl = document.querySelector('#maplibre-car-marker .tesla-car-arrow');
       if (this.isHeadingUp && markerEl) {
@@ -351,7 +382,7 @@ class TeslaMapEngine {
         zoom: this.navZoom,
         bearing: this.isHeadingUp ? targetHeading : 0,
         pitch: this.isNavigating ? 35 : 0,
-        padding: this.isNavigating ? { top: 60, bottom: 220, left: 0, right: 0 } : { top: 0, bottom: 0, left: 0, right: 0 },
+        padding: this.isHeadingUp ? { top: 220, bottom: 0, left: 0, right: 0 } : { top: 0, bottom: 0, left: 0, right: 0 },
         duration: 500
       });
     } else if (this.provider === 'yandex' && this.map) {
@@ -371,31 +402,27 @@ class TeslaMapEngine {
     }, 6000);
   }
 
-  // Zoom In map
+  // Zoom In map (maintains car tracking while adjusting magnification)
   zoomIn() {
-    this.followCar = false;
-    if (this.onUserPan) this.onUserPan();
-    this.resetAutoFollowTimer();
     if (this.provider === 'maplibre' && this.map) {
-      this.map.zoomIn({ duration: 250 });
+      this.navZoom = Math.min(19, (this.map.getZoom() || this.navZoom) + 1);
+      this.map.easeTo({ zoom: this.navZoom, duration: 250 });
     } else if (this.provider === 'yandex' && this.map) {
-      const z = Math.min(18, this.map.getZoom() + 1);
-      this.map.setZoom(z, { duration: 250 });
+      this.navZoom = Math.min(18, this.map.getZoom() + 1);
+      this.map.setZoom(this.navZoom, { duration: 250 });
     } else if (this.map && typeof this.map.zoomIn === 'function') {
       this.map.zoomIn();
     }
   }
 
-  // Zoom Out map
+  // Zoom Out map (maintains car tracking while adjusting magnification)
   zoomOut() {
-    this.followCar = false;
-    if (this.onUserPan) this.onUserPan();
-    this.resetAutoFollowTimer();
     if (this.provider === 'maplibre' && this.map) {
-      this.map.zoomOut({ duration: 250 });
+      this.navZoom = Math.max(3, (this.map.getZoom() || this.navZoom) - 1);
+      this.map.easeTo({ zoom: this.navZoom, duration: 250 });
     } else if (this.provider === 'yandex' && this.map) {
-      const z = Math.max(4, this.map.getZoom() - 1);
-      this.map.setZoom(z, { duration: 250 });
+      this.navZoom = Math.max(4, this.map.getZoom() - 1);
+      this.map.setZoom(this.navZoom, { duration: 250 });
     } else if (this.map && typeof this.map.zoomOut === 'function') {
       this.map.zoomOut();
     }
@@ -442,7 +469,7 @@ class TeslaMapEngine {
           center: [this.currentPosition.lng, this.currentPosition.lat],
           bearing: targetHeading,
           pitch: this.isNavigating ? 35 : 0,
-          padding: this.isNavigating ? { top: 60, bottom: 220, left: 0, right: 0 } : { top: 0, bottom: 0, left: 0, right: 0 },
+          padding: { top: 220, bottom: 0, left: 0, right: 0 },
           duration: 500
         });
       } else {
@@ -479,10 +506,9 @@ class TeslaMapEngine {
     return (brng + 360) % 360;
   }
 
-  // Smooth Angle Interpolation (handles 359° -> 1° wrap-around)
+  // Smooth Angle Interpolation (handles 359° -> 1° wrap-around shortest path)
   smoothAngle(current, target, factor = 0.35) {
-    let diff = (target - current + 180) % 360 - 180;
-    if (diff < -180) diff += 360;
+    let diff = ((target - current) % 360 + 540) % 360 - 180;
     return (current + diff * factor + 360) % 360;
   }
 
@@ -565,26 +591,23 @@ class TeslaMapEngine {
   }
 
   // Primary Position Update Handler with Movement Bearing & Road Snapping
-  updateCarPosition(lat, lng, rawHeading = 0, speed = 0) {
+  updateCarPosition(lat, lng, rawHeading = 0, speed = 0, isRealFix = true) {
     let targetHeading = this.currentHeading;
 
     // 1. Calculate Real Movement Bearing from GPS updates
-    if (this.lastRawPosition) {
-      const distMoved = this.calculateDistance(this.lastRawPosition.lat, this.lastRawPosition.lng, lat, lng);
-      if (distMoved >= 1.2) {
-        const movementBearing = this.calculateBearing(this.lastRawPosition.lat, this.lastRawPosition.lng, lat, lng);
-        if (rawHeading && rawHeading > 0 && Math.abs(rawHeading - movementBearing) < 60) {
-          targetHeading = rawHeading;
-        } else {
-          targetHeading = movementBearing;
-        }
-      } else if (rawHeading && rawHeading > 0 && speed > 2) {
-        targetHeading = rawHeading;
-      }
-    } else if (rawHeading && rawHeading > 0) {
+    if (window.IS_SIMULATOR_RUNNING && rawHeading != null && !isNaN(rawHeading)) {
       targetHeading = rawHeading;
+    } else if (rawHeading != null && !isNaN(rawHeading) && rawHeading > 0 && speed > 2) {
+      targetHeading = rawHeading;
+    } else if (this.lastRawPosition) {
+      const distMoved = this.calculateDistance(this.lastRawPosition.lat, this.lastRawPosition.lng, lat, lng);
+      if (distMoved >= 1.0) {
+        targetHeading = this.calculateBearing(this.lastRawPosition.lat, this.lastRawPosition.lng, lat, lng);
+        this.lastRawPosition = { lat, lng, time: Date.now() };
+      }
+    } else {
+      this.lastRawPosition = { lat, lng, time: Date.now() };
     }
-    this.lastRawPosition = { lat, lng, time: Date.now() };
 
     // 2. Road Snapping (Map Matching)
     let displayLat = lat;
@@ -599,10 +622,13 @@ class TeslaMapEngine {
         displayLat = snap.lat;
         displayLng = snap.lng;
         if (snap.bearing !== null) {
-          let angleDiff = Math.abs((targetHeading - snap.bearing + 180) % 360 - 180);
-          if (angleDiff < 55) {
+          let angleDiff = Math.abs(((targetHeading - snap.bearing) % 360 + 540) % 360 - 180);
+          if (angleDiff < 85) {
             targetHeading = snap.bearing;
           }
+        }
+        if (isRealFix && snap.segIndex != null && this.routeCumulativeDistances) {
+          this.simulatedNavDistance = this.routeCumulativeDistances[snap.segIndex] || 0;
         }
       } else if (distToRoute > 45) {
         isOffRoute = true;
@@ -610,7 +636,8 @@ class TeslaMapEngine {
     }
 
     // 3. Smooth Heading
-    this.currentHeading = this.smoothAngle(this.currentHeading, targetHeading, 0.4);
+    const smoothFactor = window.IS_SIMULATOR_RUNNING ? 0.6 : 0.35;
+    this.currentHeading = this.smoothAngle(this.currentHeading, targetHeading, smoothFactor);
     this.currentPosition = {
       lat: displayLat,
       lng: displayLng,
@@ -627,7 +654,7 @@ class TeslaMapEngine {
       const markerEl = document.querySelector('#maplibre-car-marker .tesla-car-arrow');
 
       if (this.isHeadingUp) {
-        // Heading-Up: Arrow points UP (0°), map rotates with car
+        // Heading-Up: Arrow points ALWAYS STRAIGHT UP (0°), map rotates with car
         if (markerEl) markerEl.style.transform = 'rotate(0deg)';
         if (this.carMarker && typeof this.carMarker.setRotation === 'function') {
           this.carMarker.setRotation(0);
@@ -637,8 +664,8 @@ class TeslaMapEngine {
           this.map.jumpTo({
             center: [displayLng, displayLat],
             bearing: this.currentHeading,
-            pitch: this.isNavigating ? 35 : 0,
-            padding: this.isNavigating ? { top: 60, bottom: 220, left: 0, right: 0 } : { top: 0, bottom: 0, left: 0, right: 0 }
+            pitch: 35,
+            padding: { top: 220, bottom: 0, left: 0, right: 0 }
           });
         }
       } else {
@@ -660,13 +687,30 @@ class TeslaMapEngine {
     } else if (this.provider === 'yandex' && this.carMarker && this.map) {
       this.carMarker.geometry.setCoordinates([displayLat, displayLng]);
       const markerEl = document.querySelector('#yandex-car-marker .tesla-car-arrow');
-      if (markerEl) markerEl.style.transform = `rotate(${Math.round(this.currentHeading)}deg)`;
+      const container = document.getElementById(this.containerId);
+
+      if (this.isHeadingUp) {
+        // Arrow points STRAIGHT UP (0°), map rotates underneath with CSS
+        if (markerEl) markerEl.style.transform = 'rotate(0deg)';
+        if (container) {
+          container.classList.add('yandex-rotate');
+          container.style.transform = `rotate(${-Math.round(this.currentHeading)}deg)`;
+          container.style.transformOrigin = '50% 50%';
+        }
+      } else {
+        if (markerEl) markerEl.style.transform = `rotate(${Math.round(this.currentHeading)}deg)`;
+        if (container) {
+          container.classList.remove('yandex-rotate');
+          container.style.transform = 'none';
+        }
+      }
+
       if (this.followCar) {
         const curZoom = this.map.getZoom();
-        if (this.isNavigating && curZoom < 14) {
-          this.map.setCenter([displayLat, displayLng], this.navZoom, { duration: 0 });
-        } else {
-          this.map.setCenter([displayLat, displayLng], curZoom, { duration: 0 });
+        const now = performance.now();
+        if (!this.lastYandexCenterTime || (now - this.lastYandexCenterTime > 80)) {
+          this.lastYandexCenterTime = now;
+          this.map.setCenter([displayLat, displayLng], this.isNavigating && curZoom < 14 ? this.navZoom : curZoom, { duration: 0 });
         }
       }
     } else if (this.carMarker && window.L && this.provider === 'osm') {
@@ -678,7 +722,7 @@ class TeslaMapEngine {
 
     // 5. Track Progress & Check Off-Route Rerouting
     if (this.activeRoute && this.routeSteps.length > 0) {
-      this.trackNavigationProgress(displayLat, displayLng, isOffRoute, distToRoute, speed);
+      this.trackNavigationProgress(displayLat, displayLng, isOffRoute, distToRoute, speed, isRealFix);
     }
   }
 
@@ -695,13 +739,13 @@ class TeslaMapEngine {
     return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   }
 
-  trackNavigationProgress(currentLat, currentLng, isOffRoute = false, distToRoute = 0, speed = 0) {
+  trackNavigationProgress(currentLat, currentLng, isOffRoute = false, distToRoute = 0, speed = 0, isRealFix = true) {
     if (!this.activeRoute) return;
 
-    // Off-route automatic rerouting: ONLY when active navigation is ON and car is actually driving (> 4 km/h)
-    if (this.isNavigating && speed >= 5 && isOffRoute && distToRoute > 45) {
+    // Off-route automatic rerouting: ONLY on genuine GPS fixes, NEVER on dead-reckoning extrapolation!
+    if (isRealFix && this.isNavigating && speed >= 5 && isOffRoute && distToRoute > 45) {
       this.offRouteCounter++;
-      if (this.offRouteCounter >= 3 && !this.isRerouting) {
+      if (this.offRouteCounter >= 4 && !this.isRerouting) {
         this.recalculateRoute(currentLat, currentLng);
         return;
       }
@@ -1407,7 +1451,7 @@ class TeslaMapEngine {
         center: [this.currentPosition.lng, this.currentPosition.lat],
         bearing: this.currentHeading,
         pitch: 35,
-        padding: { top: 60, bottom: 220, left: 0, right: 0 },
+        padding: { top: 220, bottom: 0, left: 0, right: 0 },
         zoom: this.navZoom,
         duration: 500
       });

@@ -61,6 +61,14 @@ html, body {
   z-index: 1;
 }
 
+#map-container.yandex-rotate {
+  width: 170vw !important;
+  height: 170vh !important;
+  left: -35vw !important;
+  top: -35vh !important;
+  will-change: transform;
+}
+
 /* 2. Floating Action Toolbar (Bottom-Left Vertical Dock like Mapsev) */
 .floating-toolbar {
   position: absolute;
@@ -1083,7 +1091,7 @@ html, body {
 .tesla-car-arrow {
   position: relative;
   z-index: 2;
-  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: none;
 }
 
 .yandex-dest-pin {
