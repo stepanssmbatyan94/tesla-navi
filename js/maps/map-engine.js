@@ -666,6 +666,22 @@ class TeslaMapEngine {
           duration: 500
         });
       }
+    } else if (this.provider === 'yandex') {
+      const container = document.getElementById(this.containerId);
+      const markerEl = document.querySelector('#yandex-car-marker .tesla-car-arrow');
+      if (this.isHeadingUp) {
+        if (markerEl) markerEl.style.transform = `rotate(${this.currentHeading.toFixed(1)}deg)`;
+        if (container) {
+          container.classList.add('yandex-rotate');
+          container.style.transform = `rotate(${-this.currentHeading.toFixed(1)}deg)`;
+        }
+      } else {
+        if (markerEl) markerEl.style.transform = `rotate(${this.currentHeading.toFixed(1)}deg)`;
+        if (container) {
+          container.classList.remove('yandex-rotate');
+          container.style.transform = 'none';
+        }
+      }
     }
     return this.isHeadingUp;
   }
