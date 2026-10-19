@@ -437,16 +437,15 @@ class TeslaMapEngine {
       if (this.isHeadingUp && markerEl) {
         markerEl.style.transform = 'rotate(0deg)';
       }
-      this.map.easeTo({
+      this.map.jumpTo({
         center: [this.currentPosition.lng, this.currentPosition.lat],
         zoom: this.navZoom,
         bearing: this.isHeadingUp ? targetHeading : 0,
         pitch: this.isNavigating ? 35 : 0,
-        padding: pad,
-        duration: 400
+        padding: pad
       });
     } else if (this.provider === 'yandex' && this.map) {
-      this.map.setCenter([this.currentPosition.lat, this.currentPosition.lng], this.navZoom, { duration: 400 });
+      this.map.setCenter([this.currentPosition.lat, this.currentPosition.lng], this.navZoom, { duration: 0 });
     } else if (this.map) {
       this.map.panTo([this.currentPosition.lat, this.currentPosition.lng]);
     }
@@ -465,31 +464,26 @@ class TeslaMapEngine {
     const recenterBtn = document.getElementById('floating-recenter-btn');
     if (recenterBtn) recenterBtn.classList.remove('hidden');
 
-    const pad = this.isHeadingUp
-      ? { top: Math.round(window.innerHeight * 0.28), bottom: 0, left: 0, right: 0 }
-      : { top: 0, bottom: 0, left: 0, right: 0 };
+    this.navZoom = Math.min(19, Math.round(this.navZoom + 0.1) + 1);
 
     if (this.provider === 'maplibre' && this.map) {
-      this.navZoom = Math.min(19, (this.map.getZoom() || this.navZoom) + 1);
+      const pad = this.isHeadingUp
+        ? { top: Math.round(window.innerHeight * 0.28), bottom: 0, left: 0, right: 0 }
+        : { top: 0, bottom: 0, left: 0, right: 0 };
       if (this.currentPosition) {
-        this.map.easeTo({
+        this.map.jumpTo({
           center: [this.currentPosition.lng, this.currentPosition.lat],
           zoom: this.navZoom,
           bearing: this.isHeadingUp ? this.currentHeading : 0,
           pitch: this.isHeadingUp ? 35 : 0,
-          padding: pad,
-          duration: 250
+          padding: pad
         });
       } else {
-        this.map.zoomTo(this.navZoom, { duration: 250 });
+        this.map.setZoom(this.navZoom);
       }
     } else if (this.provider === 'yandex' && this.map) {
-      this.navZoom = Math.min(18, Math.round(this.map.getZoom() + 1));
-      if (this.currentPosition) {
-        this.map.setCenter([this.currentPosition.lat, this.currentPosition.lng], this.navZoom, { duration: 250 });
-      } else {
-        this.map.setZoom(this.navZoom, { duration: 250 });
-      }
+      this.navZoom = Math.min(18, Math.round(this.navZoom + 0.1) + 1);
+      this.map.setZoom(this.navZoom);
     } else if (this.map && typeof this.map.zoomIn === 'function') {
       this.map.zoomIn();
     }
@@ -500,31 +494,26 @@ class TeslaMapEngine {
     const recenterBtn = document.getElementById('floating-recenter-btn');
     if (recenterBtn) recenterBtn.classList.remove('hidden');
 
-    const pad = this.isHeadingUp
-      ? { top: Math.round(window.innerHeight * 0.28), bottom: 0, left: 0, right: 0 }
-      : { top: 0, bottom: 0, left: 0, right: 0 };
+    this.navZoom = Math.max(3, Math.round(this.navZoom - 0.1) - 1);
 
     if (this.provider === 'maplibre' && this.map) {
-      this.navZoom = Math.max(3, (this.map.getZoom() || this.navZoom) - 1);
+      const pad = this.isHeadingUp
+        ? { top: Math.round(window.innerHeight * 0.28), bottom: 0, left: 0, right: 0 }
+        : { top: 0, bottom: 0, left: 0, right: 0 };
       if (this.currentPosition) {
-        this.map.easeTo({
+        this.map.jumpTo({
           center: [this.currentPosition.lng, this.currentPosition.lat],
           zoom: this.navZoom,
           bearing: this.isHeadingUp ? this.currentHeading : 0,
           pitch: this.isHeadingUp ? 35 : 0,
-          padding: pad,
-          duration: 250
+          padding: pad
         });
       } else {
-        this.map.zoomTo(this.navZoom, { duration: 250 });
+        this.map.setZoom(this.navZoom);
       }
     } else if (this.provider === 'yandex' && this.map) {
-      this.navZoom = Math.max(4, Math.round(this.map.getZoom() - 1));
-      if (this.currentPosition) {
-        this.map.setCenter([this.currentPosition.lat, this.currentPosition.lng], this.navZoom, { duration: 250 });
-      } else {
-        this.map.setZoom(this.navZoom, { duration: 250 });
-      }
+      this.navZoom = Math.max(4, Math.round(this.navZoom - 0.1) - 1);
+      this.map.setZoom(this.navZoom);
     } else if (this.map && typeof this.map.zoomOut === 'function') {
       this.map.zoomOut();
     }
@@ -785,6 +774,7 @@ class TeslaMapEngine {
           const navPadding = { top: Math.round(window.innerHeight * 0.28), bottom: 0, left: 0, right: 0 };
           this.map.jumpTo({
             center: [displayLng, displayLat],
+            zoom: this.navZoom,
             bearing: this.currentHeading,
             pitch: 35,
             padding: navPadding
@@ -800,6 +790,7 @@ class TeslaMapEngine {
         if (this.followCar) {
           this.map.jumpTo({
             center: [displayLng, displayLat],
+            zoom: this.navZoom,
             bearing: 0,
             pitch: 0,
             padding: { top: 0, bottom: 0, left: 0, right: 0 }
@@ -827,17 +818,12 @@ class TeslaMapEngine {
       }
 
       if (this.followCar) {
-        const curZoom = this.map.getZoom();
         const now = performance.now();
-        // Smooth continuous panning for Yandex Maps (no jerky step snapping)
-        if (!this.lastYandexCenterTime || (now - this.lastYandexCenterTime > 180)) {
+        // High-frequency 30fps lockstep update (35ms throttle) with duration: 0
+        // Keeps map and car marker in lockstep sync, eliminating jerky 3.5m step jumps
+        if (!this.lastYandexCenterTime || (now - this.lastYandexCenterTime >= 35)) {
           this.lastYandexCenterTime = now;
-          this.map.panTo([displayLat, displayLng], {
-            flying: false,
-            duration: 200,
-            delay: 0,
-            timingFunction: 'linear'
-          });
+          this.map.setCenter([displayLat, displayLng], undefined, { duration: 0 });
         }
       }
     } else if (this.carMarker && window.L && this.provider === 'osm') {
@@ -1043,7 +1029,7 @@ class TeslaMapEngine {
 
     try {
       const dest = this.activeRoute.destination;
-      const url = `/api/route?startLat=${lat}&startLng=${lng}&destLat=${dest.lat}&destLng=${dest.lng}`;
+      const url = `/api/route?startLat=${lat}&startLng=${lng}&destLat=${dest.lat}&destLng=${dest.lng}&provider=${this.provider}`;
       const res = await fetch(url);
       const data = await res.json();
 
@@ -1301,7 +1287,7 @@ class TeslaMapEngine {
     const end = [destination.lat, destination.lng];
 
     try {
-      const url = `/api/route?startLat=${start[0]}&startLng=${start[1]}&destLat=${end[0]}&destLng=${end[1]}`;
+      const url = `/api/route?startLat=${start[0]}&startLng=${start[1]}&destLat=${end[0]}&destLng=${end[1]}&provider=${this.provider}`;
       const res = await fetch(url);
       const data = await res.json();
 

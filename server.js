@@ -50,6 +50,12 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  if (pathname === '/favicon.ico') {
+    res.writeHead(204);
+    res.end();
+    return;
+  }
+
 // Helper: Parse coordinates directly from Yandex Maps protobuf URI
 function parseYandexGeoUri(uri) {
   if (!uri || !uri.includes('data=')) return null;
@@ -327,12 +333,13 @@ async function fetchYandexSuggestResults(q, userLng = 44.5125, userLat = 40.1776
     return;
   }
 
-  // API 3: /api/route (100% Genuine Yandex Route with Live Traffic Segments & OSRM Fallback)
+  // API 3: /api/route (Lane-accurate OpenStreetMap OSRM routing for MapLibre + Yandex Live Router for Yandex provider)
   if (pathname === '/api/route') {
     const startLat = parsedUrl.searchParams.get('startLat');
     const startLng = parsedUrl.searchParams.get('startLng');
     const destLat = parsedUrl.searchParams.get('destLat');
     const destLng = parsedUrl.searchParams.get('destLng');
+    const provider = parsedUrl.searchParams.get('provider') || 'maplibre';
 
     if (!startLat || !startLng || !destLat || !destLng) {
       res.writeHead(400, { 'Content-Type': 'application/json' });
@@ -340,8 +347,77 @@ async function fetchYandexSuggestResults(q, userLng = 44.5125, userLat = 40.1776
       return;
     }
 
+    // 1. When provider is maplibre (OpenStreetMap vector tiles):
+    // Use OSRM for 100% pixel-perfect road lane alignment (so the car drives strictly inside the asphalt lane, NOT in the median!)
+    if (provider === 'maplibre') {
+      try {
+        const osrmUrl = `https://router.project-osrm.org/route/v1/driving/${startLng},${startLat};${destLng},${destLat}?overview=full&geometries=geojson&steps=true&alternatives=true`;
+        const osrmRes = await fetch(osrmUrl);
+        const osrmData = await osrmRes.json();
+
+        if (osrmData && osrmData.code === 'Ok' && osrmData.routes && osrmData.routes.length > 0) {
+          const actionNames = {
+            'turn left': 'Поверните налево',
+            'turn right': 'Поверните направо',
+            'turn slight left': 'Держитесь левее',
+            'turn slight right': 'Держитесь правее',
+            'turn sharp left': 'Крутой поворот налево',
+            'turn sharp right': 'Крутой поворот направо',
+            'turn u-turn': 'Развернитесь',
+            'roundabout': 'Круговое движение',
+            'new name': 'Продолжайте движение',
+            'depart': 'Начните движение',
+            'arrive': 'Вы прибыли в пункт назначения'
+          };
+
+          const formattedRoutes = osrmData.routes.map((r, idx) => {
+            const steps = (r.legs && r.legs[0] && r.legs[0].steps) ? r.legs[0].steps.map((s, sIdx) => {
+              const maneuver = s.maneuver || {};
+              const key = `${maneuver.type || ''} ${maneuver.modifier || ''}`.trim().toLowerCase();
+              const actionText = actionNames[key] || actionNames[maneuver.type] || 'Двигайтесь прямо';
+              const name = s.name || '';
+              const instruction = name ? `${actionText} на ${name}` : actionText;
+
+              return {
+                index: sIdx,
+                name: name || 'Дорога',
+                instruction,
+                modifier: maneuver.modifier || 'straight',
+                type: maneuver.type || 'turn',
+                location: maneuver.location,
+                distance: s.distance,
+                duration: s.duration,
+                speedLimit: 60,
+                lanes: (s.intersections && s.intersections[0] && s.intersections[0].lanes) ? s.intersections[0].lanes : null
+              };
+            }) : [];
+
+            return {
+              index: idx,
+              distance: r.distance,
+              duration: r.duration,
+              coordinates: r.geometry.coordinates, // [lng, lat]
+              geometry: r.geometry,
+              steps,
+              specialRoadPoints: []
+            };
+          });
+
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({
+            success: true,
+            source: 'osrm',
+            routes: formattedRoutes
+          }));
+          return;
+        }
+      } catch (osrmErr) {
+        console.warn('OSRM router warning, falling back to Yandex:', osrmErr.message);
+      }
+    }
+
     try {
-      // 1. Query live Yandex Maps Router
+      // 2. Query live Yandex Maps Router (when provider is yandex or as fallback)
       const yandexUrl = `https://yandex.com/maps/10262/yerevan/?mode=routes&rtext=${startLat}%2C${startLng}~${destLat}%2C${destLng}&rtt=auto`;
       const yRes = await fetch(yandexUrl, {
         headers: {
