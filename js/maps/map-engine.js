@@ -207,6 +207,13 @@ class TeslaMapEngine {
         }
       });
 
+      this.map.on('styleimagemissing', (e) => {
+        const id = e.id;
+        if (this.map && !this.map.hasImage(id)) {
+          this.map.addImage(id, { width: 1, height: 1, data: new Uint8Array(4) });
+        }
+      });
+
       this.map.on('load', () => {
         // Remove/hide bulky 3D extruded building blocks so map stays completely clean & unobstructed
         try {
@@ -825,11 +832,12 @@ class TeslaMapEngine {
         lng: bestPoint.lng,
         bearing: roadBearing,
         dist: minDistance,
-        segIndex: bestSegIndex
+        segIndex: bestSegIndex,
+        routeDistance: snappedDist
       };
     }
 
-    return { snapped: false, lat, lng, bearing: null, dist: minDistance, segIndex: bestSegIndex };
+    return { snapped: false, lat, lng, bearing: null, dist: minDistance, segIndex: bestSegIndex, routeDistance: null };
   }
 
   // Primary Position Update Handler with Movement Bearing & Road Snapping
@@ -841,13 +849,13 @@ class TeslaMapEngine {
       targetHeading = rawHeading;
     } else if (rawHeading != null && !isNaN(rawHeading) && rawHeading > 0 && speed > 2) {
       targetHeading = rawHeading;
-    } else if (this.lastRawPosition) {
+    } else if (isRealFix && this.lastRawPosition) {
       const distMoved = this.calculateDistance(this.lastRawPosition.lat, this.lastRawPosition.lng, lat, lng);
-      if (distMoved >= 1.0) {
+      if (distMoved >= 1.5) {
         targetHeading = this.calculateBearing(this.lastRawPosition.lat, this.lastRawPosition.lng, lat, lng);
         this.lastRawPosition = { lat, lng, time: Date.now() };
       }
-    } else {
+    } else if (isRealFix) {
       this.lastRawPosition = { lat, lng, time: Date.now() };
     }
 
@@ -872,8 +880,8 @@ class TeslaMapEngine {
             targetHeading = snap.bearing;
           }
         }
-        if (isRealFix && snap.segIndex != null && this.routeCumulativeDistances) {
-          this.simulatedNavDistance = this.routeCumulativeDistances[snap.segIndex] || 0;
+        if (isRealFix) {
+          this.simulatedNavDistance = (snap.routeDistance != null) ? snap.routeDistance : (this.routeCumulativeDistances?.[snap.segIndex] || 0);
         }
       } else if (distToRoute > 45) {
         isOffRoute = true;

@@ -815,17 +815,28 @@ function updateManeuverHud(m) {
   document.getElementById('maneuver-dist').textContent = m.distance;
   document.getElementById('maneuver-street').textContent = m.street || m.instruction || 'Двигайтесь прямо';
 
-  // Arrow symbol based on modifier / type
+  // Crisp SVG vector arrow based on modifier / type (immune to missing system fonts on Tesla)
   const arrowBox = document.getElementById('maneuver-arrow-box');
   const mod = (m.modifier || '').toLowerCase();
   const type = (m.type || '').toLowerCase();
-  if (type === 'roundabout' || mod.includes('roundabout')) arrowBox.textContent = '🔄';
-  else if (mod.includes('uturn') || mod.includes('u-turn')) arrowBox.textContent = '↺';
-  else if (mod.includes('slight left') || mod.includes('fork left')) arrowBox.textContent = '↖';
-  else if (mod.includes('slight right') || mod.includes('fork right')) arrowBox.textContent = '↗';
-  else if (mod.includes('left')) arrowBox.textContent = '↰';
-  else if (mod.includes('right')) arrowBox.textContent = '↱';
-  else arrowBox.textContent = '↑';
+
+  let svgIcon = '';
+  if (type === 'roundabout' || mod.includes('roundabout')) {
+    svgIcon = `<svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="7"/><polyline points="15 5 12 2 9 5"/></svg>`;
+  } else if (mod.includes('uturn') || mod.includes('u-turn')) {
+    svgIcon = `<svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 19v-9a6 6 0 0 0-12 0v9"/><polyline points="9 16 6 19 3 16"/></svg>`;
+  } else if (mod.includes('slight left') || mod.includes('fork left')) {
+    svgIcon = `<svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"><path d="M16 19l-4-9-5-5"/><polyline points="13 5 7 5 7 11"/></svg>`;
+  } else if (mod.includes('slight right') || mod.includes('fork right')) {
+    svgIcon = `<svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 19l4-9 5-5"/><polyline points="11 5 17 5 17 11"/></svg>`;
+  } else if (mod.includes('left')) {
+    svgIcon = `<svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M18 19V11a4 4 0 0 0-4-4H5"/><polyline points="9 3 5 7 9 11"/></svg>`;
+  } else if (mod.includes('right')) {
+    svgIcon = `<svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M6 19V11a4 4 0 0 1 4-4h9"/><polyline points="15 3 19 7 15 11"/></svg>`;
+  } else {
+    svgIcon = `<svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="20" x2="12" y2="4"/><polyline points="6 10 12 4 18 10"/></svg>`;
+  }
+  if (arrowBox) arrowBox.innerHTML = svgIcon;
 
   // Update dynamic speed limit circle (60 in city, 90 on highway/outside Yerevan)
   if (m.speedLimit) {
@@ -1011,9 +1022,11 @@ function initWeatherAndMusic() {
 
   function syncMusicState(playing, trackTitle) {
     isMusicPlaying = playing;
-    const symbol = playing ? '⏸' : '▶';
-    if (btnMusicPlay) btnMusicPlay.textContent = symbol;
-    if (btnMiniPlay) btnMiniPlay.textContent = symbol;
+    const playSvg = `<svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><polygon points="6 4 20 12 6 20 6 4"/></svg>`;
+    const pauseSvg = `<svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>`;
+    const icon = playing ? pauseSvg : playSvg;
+    if (btnMusicPlay) btnMusicPlay.innerHTML = icon;
+    if (btnMiniPlay) btnMiniPlay.innerHTML = icon;
 
     if (miniPlayer) {
       miniPlayer.classList.toggle('playing', playing);
