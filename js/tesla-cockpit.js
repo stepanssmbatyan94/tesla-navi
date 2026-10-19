@@ -308,9 +308,14 @@ async function initMap() {
     },
     onProgressUpdate: (progress) => {
       const cursor = document.getElementById('prog-car-cursor');
+      const traveledFill = document.getElementById('prog-traveled-fill');
       if (typeof progress === 'object') {
-        if (cursor && progress.percent !== undefined) {
-          cursor.style.left = `${Math.min(96, Math.max(0, progress.percent))}%`;
+        const pct = Math.min(100, Math.max(0, progress.percent !== undefined ? progress.percent : 0));
+        if (cursor) {
+          cursor.style.left = `${Math.min(96, pct)}%`;
+        }
+        if (traveledFill) {
+          traveledFill.style.width = `${pct}%`;
         }
         if (progress.remainingDistance) {
           const el = document.getElementById('nav-distance');
@@ -324,8 +329,10 @@ async function initMap() {
           const el = document.getElementById('nav-eta');
           if (el) el.textContent = progress.eta;
         }
-      } else if (cursor) {
-        cursor.style.left = `${Math.min(96, Math.max(0, progress))}%`;
+      } else {
+        const pct = Math.min(100, Math.max(0, progress || 0));
+        if (cursor) cursor.style.left = `${Math.min(96, pct)}%`;
+        if (traveledFill) traveledFill.style.width = `${pct}%`;
       }
     },
     onCameraAlert: (alert) => {
@@ -794,9 +801,11 @@ function showNavigationHud(route) {
   document.getElementById('nav-distance').textContent = route.distance;
   document.getElementById('nav-eta').textContent = route.eta;
 
-  // Reset progress car cursor to 0% at route start
+  // Reset progress car cursor and traveled fill to 0% at route start
   const cursor = document.getElementById('prog-car-cursor');
   if (cursor) cursor.style.left = '0%';
+  const traveledFill = document.getElementById('prog-traveled-fill');
+  if (traveledFill) traveledFill.style.width = '0%';
 
   // Render authentic live traffic segments on the bottom progress bar
   renderTrafficProgressBar(route.trafficSegments);
@@ -844,6 +853,10 @@ function cancelActiveNavigation() {
   if (camBadge) camBadge.classList.add('hidden');
   const altDrawer = document.getElementById('route-alternatives-drawer');
   if (altDrawer) altDrawer.classList.add('hidden');
+  const cursor = document.getElementById('prog-car-cursor');
+  if (cursor) cursor.style.left = '0%';
+  const traveledFill = document.getElementById('prog-traveled-fill');
+  if (traveledFill) traveledFill.style.width = '0%';
   selectedDestination = null;
   currentRouteInfo = null;
   if (mapEngine) {
@@ -1390,6 +1403,8 @@ function initDevMode() {
     const pct = Math.min(100, Math.round((simDistance / simTotalDist) * 100));
     if (scrubSlider) scrubSlider.value = pct;
     if (scrubVal) scrubVal.textContent = `${pct}%`;
+    const traveledFill = document.getElementById('prog-traveled-fill');
+    if (traveledFill) traveledFill.style.width = `${pct}%`;
   }
 
   let simAnimId = null;

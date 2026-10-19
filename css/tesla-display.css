@@ -62,10 +62,14 @@ html, body {
 }
 
 #map-container.yandex-rotate {
-  width: 170vw !important;
-  height: 170vh !important;
-  left: -35vw !important;
-  top: -35vh !important;
+  position: absolute !important;
+  width: 250vmax !important;
+  height: 250vmax !important;
+  left: 50% !important;
+  top: 50% !important;
+  margin-left: -125vmax !important;
+  margin-top: -125vmax !important;
+  transform-origin: center center !important;
   will-change: transform;
 }
 
@@ -834,6 +838,18 @@ html, body {
 .prog-seg.yellow { background: #eab308; }
 .prog-seg.amber { background: #f97316; }
 .prog-seg.red { background: #ef4444; }
+
+.prog-traveled-fill {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  background: #94a3b8;
+  border-radius: 3px 0 0 3px;
+  z-index: 5;
+  pointer-events: none;
+  transition: width 0.25s ease-out;
+}
 
 .prog-car-cursor {
   position: absolute;

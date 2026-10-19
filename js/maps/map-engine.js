@@ -299,9 +299,19 @@ class TeslaMapEngine {
         const CarLayout = window.ymaps.templateLayoutFactory.createClass(
           `<div id="yandex-car-marker" class="tesla-3d-car-marker" style="transform: translate(-50%, -50%);">
             <div class="tesla-car-pulse"></div>
-            <div class="tesla-car-arrow" style="transform: rotate(0deg);">
-              <svg viewBox="0 0 54 54" width="52" height="52">
-                <polygon points="27,4 49,46 27,35 5,46" fill="#ef4444" stroke="#ffffff" stroke-width="3.5" stroke-linejoin="round"/>
+            <div class="tesla-car-arrow" style="transform: rotate(0deg); transition: none;">
+              <svg viewBox="0 0 54 54" width="50" height="50">
+                <defs>
+                  <filter id="yandex-car-shadow" x="-30%" y="-30%" width="160%" height="160%">
+                    <feDropShadow dx="0" dy="4" stdDeviation="4" flood-color="#000" flood-opacity="0.65"/>
+                  </filter>
+                  <linearGradient id="yandex-arrow-gold" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" stop-color="#fde047" />
+                    <stop offset="60%" stop-color="#eab308" />
+                    <stop offset="100%" stop-color="#ca8a04" />
+                  </linearGradient>
+                </defs>
+                <polygon points="27,4 49,46 27,35 5,46" fill="url(#yandex-arrow-gold)" stroke="#ffffff" stroke-width="3" stroke-linejoin="round" filter="url(#yandex-car-shadow)"/>
                 <circle cx="27" cy="26" r="3.5" fill="#ffffff" />
               </svg>
             </div>
@@ -405,11 +415,11 @@ class TeslaMapEngine {
   // Zoom In map (maintains car tracking while adjusting magnification)
   zoomIn() {
     if (this.provider === 'maplibre' && this.map) {
-      this.navZoom = Math.min(19, (this.map.getZoom() || this.navZoom) + 1);
-      this.map.easeTo({ zoom: this.navZoom, duration: 250 });
+      this.navZoom = Math.min(19, Math.round((this.map.getZoom() || this.navZoom) + 1));
+      this.map.jumpTo({ zoom: this.navZoom });
     } else if (this.provider === 'yandex' && this.map) {
-      this.navZoom = Math.min(18, this.map.getZoom() + 1);
-      this.map.setZoom(this.navZoom, { duration: 250 });
+      this.navZoom = Math.min(18, Math.round(this.map.getZoom() + 1));
+      this.map.setZoom(this.navZoom);
     } else if (this.map && typeof this.map.zoomIn === 'function') {
       this.map.zoomIn();
     }
@@ -418,11 +428,11 @@ class TeslaMapEngine {
   // Zoom Out map (maintains car tracking while adjusting magnification)
   zoomOut() {
     if (this.provider === 'maplibre' && this.map) {
-      this.navZoom = Math.max(3, (this.map.getZoom() || this.navZoom) - 1);
-      this.map.easeTo({ zoom: this.navZoom, duration: 250 });
+      this.navZoom = Math.max(3, Math.round((this.map.getZoom() || this.navZoom) - 1));
+      this.map.jumpTo({ zoom: this.navZoom });
     } else if (this.provider === 'yandex' && this.map) {
-      this.navZoom = Math.max(4, this.map.getZoom() - 1);
-      this.map.setZoom(this.navZoom, { duration: 250 });
+      this.navZoom = Math.max(4, Math.round(this.map.getZoom() - 1));
+      this.map.setZoom(this.navZoom);
     } else if (this.map && typeof this.map.zoomOut === 'function') {
       this.map.zoomOut();
     }
@@ -690,12 +700,11 @@ class TeslaMapEngine {
       const container = document.getElementById(this.containerId);
 
       if (this.isHeadingUp) {
-        // Arrow points STRAIGHT UP (0°), map rotates underneath with CSS
-        if (markerEl) markerEl.style.transform = 'rotate(0deg)';
+        // Counteract container rotation so arrow points ALWAYS STRAIGHT UP (0° relative to screen)
+        if (markerEl) markerEl.style.transform = `rotate(${Math.round(this.currentHeading)}deg)`;
         if (container) {
           container.classList.add('yandex-rotate');
           container.style.transform = `rotate(${-Math.round(this.currentHeading)}deg)`;
-          container.style.transformOrigin = '50% 50%';
         }
       } else {
         if (markerEl) markerEl.style.transform = `rotate(${Math.round(this.currentHeading)}deg)`;
@@ -708,8 +717,14 @@ class TeslaMapEngine {
       if (this.followCar) {
         const curZoom = this.map.getZoom();
         const now = performance.now();
-        if (!this.lastYandexCenterTime || (now - this.lastYandexCenterTime > 80)) {
+        const distFromLastCenter = this.lastYandexCenterPos
+          ? this.calculateDistance(this.lastYandexCenterPos.lat, this.lastYandexCenterPos.lng, displayLat, displayLng)
+          : Infinity;
+
+        // Throttle Yandex setCenter to avoid flooding internal tile queue (prevents freezing)
+        if (!this.lastYandexCenterTime || (distFromLastCenter > 3.5 && (now - this.lastYandexCenterTime > 350))) {
           this.lastYandexCenterTime = now;
+          this.lastYandexCenterPos = { lat: displayLat, lng: displayLng };
           this.map.setCenter([displayLat, displayLng], this.isNavigating && curZoom < 14 ? this.navZoom : curZoom, { duration: 0 });
         }
       }
@@ -1319,9 +1334,9 @@ class TeslaMapEngine {
       source: 'route-traveled',
       layout: { 'line-join': 'round', 'line-cap': 'round' },
       paint: {
-        'line-color': '#475569',
+        'line-color': '#94a3b8',
         'line-width': 8.5,
-        'line-opacity': 0.75
+        'line-opacity': 0.85
       }
     });
 
