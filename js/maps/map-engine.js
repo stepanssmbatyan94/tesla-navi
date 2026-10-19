@@ -1270,7 +1270,7 @@ class TeslaMapEngine {
           try { this.currentAudioVoice.pause(); } catch (e) {}
           this.currentAudioVoice = null;
         }
-        const audio = new Audio(`/api/tts?text=${encodeURIComponent(text)}&lang=ru`);
+        const audio = new Audio(`/api/tts?text=${encodeURIComponent(text)}&voice=svetlana`);
         audio.volume = 1.0;
         this.currentAudioVoice = audio;
         audio.play().catch(e => {

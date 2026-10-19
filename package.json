@@ -9,6 +9,7 @@
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.118.0",
+    "msedge-tts": "^2.1.0",
     "ws": "^8.18.0"
   },
   "keywords": [

@@ -3,6 +3,55 @@ const fs = require('fs');
 const path = require('path');
 const { WebSocketServer } = require('ws');
 
+let MsEdgeTTS, OUTPUT_FORMAT;
+try {
+  const edgeTtsModule = require('msedge-tts');
+  MsEdgeTTS = edgeTtsModule.MsEdgeTTS;
+  OUTPUT_FORMAT = edgeTtsModule.OUTPUT_FORMAT;
+} catch (e) {
+  console.warn('msedge-tts not loaded:', e.message);
+}
+
+// In-memory cache for synthesized neural audio (fast 0ms repeats)
+const ttsAudioCache = new Map();
+
+async function synthesizeNeuralSpeech(text, voiceChoice = 'svetlana') {
+  const voice = (voiceChoice === 'dmitry') ? 'ru-RU-DmitryNeural' : 'ru-RU-SvetlanaNeural';
+  const cacheKey = `${voice}:${text}`;
+  if (ttsAudioCache.has(cacheKey)) {
+    return ttsAudioCache.get(cacheKey);
+  }
+
+  if (!MsEdgeTTS) {
+    throw new Error('MsEdgeTTS not available');
+  }
+
+  const tts = new MsEdgeTTS();
+  await tts.setMetadata(voice, OUTPUT_FORMAT.AUDIO_24KHZ_48KBITRATE_MONO_MP3);
+  const { audioStream } = tts.toStream(text);
+
+  return new Promise((resolve, reject) => {
+    const chunks = [];
+    const timeout = setTimeout(() => {
+      reject(new Error('TTS timeout'));
+    }, 7000);
+
+    audioStream.on('data', chunk => chunks.push(chunk));
+    audioStream.on('end', () => {
+      clearTimeout(timeout);
+      const buffer = Buffer.concat(chunks);
+      if (buffer.length > 0) {
+        ttsAudioCache.set(cacheKey, buffer);
+      }
+      resolve(buffer);
+    });
+    audioStream.on('error', err => {
+      clearTimeout(timeout);
+      reject(err);
+    });
+  });
+}
+
 const PORT = process.env.PORT || 3000;
 
 const MIME_TYPES = {
@@ -256,10 +305,10 @@ async function fetchYandexSuggestResults(q, userLng = 44.5125, userLat = 40.1776
     return;
   }
 
-  // API 1.5: /api/tts (Audio Voice Synthesizer for Tesla Browser when system voices count is 0)
+  // API 1.5: /api/tts (Human-Like Neural Voice Synthesizer - Svetlana / Dmitry)
   if (pathname === '/api/tts') {
     const text = (parsedUrl.searchParams.get('text') || '').trim();
-    const lang = (parsedUrl.searchParams.get('lang') || 'ru').trim();
+    const voice = (parsedUrl.searchParams.get('voice') || 'svetlana').trim();
     if (!text) {
       res.writeHead(400, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ error: 'Text required' }));
@@ -267,31 +316,44 @@ async function fetchYandexSuggestResults(q, userLng = 44.5125, userLat = 40.1776
     }
 
     try {
-      const ttsUrl = `https://translate.google.com/translate_tts?ie=UTF-8&q=${encodeURIComponent(text)}&tl=${encodeURIComponent(lang)}&client=tw-ob`;
-      const ttsRes = await fetch(ttsUrl, {
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-        }
-      });
-
-      if (!ttsRes.ok) {
-        throw new Error(`TTS provider responded with status ${ttsRes.status}`);
-      }
-
-      const audioBuf = await ttsRes.arrayBuffer();
+      const audioBuf = await synthesizeNeuralSpeech(text, voice);
       res.writeHead(200, {
         'Content-Type': 'audio/mpeg',
         'Content-Length': audioBuf.byteLength,
-        'Cache-Control': 'public, max-age=86400',
+        'Cache-Control': 'public, max-age=604800, immutable',
         'Access-Control-Allow-Origin': '*'
       });
-      res.end(Buffer.from(audioBuf));
+      res.end(audioBuf);
       return;
-    } catch (ttsErr) {
-      console.warn('TTS proxy error:', ttsErr.message);
-      res.writeHead(500, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ error: ttsErr.message }));
-      return;
+    } catch (neuralErr) {
+      console.warn('Neural TTS warning, falling back to Google TTS:', neuralErr.message);
+      try {
+        const ttsUrl = `https://translate.google.com/translate_tts?ie=UTF-8&q=${encodeURIComponent(text)}&tl=ru&client=tw-ob`;
+        const ttsRes = await fetch(ttsUrl, {
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+          }
+        });
+
+        if (!ttsRes.ok) {
+          throw new Error(`TTS provider responded with status ${ttsRes.status}`);
+        }
+
+        const audioBuf = await ttsRes.arrayBuffer();
+        res.writeHead(200, {
+          'Content-Type': 'audio/mpeg',
+          'Content-Length': audioBuf.byteLength,
+          'Cache-Control': 'public, max-age=86400',
+          'Access-Control-Allow-Origin': '*'
+        });
+        res.end(Buffer.from(audioBuf));
+        return;
+      } catch (fbErr) {
+        console.warn('TTS proxy fallback error:', fbErr.message);
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: fbErr.message }));
+        return;
+      }
     }
   }
 
@@ -767,4 +829,25 @@ server.listen(PORT, () => {
   console.log(`⚡ Tesla Navi Server running at: http://localhost:${PORT}`);
   console.log(`📱 Tesla Display: http://localhost:${PORT}/`);
   console.log(`📱 Phone Remote: http://localhost:${PORT}/phone?code=DEMO12`);
+
+  // Pre-warm neural audio cache in background for instant 0ms response
+  const PREWARM_PHRASES = [
+    'Маршрут построен. Поехали!',
+    'Вы прибыли в пункт назначения',
+    'Перестраиваю маршрут',
+    'Поверните направо',
+    'Поверните налево',
+    'Держитесь правее',
+    'Держитесь левее',
+    'Двигайтесь прямо',
+    'Тест голосового оповещения Tesla Navi. Маршрут свободен.'
+  ];
+  setTimeout(async () => {
+    for (const p of PREWARM_PHRASES) {
+      try {
+        await synthesizeNeuralSpeech(p, 'svetlana');
+      } catch (e) {}
+    }
+    console.log('🎙️ Neural Voice Cache pre-warmed for instant playback');
+  }, 1500);
 });
