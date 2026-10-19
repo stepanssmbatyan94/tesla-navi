@@ -998,6 +998,14 @@ html, body {
   pointer-events: none;
 }
 
+#yandex-car-marker {
+  position: absolute;
+  left: 0;
+  top: 0;
+  transform: translate(-50%, -50%);
+  margin: 0;
+}
+
 .tesla-car-pulse {
   position: absolute;
   width: 44px;

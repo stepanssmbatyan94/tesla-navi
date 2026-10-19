@@ -74,6 +74,8 @@ class TeslaMapEngine {
         style: CONFIG.maplibreStyle || 'https://tiles.openfreemap.org/styles/liberty',
         center: [this.center.lng, this.center.lat],
         zoom: this.navZoom,
+        minZoom: 3,
+        maxZoom: 19,
         pitch: 0, // Clean flat 2D like Mapsev & Yandex Navigator
         bearing: 0,
         attributionControl: false,
@@ -204,8 +206,17 @@ class TeslaMapEngine {
         }, {
           suppressMapOpenBlock: true,
           autoFitToViewport: 'always',
-          yandexMapDisablePoiInteractivity: true
+          yandexMapDisablePoiInteractivity: true,
+          minZoom: 4,
+          maxZoom: 18
         });
+
+        try {
+          this.map.options.set({
+            minZoom: 4,
+            maxZoom: 18
+          });
+        } catch (e) {}
 
         try {
           this.trafficLayer = new window.ymaps.control.TrafficControl({
@@ -223,7 +234,7 @@ class TeslaMapEngine {
         this.map.events.add(['mousedown', 'multitouchstart'], handleYandexUserPan);
 
         const CarLayout = window.ymaps.templateLayoutFactory.createClass(
-          `<div id="yandex-car-marker" class="tesla-3d-car-marker">
+          `<div id="yandex-car-marker" class="tesla-3d-car-marker" style="transform: translate(-50%, -50%);">
             <div class="tesla-car-pulse"></div>
             <div class="tesla-car-arrow" style="transform: rotate(0deg);">
               <svg viewBox="0 0 54 54" width="52" height="52">
@@ -237,7 +248,7 @@ class TeslaMapEngine {
         this.carMarker = new window.ymaps.Placemark([this.center.lat, this.center.lng], {}, {
           iconLayout: CarLayout,
           iconImageSize: [52, 52],
-          iconImageOffset: [-26, -26]
+          iconImageOffset: [0, 0]
         });
 
         this.map.geoObjects.add(this.carMarker);
@@ -312,7 +323,7 @@ class TeslaMapEngine {
         duration: 500
       });
     } else if (this.provider === 'yandex' && this.map) {
-      this.map.panTo([this.currentPosition.lat, this.currentPosition.lng], { duration: 400 });
+      this.map.setCenter([this.currentPosition.lat, this.currentPosition.lng], this.navZoom, { duration: 400 });
     } else if (this.map) {
       this.map.panTo([this.currentPosition.lat, this.currentPosition.lng]);
     }
@@ -533,20 +544,18 @@ class TeslaMapEngine {
           });
         }
       }
-
-      // Auto-recover followCar if moving at speed and drifted away
-      if (!this.followCar && speed > 8) {
-        const mapCenter = this.map.getCenter();
-        const distFromCenter = this.calculateDistance(mapCenter.lat, mapCenter.lng, displayLat, displayLng);
-        if (distFromCenter > 75) {
-          this.recenter();
-        }
-      }
     } else if (this.provider === 'yandex' && this.carMarker && this.map) {
       this.carMarker.geometry.setCoordinates([displayLat, displayLng]);
       const markerEl = document.querySelector('#yandex-car-marker .tesla-car-arrow');
       if (markerEl) markerEl.style.transform = `rotate(${Math.round(this.currentHeading)}deg)`;
-      if (this.followCar) this.map.panTo([displayLat, displayLng], { duration: 300, flying: false });
+      if (this.followCar) {
+        const curZoom = this.map.getZoom();
+        if (this.isNavigating && curZoom < 14) {
+          this.map.setCenter([displayLat, displayLng], this.navZoom, { duration: 400 });
+        } else {
+          this.map.panTo([displayLat, displayLng], { duration: 250, flying: false });
+        }
+      }
     } else if (this.carMarker && window.L && this.provider === 'osm') {
       this.carMarker.setLatLng([displayLat, displayLng]);
       const markerEl = document.querySelector('#leaflet-car-marker .tesla-car-arrow');
@@ -1206,7 +1215,7 @@ class TeslaMapEngine {
     this.map.geoObjects.add(this.destMarker);
 
     try {
-      if (this.routePolyline && this.routePolyline.getBounds()) {
+      if (!this.isNavigating && this.routePolyline && this.routePolyline.getBounds()) {
         this.map.setBounds(this.routePolyline.getBounds(), {
           checkZoomRange: true,
           zoomMargin: 60
@@ -1275,12 +1284,18 @@ class TeslaMapEngine {
     if (this.provider === 'maplibre' && this.map) {
       const markerEl = document.querySelector('#maplibre-car-marker .tesla-car-arrow');
       if (markerEl) markerEl.style.transform = 'rotate(0deg)';
+      this.map.stop();
       this.map.easeTo({
         center: [this.currentPosition.lng, this.currentPosition.lat],
         bearing: this.currentHeading,
         pitch: 35,
         padding: { top: 60, bottom: 220, left: 0, right: 0 },
         zoom: this.navZoom,
+        duration: 500
+      });
+    } else if (this.provider === 'yandex' && this.map) {
+      this.map.setCenter([this.currentPosition.lat, this.currentPosition.lng], this.navZoom, {
+        checkZoomRange: true,
         duration: 500
       });
     }
