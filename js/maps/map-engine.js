@@ -814,16 +814,19 @@ class TeslaMapEngine {
     // If within 40m of road centerline -> snap to road
     if (minDistance <= 40) {
       let roadBearing = bestBearing;
-      if (this.routeCumulativeDistances && this.totalRouteMeters) {
+      let snappedDist = null;
+      if (this.routeCumulativeDistances && this.routeCumulativeDistances.length > bestSegIndex) {
         const segDist = this.routeCumulativeDistances[bestSegIndex] || 0;
-        const segLen = (this.routeCumulativeDistances[bestSegIndex + 1] || (segDist + 1)) - segDist;
+        const segLen = Math.max(0.1, (this.routeCumulativeDistances[bestSegIndex + 1] || (segDist + 1)) - segDist);
         const p1 = this.routeCoordinates[bestSegIndex];
         const p2 = this.routeCoordinates[bestSegIndex + 1];
-        const projT = this.projectPointToSegment(lng, lat, p1[0], p1[1], p2[0], p2[1]).t;
-        const snappedDist = segDist + (projT * segLen);
-        const aheadPt = this.getPositionAtDistance(snappedDist + 24);
-        if (aheadPt) {
-          roadBearing = this.calculateBearing(bestPoint.lat, bestPoint.lng, aheadPt.lat, aheadPt.lng);
+        if (p1 && p2) {
+          const projT = this.projectPointToSegment(lng, lat, p1[0], p1[1], p2[0], p2[1]).t;
+          snappedDist = segDist + (projT * segLen);
+          const aheadPt = this.getPositionAtDistance(snappedDist + 24);
+          if (aheadPt) {
+            roadBearing = this.calculateBearing(bestPoint.lat, bestPoint.lng, aheadPt.lat, aheadPt.lng);
+          }
         }
       }
       return {
@@ -1221,12 +1224,9 @@ class TeslaMapEngine {
   // Authentic Navigation Audio Chime (/sounds/nav-chime.wav with Web Audio fallback)
   playNavChime() {
     try {
-      if (!this.chimeAudio) {
-        this.chimeAudio = new Audio('/sounds/nav-chime.wav');
-        this.chimeAudio.volume = 0.85;
-      }
-      this.chimeAudio.currentTime = 0;
-      const playPromise = this.chimeAudio.play();
+      const chime = new Audio('/sounds/nav-chime.wav');
+      chime.volume = 0.85;
+      const playPromise = chime.play();
       if (playPromise && playPromise.catch) {
         playPromise.catch(() => {
           // Web Audio fallback if media element is delayed

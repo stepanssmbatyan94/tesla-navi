@@ -33,9 +33,13 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Universal Audio Pipeline Unlock for Tesla Browser Autoplay Policy
   const unlockAudioPipeline = () => {
     try {
-      if (mapEngine) mapEngine.playNavChime();
       const silentAudio = new Audio('data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA');
       silentAudio.play().catch(() => {});
+      if (window.AudioContext || window.webkitAudioContext) {
+        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+        const dummy = new AudioCtx();
+        dummy.resume().then(() => dummy.close()).catch(() => {});
+      }
     } catch (e) {}
     window.removeEventListener('pointerdown', unlockAudioPipeline);
     window.removeEventListener('touchstart', unlockAudioPipeline);
@@ -464,16 +468,28 @@ function initToolbarHandlers() {
   // "Go / Поехали" Action Button (Starts active turn-by-turn navigation)
   const btnStartRouteNav = document.getElementById('btn-start-route-nav');
   if (btnStartRouteNav) {
-    btnStartRouteNav.addEventListener('click', () => {
-      document.getElementById('route-alternatives-drawer').classList.add('hidden');
+    const handleStartNav = (e) => {
+      if (e) e.preventDefault();
+      document.getElementById('route-alternatives-drawer')?.classList.add('hidden');
       if (currentRouteInfo) {
         showNavigationHud(currentRouteInfo);
-        if (mapEngine) {
-          mapEngine.startNavigation(); // Activates movement tracking, audio cue & off-route rerouting
-          mapEngine.recenter();
-        }
+      } else if (mapEngine && mapEngine.activeRoute) {
+        const fallbackRoute = {
+          duration: '15 мин',
+          distance: `${((mapEngine.totalDistance || 1000) / 1000).toFixed(1)} км`,
+          eta: '18:45',
+          name: mapEngine.activeRoute.destination?.name || 'Маршрут',
+          steps: mapEngine.routeSteps || [],
+          trafficSegments: mapEngine.trafficSegments || []
+        };
+        showNavigationHud(fallbackRoute);
       }
-    });
+      if (mapEngine) {
+        mapEngine.startNavigation(); // Activates movement tracking, audio cue & off-route rerouting
+        mapEngine.recenter();
+      }
+    };
+    btnStartRouteNav.addEventListener('click', handleStartNav);
   }
 
   // Tap on bottom nav bar to view full turn-by-turn steps
@@ -1711,25 +1727,30 @@ function initDevMode() {
 
   // Play / Pause / Reset
   if (btnSimPlay) {
-    btnSimPlay.addEventListener('click', async () => {
-      if (!mapEngine.routeCoordinates || mapEngine.routeCoordinates.length < 2) {
-        console.log('🚗 Запуск маршрута по умолчанию: Ереван → Aghveran...');
-        await loadPresetRoute(
-          { lat: 40.1915, lng: 44.5150, name: 'Ереван (Каскад)' },
-          { lat: 40.5050, lng: 44.5820, name: 'Park Resort Aghveran' },
-          true
-        );
-        return;
+    btnSimPlay.addEventListener('click', async (e) => {
+      if (e) e.preventDefault();
+      try {
+        if (!mapEngine.routeCoordinates || mapEngine.routeCoordinates.length < 2) {
+          console.log('🚗 Запуск маршрута по умолчанию: Ереван → Aghveran...');
+          await loadPresetRoute(
+            { lat: 40.1915, lng: 44.5150, name: 'Ереван (Каскад)' },
+            { lat: 40.5050, lng: 44.5820, name: 'Park Resort Aghveran' },
+            true
+          );
+          return;
+        }
+        if (!mapEngine.isNavigating) {
+          mapEngine.startNavigation();
+        }
+        isSimRunning = true;
+        window.IS_SIMULATOR_RUNNING = true;
+        btnSimPlay.classList.add('active');
+        btnSimPause.classList.remove('active');
+        startSimTicker();
+        console.log(`▶️ Симулятор запущен со скоростью ${simSpeed} км/ч`);
+      } catch (err) {
+        console.error('Ошибка в кнопке Поехать:', err);
       }
-      if (!mapEngine.isNavigating) {
-        mapEngine.startNavigation();
-      }
-      isSimRunning = true;
-      window.IS_SIMULATOR_RUNNING = true;
-      btnSimPlay.classList.add('active');
-      btnSimPause.classList.remove('active');
-      startSimTicker();
-      console.log(`▶️ Симулятор запущен со скоростью ${simSpeed} км/ч`);
     });
   }
 
