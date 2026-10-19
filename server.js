@@ -338,12 +338,11 @@ async function fetchYandexSuggestResults(q, userLng = 44.5125, userLat = 40.1776
     return;
   }
 
-// Authentic Armenian Voice Pack Matcher (Neural Piper Gor & Suzie)
-function getArmenianAudio(text, voiceChoice = 'suzie') {
+// Authentic Armenian Neural Voice Pack (Gor - High-Fidelity Eastern Armenian)
+function getArmenianAudio(text, voiceChoice = 'gor') {
   const t = (text || '').toLowerCase().trim();
   const v = (voiceChoice || '').toLowerCase();
-  const isMale = (v === 'gor' || v === 'male' || v === 'dmitry');
-  const folder = isMale ? 'gor' : 'suzie';
+  const folder = (v === 'suzie') ? 'suzie' : 'gor';
 
   let file = 'welcome.mp3';
 
@@ -379,11 +378,14 @@ function getArmenianAudio(text, voiceChoice = 'suzie') {
     file = 'speed_limit.mp3';
   } else if (t.includes('ընտրված') || t === 'voice_switched') {
     file = 'voice_switched.mp3';
-  } else if (t.includes('սյուզի') || t.includes('գոռն') || t.includes('բարև') || t === 'welcome') {
+  } else if (t.includes('գոռն') || t.includes('սյուզի') || t.includes('բարև') || t === 'welcome') {
     file = 'welcome.mp3';
   }
 
   let filePath = path.join(__dirname, 'sounds', 'hy', folder, file);
+  if (!fs.existsSync(filePath)) {
+    filePath = path.join(__dirname, 'sounds', 'hy', 'gor', file);
+  }
   if (!fs.existsSync(filePath)) {
     filePath = path.join(__dirname, 'sounds', 'hy', file);
   }
@@ -404,14 +406,14 @@ function getArmenianAudio(text, voiceChoice = 'suzie') {
       return;
     }
 
-    // Armenian: High fidelity native Piper Suzie (Female) & Gor (Male) audio pack
+    // Armenian: High fidelity native Piper Gor audio pack
     if (lang === 'hy' || voice === 'gor' || voice === 'suzie') {
       const armenianBuf = getArmenianAudio(text, voice);
       if (armenianBuf) {
         res.writeHead(200, {
           'Content-Type': 'audio/mpeg',
           'Content-Length': armenianBuf.byteLength,
-          'Cache-Control': 'public, max-age=86400',
+          'Cache-Control': 'public, max-age=3600, must-revalidate',
           'Access-Control-Allow-Origin': '*'
         });
         res.end(armenianBuf);

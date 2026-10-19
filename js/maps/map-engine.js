@@ -1292,11 +1292,12 @@ class TeslaMapEngine {
         const savedVoice = localStorage.getItem('tesla_navi_voice') || 'female';
         const isMale = (savedVoice === 'male' || savedVoice === 'dmitry' || savedVoice === 'gor' || savedVoice === 'andrew');
         let defaultVoice = 'svetlana';
-        if (lang === 'hy') defaultVoice = isMale ? 'gor' : 'suzie';
+        if (lang === 'hy') defaultVoice = 'gor';
         else if (lang === 'en') defaultVoice = isMale ? 'andrew' : 'ava';
         else defaultVoice = isMale ? 'dmitry' : 'svetlana';
         const voice = forcedVoice || defaultVoice;
-        const audio = new Audio(`/api/tts?text=${encodeURIComponent(text)}&lang=${lang}&voice=${encodeURIComponent(voice)}&v=neural_v2`);
+        const cacheBuster = 'v=v4_gor_hd';
+        const audio = new Audio(`/api/tts?text=${encodeURIComponent(text)}&lang=${lang}&voice=${encodeURIComponent(voice)}&${cacheBuster}`);
         audio.volume = 1.0;
         this.currentAudioVoice = audio;
         audio.play().catch(e => {

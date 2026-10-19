@@ -93,8 +93,7 @@ function initLanguage() {
 
     if (mapEngine) {
       if (currentLang === 'hy') {
-        const isMale = (window.CURRENT_VOICE === 'male' || window.CURRENT_VOICE === 'dmitry' || window.CURRENT_VOICE === 'gor');
-        mapEngine.speakVoice('welcome', isMale ? 'gor' : 'suzie');
+        mapEngine.speakVoice('welcome', 'gor');
       } else if (currentLang === 'en') {
         mapEngine.speakVoice('Voice navigation switched to Ava.', 'ava');
       } else {
@@ -141,8 +140,7 @@ function initVoiceSelector() {
       if (mapEngine) {
         const lang = window.CURRENT_LANG || 'ru';
         if (lang === 'hy') {
-          const v = currentVoice === 'male' ? 'gor' : 'suzie';
-          mapEngine.speakVoice('voice_switched', v);
+          mapEngine.speakVoice('voice_switched', 'gor');
         } else if (lang === 'en') {
           const phrase = currentVoice === 'male'
             ? 'Voice switched to Andrew'
@@ -165,8 +163,8 @@ function updateVoiceIndicator(voice) {
     const isMale = (voice === 'male' || voice === 'dmitry' || voice === 'gor' || voice === 'andrew');
     const lang = window.CURRENT_LANG || 'ru';
     if (lang === 'hy') {
-      ind.textContent = isMale ? '👨 Գոռ' : '👩 Սյուզի';
-      ind.title = isMale ? 'Ձայն: Գոռ (Տղամարդու)' : 'Ձայն: Սյուզի (Կանացի)';
+      ind.textContent = '👨 Գոռ';
+      ind.title = 'Ձայն: Գոռ (Նեյրոնային բնական հայերեն)';
     } else if (lang === 'en') {
       ind.textContent = isMale ? '👨 EN' : '👩 EN';
       ind.title = isMale ? 'Voice: Andrew (Male)' : 'Voice: Ava (Female)';
@@ -1569,17 +1567,6 @@ function initDevMode() {
     });
   }
 
-  const btnDiagTtsSuzie = document.getElementById('btn-diag-tts-suzie');
-  if (btnDiagTtsSuzie) {
-    btnDiagTtsSuzie.addEventListener('click', () => {
-      console.log('👩 [Диагностика] Воспроизведение армянского голоса: Սյուզի (Suzie)...');
-      if (mapEngine) {
-        mapEngine.playNavChime();
-        mapEngine.speakVoice('welcome', 'suzie');
-        console.log('🗣️ Запущена фраза самопрезентации Սյուզի (Հայերեն)');
-      }
-    });
-  }
 
   const btnDiagTtsGor = document.getElementById('btn-diag-tts-gor');
   if (btnDiagTtsGor) {
