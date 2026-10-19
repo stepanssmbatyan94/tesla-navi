@@ -63,12 +63,12 @@ html, body {
 
 #map-container.yandex-rotate {
   position: absolute !important;
-  width: 250vmax !important;
-  height: 250vmax !important;
+  width: 148vmax !important;
+  height: 148vmax !important;
   left: 50% !important;
   top: 50% !important;
-  margin-left: -125vmax !important;
-  margin-top: -125vmax !important;
+  margin-left: -74vmax !important;
+  margin-top: -74vmax !important;
   transform-origin: center center !important;
   will-change: transform;
 }

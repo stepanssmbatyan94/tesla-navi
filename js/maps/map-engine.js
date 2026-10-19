@@ -335,12 +335,15 @@ class TeslaMapEngine {
         } catch (e) {}
 
         try {
-          this.map.behaviors.enable(['drag', 'multiTouch', 'scrollZoom', 'dblClickZoom']);
+          this.map.behaviors.disable('multiTouch');
+          this.map.behaviors.enable(['drag', 'scrollZoom', 'dblClickZoom']);
         } catch (e) {}
 
         const containerEl = document.getElementById(this.containerId);
         this.isUserPinching = false;
         let touchStartPos = null;
+        let pinchStartDist = null;
+        let pinchStartZoom = null;
         let pinchTimeout = null;
 
         if (containerEl) {
@@ -348,14 +351,38 @@ class TeslaMapEngine {
             if (e.touches.length >= 2) {
               this.isUserPinching = true;
               if (pinchTimeout) clearTimeout(pinchTimeout);
+              pinchStartDist = Math.hypot(
+                e.touches[0].clientX - e.touches[1].clientX,
+                e.touches[0].clientY - e.touches[1].clientY
+              );
+              pinchStartZoom = this.navZoom;
             } else if (e.touches.length === 1) {
               touchStartPos = { x: e.touches[0].clientX, y: e.touches[0].clientY };
             }
-          }, { passive: true });
+          }, { passive: false });
 
           containerEl.addEventListener('touchmove', (e) => {
-            if (e.touches.length >= 2) {
+            if (e.touches.length >= 2 && pinchStartDist && pinchStartZoom != null) {
+              if (e.cancelable) e.preventDefault();
               this.isUserPinching = true;
+              const curDist = Math.hypot(
+                e.touches[0].clientX - e.touches[1].clientX,
+                e.touches[0].clientY - e.touches[1].clientY
+              );
+              if (curDist > 10 && pinchStartDist > 10) {
+                const deltaZoom = Math.log2(curDist / pinchStartDist);
+                const targetZoom = Math.min(18, Math.max(4, +(pinchStartZoom + deltaZoom).toFixed(2)));
+                if (Math.abs(targetZoom - this.navZoom) >= 0.05) {
+                  this.navZoom = targetZoom;
+                  const recenterBtn = document.getElementById('floating-recenter-btn');
+                  if (recenterBtn && Math.abs(this.navZoom - (CONFIG.navigationZoom || 16.5)) > 0.3) {
+                    recenterBtn.classList.remove('hidden');
+                  }
+                  if (this.currentPosition && this.map) {
+                    this.map.setCenter([this.currentPosition.lat, this.currentPosition.lng], targetZoom, { duration: 0, checkZoomRange: false });
+                  }
+                }
+              }
             } else if (e.touches.length === 1 && touchStartPos && !this.isUserPinching) {
               const dx = e.touches[0].clientX - touchStartPos.x;
               const dy = e.touches[0].clientY - touchStartPos.y;
@@ -368,11 +395,13 @@ class TeslaMapEngine {
                 this.resetAutoFollowTimer();
               }
             }
-          }, { passive: true });
+          }, { passive: false });
 
           containerEl.addEventListener('touchend', (e) => {
             if (e.touches.length === 0) {
               touchStartPos = null;
+              pinchStartDist = null;
+              pinchStartZoom = null;
               if (this.isUserPinching) {
                 pinchTimeout = setTimeout(() => {
                   this.isUserPinching = false;
@@ -380,7 +409,7 @@ class TeslaMapEngine {
                   if (this.followCar && this.currentPosition && this.map) {
                     this.map.setCenter([this.currentPosition.lat, this.currentPosition.lng], this.navZoom, { duration: 0, checkZoomRange: false });
                   }
-                }, 200);
+                }, 150);
               }
             } else if (e.touches.length === 1 && this.isUserPinching) {
               touchStartPos = null;
@@ -915,13 +944,18 @@ class TeslaMapEngine {
       const container = document.getElementById(this.containerId);
 
       if (this.isHeadingUp) {
-        // Counteract container rotation so arrow points ALWAYS STRAIGHT UP (0° relative to screen)
-        if (markerEl) markerEl.style.transform = `rotate(${this.currentHeading.toFixed(1)}deg)`;
-        if (container) {
-          container.classList.add('yandex-rotate');
-          container.style.transform = `rotate(${-this.currentHeading.toFixed(1)}deg)`;
+        // Deadband filter: only update CSS transform if heading changed by >= 0.35 deg or first render
+        const headingDelta = Math.abs(this.currentHeading - (this.lastYandexRenderedHeading ?? -999));
+        if (headingDelta >= 0.35) {
+          this.lastYandexRenderedHeading = this.currentHeading;
+          if (markerEl) markerEl.style.transform = `rotate(${this.currentHeading.toFixed(1)}deg)`;
+          if (container) {
+            container.classList.add('yandex-rotate');
+            container.style.transform = `rotate(${-this.currentHeading.toFixed(1)}deg)`;
+          }
         }
       } else {
+        this.lastYandexRenderedHeading = null;
         if (markerEl) markerEl.style.transform = `rotate(${this.currentHeading.toFixed(1)}deg)`;
         if (container) {
           container.classList.remove('yandex-rotate');
