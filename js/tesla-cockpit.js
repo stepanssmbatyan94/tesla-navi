@@ -366,12 +366,26 @@ function initToolbarHandlers() {
     searchDrawer.classList.add('hidden');
   });
 
-  // Floating Recenter Button
+  // Floating Recenter Button (Yandex Style)
   const recenterBtn = document.getElementById('floating-recenter-btn');
   if (recenterBtn) {
     recenterBtn.addEventListener('click', () => {
       if (mapEngine) mapEngine.recenter();
       recenterBtn.classList.add('hidden');
+    });
+  }
+
+  // Floating Zoom Buttons (+ / -)
+  const btnZoomIn = document.getElementById('btn-zoom-in');
+  const btnZoomOut = document.getElementById('btn-zoom-out');
+  if (btnZoomIn) {
+    btnZoomIn.addEventListener('click', () => {
+      if (mapEngine) mapEngine.zoomIn();
+    });
+  }
+  if (btnZoomOut) {
+    btnZoomOut.addEventListener('click', () => {
+      if (mapEngine) mapEngine.zoomOut();
     });
   }
 
@@ -773,7 +787,7 @@ function showNavigationHud(route) {
 
   // Initial step details from route steps
   const firstStep = (route.steps && route.steps[0]) ? route.steps[0] : null;
-  document.getElementById('maneuver-dist').textContent = firstStep ? (firstStep.distance >= 1000 ? `${(firstStep.distance / 1000).toFixed(1)} км` : `${Math.round(firstStep.distance)} м`) : route.distance;
+  document.getElementById('maneuver-dist').textContent = firstStep ? (mapEngine ? mapEngine.formatNavDistance(firstStep.distance) : `${Math.round(firstStep.distance)} м`) : route.distance;
   document.getElementById('maneuver-street').textContent = firstStep ? (firstStep.name || firstStep.instruction) : route.name;
 
   document.getElementById('nav-duration').textContent = route.duration;
@@ -1178,6 +1192,11 @@ function initDevMode() {
     btnExit.addEventListener('click', () => {
       // 1. Terminate simulation ticker
       isSimRunning = false;
+      window.IS_SIMULATOR_RUNNING = false;
+      if (window.simAnimId) {
+        cancelAnimationFrame(window.simAnimId);
+        window.simAnimId = null;
+      }
       if (simTimer) {
         clearInterval(simTimer);
         simTimer = null;
@@ -1373,25 +1392,53 @@ function initDevMode() {
     if (scrubVal) scrubVal.textContent = `${pct}%`;
   }
 
+  let simAnimId = null;
+  let lastSimTime = performance.now();
+
   function startSimTicker() {
-    if (simTimer) clearInterval(simTimer);
-    simTimer = setInterval(() => {
-      if (!isSimRunning || !mapEngine || !mapEngine.routeCoordinates || mapEngine.routeCoordinates.length < 2) return;
+    window.IS_SIMULATOR_RUNNING = true;
+    if (simAnimId) {
+      cancelAnimationFrame(simAnimId);
+      simAnimId = null;
+    }
+    if (simTimer) {
+      clearInterval(simTimer);
+      simTimer = null;
+    }
+    lastSimTime = performance.now();
 
-      const dt = 0.2; // 200ms
-      const stepMeters = (simSpeed / 3.6) * dt;
-      simDistance += stepMeters;
+    function simFrame(now) {
+      if (!isSimRunning) {
+        window.IS_SIMULATOR_RUNNING = false;
+        return;
+      }
+      const dt = Math.min(0.08, (now - lastSimTime) / 1000);
+      lastSimTime = now;
 
-      if (simDistance >= simTotalDist) {
-        simDistance = simTotalDist;
-        isSimRunning = false;
-        btnSimPlay.classList.remove('active');
-        btnSimPause.classList.add('active');
-        console.log('🏁 Симулятор: Маршрут завершен. Прибытие!');
+      if (mapEngine && mapEngine.routeCoordinates && mapEngine.routeCoordinates.length >= 2) {
+        const stepMeters = (simSpeed / 3.6) * dt;
+        simDistance += stepMeters;
+
+        if (simDistance >= simTotalDist) {
+          simDistance = simTotalDist;
+          isSimRunning = false;
+          window.IS_SIMULATOR_RUNNING = false;
+          btnSimPlay.classList.remove('active');
+          btnSimPause.classList.add('active');
+          updateSimCar(simDistance);
+          console.log('🏁 Симулятор: Маршрут завершен. Прибытие!');
+          return;
+        }
+
+        updateSimCar(simDistance);
       }
 
-      updateSimCar(simDistance);
-    }, 200);
+      simAnimId = requestAnimationFrame(simFrame);
+      window.simAnimId = simAnimId;
+    }
+
+    simAnimId = requestAnimationFrame(simFrame);
+    window.simAnimId = simAnimId;
   }
 
   // Load Preset Routes
@@ -1413,6 +1460,7 @@ function initDevMode() {
       updateSimCar(0);
       if (autoPlay) {
         isSimRunning = true;
+        window.IS_SIMULATOR_RUNNING = true;
         btnSimPlay.classList.add('active');
         btnSimPause.classList.remove('active');
         startSimTicker();
@@ -1467,6 +1515,7 @@ function initDevMode() {
         mapEngine.startNavigation();
       }
       isSimRunning = true;
+      window.IS_SIMULATOR_RUNNING = true;
       btnSimPlay.classList.add('active');
       btnSimPause.classList.remove('active');
       startSimTicker();
@@ -1477,6 +1526,11 @@ function initDevMode() {
   if (btnSimPause) {
     btnSimPause.addEventListener('click', () => {
       isSimRunning = false;
+      window.IS_SIMULATOR_RUNNING = false;
+      if (simAnimId) {
+        cancelAnimationFrame(simAnimId);
+        simAnimId = null;
+      }
       btnSimPause.classList.add('active');
       btnSimPlay.classList.remove('active');
       console.log('⏸️ Симулятор на паузе');
@@ -1486,6 +1540,11 @@ function initDevMode() {
   if (btnSimReset) {
     btnSimReset.addEventListener('click', () => {
       isSimRunning = false;
+      window.IS_SIMULATOR_RUNNING = false;
+      if (simAnimId) {
+        cancelAnimationFrame(simAnimId);
+        simAnimId = null;
+      }
       btnSimPlay.classList.remove('active');
       btnSimPause.classList.remove('active');
       updateSimCar(0);

@@ -313,18 +313,22 @@
     </div>
   </div>
 
-  <!-- Floating Recenter Button (Appears when map is dragged/moved by user) -->
-  <button id="floating-recenter-btn" class="floating-recenter-btn hidden" title="Вернуть по центру">
-    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#38bdf8" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-      <circle cx="12" cy="12" r="8"></circle>
-      <line x1="12" y1="2" x2="12" y2="5"></line>
-      <line x1="12" y1="19" x2="12" y2="22"></line>
-      <line x1="2" y1="12" x2="5" y2="12"></line>
-      <line x1="19" y1="12" x2="22" y2="12"></line>
-      <circle cx="12" cy="12" r="2.5" fill="#38bdf8"></circle>
-    </svg>
-    <span>В центр</span>
-  </button>
+  <!-- Right Floating Navigation Controls: Zoom (+/-) and Recenter Navigation Arrow (Mapsev & Yandex Style) -->
+  <div class="right-map-controls">
+    <!-- Zoom Controls Pill (+ / -) -->
+    <div class="map-zoom-pill">
+      <button id="btn-zoom-in" class="zoom-btn" title="Приблизить">+</button>
+      <div class="zoom-divider"></div>
+      <button id="btn-zoom-out" class="zoom-btn" title="Отдалить">−</button>
+    </div>
+
+    <!-- Floating Recenter Navigation Arrow Button (Yandex Navigator Style) -->
+    <button id="floating-recenter-btn" class="floating-recenter-btn hidden" title="Вернуться к машине и сбросить zoom">
+      <svg class="recenter-nav-arrow" viewBox="0 0 24 24" width="24" height="24" fill="none">
+        <path d="M4 12L20 4L12 20L10.5 13.5L4 12Z" fill="#1e293b" stroke="#1e293b" stroke-width="2" stroke-linejoin="round"/>
+      </svg>
+    </button>
+  </div>
 
   <!-- 6. Compact Modals -->
 

@@ -64,6 +64,37 @@ class TeslaMapEngine {
     } else {
       await this.initLeaflet();
     }
+    this.startMotionExtrapolator();
+  }
+
+  // Start continuous 60fps dead-reckoning loop for real-time motion during live driving
+  startMotionExtrapolator() {
+    if (this.extrapolatorAnimId) return;
+    let lastTime = performance.now();
+
+    const loop = (now) => {
+      const dt = Math.min(0.08, (now - lastTime) / 1000);
+      lastTime = now;
+
+      // Only extrapolate during live driving when simulator is NOT active, vehicle speed > 2 km/h, and followCar is true
+      if (!window.IS_SIMULATOR_RUNNING && this.currentPosition && this.currentPosition.speed > 2 && this.followCar) {
+        const speedMps = this.currentPosition.speed / 3.6;
+        const distMeters = speedMps * dt;
+        const headingRad = (this.currentHeading * Math.PI) / 180;
+
+        const dLat = (distMeters * Math.cos(headingRad)) / 111111;
+        const dLng = (distMeters * Math.sin(headingRad)) / (111111 * Math.cos((this.currentPosition.lat * Math.PI) / 180));
+
+        const nextLat = this.currentPosition.lat + dLat;
+        const nextLng = this.currentPosition.lng + dLng;
+
+        this.updateCarPosition(nextLat, nextLng, this.currentHeading, this.currentPosition.speed);
+      }
+
+      this.extrapolatorAnimId = requestAnimationFrame(loop);
+    };
+
+    this.extrapolatorAnimId = requestAnimationFrame(loop);
   }
 
   // 1. MapLibre GL Clean Vector Map (No bulky 3D extruded blocks, fluid touch gestures)
@@ -98,6 +129,7 @@ class TeslaMapEngine {
       this.map.on('dragstart', handleUserPan);
       this.map.on('rotatestart', handleUserPan);
       this.map.on('zoomstart', handleUserPan);
+      this.map.on('wheel', handleUserPan);
 
       this.map.on('load', () => {
         // Remove/hide bulky 3D extruded building blocks so map stays completely clean & unobstructed
@@ -231,7 +263,7 @@ class TeslaMapEngine {
           if (this.onUserPan) this.onUserPan();
           this.resetAutoFollowTimer();
         };
-        this.map.events.add(['mousedown', 'multitouchstart'], handleYandexUserPan);
+        this.map.events.add(['mousedown', 'multitouchstart', 'wheel'], handleYandexUserPan);
 
         const CarLayout = window.ymaps.templateLayoutFactory.createClass(
           `<div id="yandex-car-marker" class="tesla-3d-car-marker" style="transform: translate(-50%, -50%);">
@@ -339,6 +371,65 @@ class TeslaMapEngine {
     }, 6000);
   }
 
+  // Zoom In map
+  zoomIn() {
+    this.followCar = false;
+    if (this.onUserPan) this.onUserPan();
+    this.resetAutoFollowTimer();
+    if (this.provider === 'maplibre' && this.map) {
+      this.map.zoomIn({ duration: 250 });
+    } else if (this.provider === 'yandex' && this.map) {
+      const z = Math.min(18, this.map.getZoom() + 1);
+      this.map.setZoom(z, { duration: 250 });
+    } else if (this.map && typeof this.map.zoomIn === 'function') {
+      this.map.zoomIn();
+    }
+  }
+
+  // Zoom Out map
+  zoomOut() {
+    this.followCar = false;
+    if (this.onUserPan) this.onUserPan();
+    this.resetAutoFollowTimer();
+    if (this.provider === 'maplibre' && this.map) {
+      this.map.zoomOut({ duration: 250 });
+    } else if (this.provider === 'yandex' && this.map) {
+      const z = Math.max(4, this.map.getZoom() - 1);
+      this.map.setZoom(z, { duration: 250 });
+    } else if (this.map && typeof this.map.zoomOut === 'function') {
+      this.map.zoomOut();
+    }
+  }
+
+  // Smart Maneuver & Route Distance Quantization
+  formatNavDistance(meters) {
+    if (meters == null || isNaN(meters)) return '0 м';
+    const m = Math.max(0, meters);
+    if (m < 20) {
+      return `${Math.round(m)} м`;
+    }
+    if (m < 100) {
+      return `${Math.round(m / 5) * 5} м`;
+    }
+    if (m < 300) {
+      return `${Math.round(m / 10) * 10} м`;
+    }
+    if (m < 800) {
+      return `${Math.round(m / 50) * 50} м`;
+    }
+    if (m < 1500) {
+      if (m < 1000) {
+        return `${Math.round(m / 100) * 100} м`;
+      } else {
+        return `${(Math.round(m / 100) / 10).toFixed(1)} км`;
+      }
+    }
+    if (m < 10000) {
+      return `${(Math.round(m / 100) / 10).toFixed(1)} км`;
+    }
+    return `${Math.round(m / 1000)} км`;
+  }
+
   // Toggle Heading-Up Driving View vs North-Up Overview
   toggleHeadingUp() {
     this.isHeadingUp = !this.isHeadingUp;
@@ -417,7 +508,17 @@ class TeslaMapEngine {
     let bestBearing = null;
     let bestSegIndex = 0;
 
-    for (let i = 0; i < this.routeCoordinates.length - 1; i++) {
+    const totalSegs = this.routeCoordinates.length - 1;
+    let searchStart = 0;
+    let searchEnd = totalSegs;
+
+    // Fast localized search window around last progress point (O(1))
+    if (this.lastProgressIndex != null && this.lastProgressIndex > 0) {
+      searchStart = Math.max(0, this.lastProgressIndex - 5);
+      searchEnd = Math.min(totalSegs, this.lastProgressIndex + 40);
+    }
+
+    for (let i = searchStart; i < searchEnd; i++) {
       const p1 = this.routeCoordinates[i];     // [lng, lat]
       const p2 = this.routeCoordinates[i + 1]; // [lng, lat]
 
@@ -432,8 +533,24 @@ class TeslaMapEngine {
       }
     }
 
-    // If within 38m of road centerline -> snap to road
-    if (minDistance <= 38) {
+    // Fallback to full search if not within localized window
+    if (minDistance > 45 && searchStart > 0) {
+      for (let i = 0; i < totalSegs; i++) {
+        const p1 = this.routeCoordinates[i];
+        const p2 = this.routeCoordinates[i + 1];
+        const proj = this.projectPointToSegment(lng, lat, p1[0], p1[1], p2[0], p2[1]);
+        const dist = this.calculateDistance(lat, lng, proj.y, proj.x);
+        if (dist < minDistance) {
+          minDistance = dist;
+          bestPoint = { lat: proj.y, lng: proj.x };
+          bestBearing = this.calculateBearing(p1[1], p1[0], p2[1], p2[0]);
+          bestSegIndex = i;
+        }
+      }
+    }
+
+    // If within 40m of road centerline -> snap to road
+    if (minDistance <= 40) {
       return {
         snapped: true,
         lat: bestPoint.lat,
@@ -517,13 +634,11 @@ class TeslaMapEngine {
         }
 
         if (this.followCar) {
-          this.map.easeTo({
+          this.map.jumpTo({
             center: [displayLng, displayLat],
             bearing: this.currentHeading,
             pitch: this.isNavigating ? 35 : 0,
-            padding: this.isNavigating ? { top: 60, bottom: 220, left: 0, right: 0 } : { top: 0, bottom: 0, left: 0, right: 0 },
-            duration: 250,
-            easing: (t) => t
+            padding: this.isNavigating ? { top: 60, bottom: 220, left: 0, right: 0 } : { top: 0, bottom: 0, left: 0, right: 0 }
           });
         }
       } else {
@@ -534,13 +649,11 @@ class TeslaMapEngine {
         }
 
         if (this.followCar) {
-          this.map.easeTo({
+          this.map.jumpTo({
             center: [displayLng, displayLat],
             bearing: 0,
             pitch: 0,
-            padding: { top: 0, bottom: 0, left: 0, right: 0 },
-            duration: 250,
-            easing: (t) => t
+            padding: { top: 0, bottom: 0, left: 0, right: 0 }
           });
         }
       }
@@ -551,16 +664,16 @@ class TeslaMapEngine {
       if (this.followCar) {
         const curZoom = this.map.getZoom();
         if (this.isNavigating && curZoom < 14) {
-          this.map.setCenter([displayLat, displayLng], this.navZoom, { duration: 400 });
+          this.map.setCenter([displayLat, displayLng], this.navZoom, { duration: 0 });
         } else {
-          this.map.panTo([displayLat, displayLng], { duration: 250, flying: false });
+          this.map.setCenter([displayLat, displayLng], curZoom, { duration: 0 });
         }
       }
     } else if (this.carMarker && window.L && this.provider === 'osm') {
       this.carMarker.setLatLng([displayLat, displayLng]);
       const markerEl = document.querySelector('#leaflet-car-marker .tesla-car-arrow');
       if (markerEl) markerEl.style.transform = `rotate(${Math.round(this.currentHeading)}deg)`;
-      if (this.followCar && this.map) this.map.panTo([displayLat, displayLng], { animate: true, duration: 0.3 });
+      if (this.followCar && this.map) this.map.setView([displayLat, displayLng], this.map.getZoom(), { animate: false });
     }
 
     // 5. Track Progress & Check Off-Route Rerouting
@@ -613,10 +726,13 @@ class TeslaMapEngine {
           closestIdx = i;
         }
       }
-      this.lastProgressIndex = Math.max(this.lastProgressIndex || 0, closestIdx);
+      const prevProgressIdx = this.lastProgressIndex || 0;
+      this.lastProgressIndex = Math.max(prevProgressIdx, closestIdx);
 
-      // 2. Update traveled route line on MapLibre GL (Dimmed gray #475569)
-      if (this.provider === 'maplibre' && this.map) {
+      // 2. Update traveled route line on MapLibre GL only when progress advances (throttled)
+      const now = performance.now();
+      if (this.provider === 'maplibre' && this.map && (this.lastProgressIndex > prevProgressIdx || !this.lastTraveledUpdate || (now - this.lastTraveledUpdate > 350))) {
+        this.lastTraveledUpdate = now;
         const traveledSource = this.map.getSource('route-traveled');
         if (traveledSource) {
           const traveledCoords = this.routeCoordinates.slice(0, this.lastProgressIndex + 1);
@@ -628,41 +744,33 @@ class TeslaMapEngine {
         }
       }
 
-      // 3. Calculate remaining route distance dynamically
+      // 3. Instant O(1) Remaining Route Distance
+      const totalDist = this.totalRouteMeters || this.totalDistance || 1000;
       let remainingMeters = 0;
-      const currentRoutePt = this.routeCoordinates[this.lastProgressIndex];
-      remainingMeters += this.calculateDistance(currentLat, currentLng, currentRoutePt[1], currentRoutePt[0]);
-      for (let i = this.lastProgressIndex; i < this.routeCoordinates.length - 1; i++) {
-        const p1 = this.routeCoordinates[i];
-        const p2 = this.routeCoordinates[i + 1];
-        remainingMeters += this.calculateDistance(p1[1], p1[0], p2[1], p2[0]);
+      if (this.routeCumulativeDistances && this.routeCumulativeDistances[this.lastProgressIndex] != null) {
+        remainingMeters = Math.max(0, totalDist - this.routeCumulativeDistances[this.lastProgressIndex]);
+      } else {
+        remainingMeters = Math.max(0, distToDest);
       }
 
-      const totalDist = this.totalDistance || 1000;
       const progressPercent = Math.min(96, Math.max(0, Math.round((1 - remainingMeters / totalDist) * 100)));
 
       // Calculate remaining duration and ETA
-      const totalDurSec = this.activeRoute.durationSec || (this.totalDistance / 11);
+      const totalDurSec = this.activeRoute.durationSec || (totalDist / 11);
       const remainingRatio = Math.max(0, Math.min(1, remainingMeters / totalDist));
       const remainingDurationSec = Math.max(30, Math.round(totalDurSec * remainingRatio));
       const remainingMinutes = Math.max(1, Math.round(remainingDurationSec / 60));
 
-      const now = new Date();
-      const etaDate = new Date(now.getTime() + remainingDurationSec * 1000);
+      const nowTime = new Date();
+      const etaDate = new Date(nowTime.getTime() + remainingDurationSec * 1000);
       const etaHours = String(etaDate.getHours()).padStart(2, '0');
       const etaMins = String(etaDate.getMinutes()).padStart(2, '0');
 
-      const remainingDistanceStr = remainingMeters >= 1000
-        ? `${(remainingMeters / 1000).toFixed(1)} км`
-        : `${Math.round(remainingMeters)} м`;
-      const remainingDurationStr = `${remainingMinutes} мин`;
-      const etaStr = `${etaHours}:${etaMins}`;
-
       this.onProgressUpdate({
         percent: progressPercent,
-        remainingDistance: remainingDistanceStr,
-        remainingDuration: remainingDurationStr,
-        eta: etaStr,
+        remainingDistance: this.formatNavDistance(remainingMeters),
+        remainingDuration: `${remainingMinutes} мин`,
+        eta: `${etaHours}:${etaMins}`,
         remainingMeters: remainingMeters
       });
     }
@@ -675,7 +783,7 @@ class TeslaMapEngine {
       return;
     }
 
-    // 4. Maneuver advancement & countdown
+    // 4. Maneuver advancement & countdown with smart rounding
     if (this.routeSteps && this.routeSteps.length > 0) {
       while (this.currentStepIndex < this.routeSteps.length - 1) {
         const step = this.routeSteps[this.currentStepIndex];
@@ -683,7 +791,7 @@ class TeslaMapEngine {
           break;
         }
         const stepDist = this.calculateDistance(currentLat, currentLng, step.location[1], step.location[0]);
-        if (stepDist < 35) {
+        if (stepDist < 30) {
           this.currentStepIndex++;
           this.spokenDistanceThresholds = {};
         } else {
@@ -694,9 +802,9 @@ class TeslaMapEngine {
       const activeStep = this.routeSteps[this.currentStepIndex] || this.routeSteps[this.routeSteps.length - 1];
       let activeDist = 0;
       if (activeStep.location) {
-        activeDist = Math.round(this.calculateDistance(currentLat, currentLng, activeStep.location[1], activeStep.location[0]));
+        activeDist = Math.max(0, this.calculateDistance(currentLat, currentLng, activeStep.location[1], activeStep.location[0]));
       } else {
-        activeDist = Math.round(distToDest);
+        activeDist = Math.max(0, distToDest);
       }
 
       // Check distance from Yerevan center to adjust speed limit if outside
@@ -706,7 +814,7 @@ class TeslaMapEngine {
       const currentSpeedLimit = activeStep.speedLimit || (distFromYerevan > 14 ? 90 : 60);
 
       this.onManeuverUpdate({
-        distance: activeDist < 1000 ? `${activeDist} м` : `${(activeDist / 1000).toFixed(1)} км`,
+        distance: this.formatNavDistance(activeDist),
         distanceMeters: activeDist,
         instruction: activeStep.instruction || activeStep.name || 'Двигайтесь прямо',
         street: activeStep.name || activeStep.instruction || dest.name,
@@ -749,7 +857,7 @@ class TeslaMapEngine {
     }
 
     if (nearestCameraDist < 600) {
-      this.onCameraAlert({ visible: true, distance: `${nearestCameraDist} м` });
+      this.onCameraAlert({ visible: true, distance: this.formatNavDistance(nearestCameraDist) });
     } else {
       this.onCameraAlert({ visible: false });
     }
@@ -899,6 +1007,16 @@ class TeslaMapEngine {
     const durationSec = primaryRoute.duration;
     const distanceMeters = primaryRoute.distance;
     this.totalDistance = distanceMeters;
+
+    // Pre-calculate cumulative polyline distances for instant O(1) navigation tracking
+    this.routeCumulativeDistances = [0];
+    for (let i = 0; i < coordinates.length - 1; i++) {
+      const p1 = coordinates[i];
+      const p2 = coordinates[i + 1];
+      const d = this.calculateDistance(p1[1], p1[0], p2[1], p2[0]);
+      this.routeCumulativeDistances.push(this.routeCumulativeDistances[i] + d);
+    }
+    this.totalRouteMeters = this.routeCumulativeDistances[this.routeCumulativeDistances.length - 1] || distanceMeters;
 
     // Alternative Route
     this.hasAlternative = data.routes.length > 1;

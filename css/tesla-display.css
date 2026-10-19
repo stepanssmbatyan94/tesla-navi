@@ -140,51 +140,111 @@ html, body {
   transition: transform 0.2s ease;
 }
 
-/* Floating Recenter Button (Centered horizontally, appears when user drags map) */
-.floating-recenter-btn {
+/* Right-side floating controls (Zoom & Recenter Navigation Arrow) */
+.right-map-controls {
   position: absolute;
-  bottom: 36px;
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 85;
-  background: rgba(15, 23, 42, 0.94);
-  border: 1.5px solid rgba(56, 189, 248, 0.55);
-  border-radius: 30px;
-  padding: 10px 24px;
+  right: 20px;
+  top: 50%;
+  transform: translateY(-20%);
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 10px;
-  color: #ffffff;
-  font-size: 15px;
-  font-weight: 700;
-  cursor: pointer;
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  box-shadow: 0 12px 35px rgba(0, 0, 0, 0.65), 0 0 20px rgba(56, 189, 248, 0.25);
-  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
-  white-space: nowrap;
+  gap: 14px;
+  z-index: 85;
+  pointer-events: none;
 }
 
-/* When bottom navigation card is open, elevate button cleanly above it */
-.bottom-nav-bar:not(.hidden) ~ .floating-recenter-btn {
-  bottom: 116px;
+.right-map-controls > * {
+  pointer-events: auto;
+}
+
+/* Vertical Zoom Controls Pill (+ / -) */
+.map-zoom-pill {
+  display: flex;
+  flex-direction: column;
+  background: rgba(255, 255, 255, 0.95);
+  border-radius: 12px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.22), 0 1px 3px rgba(0, 0, 0, 0.1);
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  overflow: hidden;
+  width: 44px;
+}
+
+.zoom-btn {
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+  font-weight: 500;
+  line-height: 1;
+  color: #1e293b;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition: background 0.15s ease, transform 0.1s ease;
+  user-select: none;
+}
+
+.zoom-btn:hover {
+  background: rgba(0, 0, 0, 0.07);
+}
+
+.zoom-btn:active {
+  background: rgba(0, 0, 0, 0.14);
+  transform: scale(0.92);
+}
+
+.zoom-divider {
+  width: 28px;
+  height: 1px;
+  background: rgba(0, 0, 0, 0.1);
+  margin: 0 auto;
+}
+
+/* Circular Recenter Navigation Arrow Button (Yandex Style) */
+.floating-recenter-btn {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: #ffffff;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.28), 0 2px 6px rgba(0, 0, 0, 0.12);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  padding: 0;
+  outline: none;
+}
+
+.floating-recenter-btn .recenter-nav-arrow {
+  transition: transform 0.2s ease;
+  transform: rotate(-5deg);
 }
 
 .floating-recenter-btn:hover {
-  background: rgba(30, 41, 59, 0.98);
-  border-color: rgba(56, 189, 248, 0.85);
-  transform: translateX(-50%) scale(1.05);
-  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.75), 0 0 25px rgba(56, 189, 248, 0.4);
+  background: #f8fafc;
+  transform: scale(1.08);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+}
+
+.floating-recenter-btn:hover .recenter-nav-arrow {
+  transform: rotate(0deg) scale(1.1);
 }
 
 .floating-recenter-btn:active {
-  transform: translateX(-50%) scale(0.96);
+  transform: scale(0.92);
 }
 
 .floating-recenter-btn.hidden {
   opacity: 0;
+  transform: scale(0.5) translateY(12px);
   pointer-events: none;
-  transform: translateX(-50%) translateY(16px);
 }
 
 /* 3. Sliding Search Drawer (Left Drawer, Sleek & Fully Closable) */
