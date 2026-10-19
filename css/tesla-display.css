@@ -2,23 +2,23 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600;700&family=Noto+Sans+Armenian:wght@400;500;600;700;800&display=swap');
 
 :root {
-  --bg-dark: #0b0f17;
-  --bg-surface: rgba(18, 24, 38, 0.94);
-  --bg-surface-elevated: #1a2233;
-  --bg-card: rgba(22, 28, 44, 0.97);
-  --border-subtle: rgba(255, 255, 255, 0.12);
-  --border-active: rgba(0, 122, 255, 0.7);
+  --bg-dark: #f8fafc;
+  --bg-surface: #ffffff;
+  --bg-surface-elevated: #ffffff;
+  --bg-card: #ffffff;
+  --border-subtle: rgba(0, 0, 0, 0.08);
+  --border-active: #2563eb;
 
-  --accent-blue: #007aff;
-  --accent-cyan: #00f0ff;
-  --accent-green: #22c55e;
+  --accent-blue: #2563eb;
+  --accent-cyan: #0284c7;
+  --accent-green: #16a34a;
   --accent-amber: #f59e0b;
-  --accent-red: #ef4444;
-  --accent-burgundy: #991b1b;
+  --accent-red: #ff3b30;
+  --accent-burgundy: #b91c1c;
 
-  --text-primary: #ffffff;
-  --text-secondary: rgba(255, 255, 255, 0.75);
-  --text-muted: rgba(255, 255, 255, 0.45);
+  --text-primary: #111827;
+  --text-secondary: #4b5563;
+  --text-muted: #9ca3af;
 
   --font-main: 'Inter', 'Noto Sans Armenian', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   --font-mono: 'JetBrains Mono', monospace;
@@ -81,55 +81,54 @@ html, body {
   z-index: 50;
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  background: var(--bg-surface);
-  border: 1px solid var(--border-subtle);
-  border-radius: 20px;
+  gap: 8px;
+  background: #ffffff;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  border-radius: 22px;
   padding: 8px 6px;
-  backdrop-filter: blur(20px);
-  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.55);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08), 0 1px 3px rgba(0, 0, 0, 0.04);
 }
 
 .tool-btn {
   position: relative;
   width: 44px;
   height: 44px;
-  border-radius: 13px;
+  border-radius: 14px;
   border: none;
   background: transparent;
-  color: var(--text-secondary);
+  color: #1e293b;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .tool-btn:hover {
-  background: rgba(255, 255, 255, 0.1);
-  color: #ffffff;
-  transform: scale(1.06);
+  background: #f1f5f9;
+  color: #000000;
+  transform: scale(1.05);
 }
 
 .tool-btn:active {
-  transform: scale(0.94);
+  transform: scale(0.95);
 }
 
 .tool-btn.active {
-  background: var(--accent-blue);
-  color: #ffffff;
-  box-shadow: 0 4px 14px rgba(0, 122, 255, 0.4);
+  background: #eff6ff;
+  color: #2563eb;
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.2);
 }
 
 .tool-badge-dot {
   position: absolute;
-  top: 7px;
-  right: 7px;
+  top: 8px;
+  right: 8px;
   width: 8px;
   height: 8px;
   border-radius: 50%;
   background: var(--accent-amber);
-  border: 1.5px solid var(--bg-dark);
+  border: 1.5px solid #ffffff;
 }
 
 .tool-badge-dot.connected {
@@ -139,9 +138,28 @@ html, body {
 
 .tool-lang-badge {
   font-size: 13px;
+  font-weight: 800;
+  color: #0f172a;
+  letter-spacing: 0.3px;
+}
+
+/* Attached Battery Pill (Mapsev Screenshot 1 Style) */
+.dock-battery-pill {
+  position: absolute;
+  left: 78px;
+  bottom: 24px;
+  z-index: 49;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  background: #ffffff;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  border-radius: 12px;
+  padding: 5px 9px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.06);
+  font-size: 13px;
   font-weight: 700;
-  color: #ffffff;
-  letter-spacing: 0.5px;
+  color: #16a34a;
 }
 
 .compass-arrow-wrap {
@@ -259,7 +277,7 @@ html, body {
   pointer-events: none;
 }
 
-/* 3. Sliding Search Drawer (Left Drawer, Sleek & Fully Closable) */
+/* 3. Sliding Search Drawer (Left Drawer, Sleek & Fully Closable - Mapsev Light) */
 .search-drawer {
   position: absolute;
   top: 16px;
@@ -268,11 +286,10 @@ html, body {
   max-width: 92vw;
   max-height: calc(100vh - 32px);
   z-index: 70;
-  background: var(--bg-surface);
-  border: 1px solid var(--border-subtle);
+  background: #ffffff;
+  border: 1px solid rgba(0, 0, 0, 0.08);
   border-radius: 24px;
-  backdrop-filter: blur(28px);
-  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.7);
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.12), 0 2px 8px rgba(0, 0, 0, 0.04);
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -291,7 +308,7 @@ html, body {
   display: flex;
   align-items: center;
   padding: 14px 18px;
-  border-bottom: 1px solid var(--border-subtle);
+  border-bottom: 1px solid #f1f5f9;
   gap: 12px;
 }
 
@@ -299,16 +316,17 @@ html, body {
   flex: 1;
   display: flex;
   align-items: center;
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid var(--border-subtle);
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
   border-radius: 16px;
   padding: 8px 14px;
   gap: 10px;
 }
 
 .drawer-search-wrap:focus-within {
-  border-color: var(--accent-blue);
-  box-shadow: 0 0 0 2px rgba(0, 122, 255, 0.25);
+  border-color: #2563eb;
+  background: #ffffff;
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.15);
 }
 
 .drawer-search-input {
@@ -316,13 +334,13 @@ html, body {
   background: transparent;
   border: none;
   outline: none;
-  color: #ffffff;
+  color: #111827;
   font-size: 16px;
   font-weight: 500;
 }
 
 .drawer-search-input::placeholder {
-  color: var(--text-muted);
+  color: #94a3b8;
 }
 
 .drawer-close-btn {
@@ -330,8 +348,8 @@ html, body {
   height: 36px;
   border-radius: 50%;
   border: none;
-  background: rgba(255, 255, 255, 0.08);
-  color: var(--text-secondary);
+  background: #f1f5f9;
+  color: #4b5563;
   display: grid;
   place-items: center;
   cursor: pointer;
@@ -340,8 +358,8 @@ html, body {
 }
 
 .drawer-close-btn:hover {
-  background: rgba(255, 255, 255, 0.18);
-  color: #fff;
+  background: #e2e8f0;
+  color: #0f172a;
 }
 
 .drawer-body {
@@ -360,8 +378,8 @@ html, body {
 }
 
 .commute-tile-item {
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid var(--border-subtle);
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
   border-radius: 16px;
   padding: 12px;
   display: flex;
@@ -373,8 +391,8 @@ html, body {
 }
 
 .commute-tile-item:hover {
-  background: rgba(255, 255, 255, 0.12);
-  border-color: var(--accent-blue);
+  background: #f1f5f9;
+  border-color: #2563eb;
   transform: translateY(-1px);
 }
 
@@ -390,21 +408,21 @@ html, body {
   gap: 6px;
   font-size: 15px;
   font-weight: 700;
-  color: #ffffff;
+  color: #111827;
 }
 
 .commute-eta-badge {
   font-size: 11px;
   font-weight: 700;
-  color: var(--accent-green);
-  background: rgba(34, 197, 94, 0.15);
+  color: #16a34a;
+  background: #dcfce7;
   border-radius: 8px;
   padding: 2px 6px;
 }
 
 .commute-address-sub {
   font-size: 12px;
-  color: var(--text-secondary);
+  color: #64748b;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -425,20 +443,21 @@ html, body {
   display: flex;
   align-items: center;
   gap: 6px;
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid var(--border-subtle);
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
   border-radius: 20px;
   padding: 7px 13px;
   font-size: 13px;
   font-weight: 600;
-  color: var(--text-primary);
+  color: #334155;
   cursor: pointer;
   transition: all 0.2s ease;
 }
 
 .drawer-chip:hover {
-  background: rgba(255, 255, 255, 0.14);
-  border-color: var(--accent-blue);
+  background: #f1f5f9;
+  border-color: #2563eb;
+  color: #1d4ed8;
 }
 
 .drawer-section-title {
@@ -446,7 +465,7 @@ html, body {
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.8px;
-  color: var(--text-muted);
+  color: #94a3b8;
   margin-bottom: 4px;
 }
 
@@ -467,7 +486,7 @@ html, body {
 }
 
 .drawer-list-item:hover {
-  background: rgba(255, 255, 255, 0.08);
+  background: #f8fafc;
 }
 
 .item-left {
@@ -481,10 +500,10 @@ html, body {
   width: 28px;
   height: 28px;
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.07);
+  background: #eff6ff;
   display: grid;
   place-items: center;
-  color: var(--accent-blue);
+  color: #2563eb;
   flex: none;
   font-size: 13px;
 }
@@ -492,7 +511,7 @@ html, body {
 .item-title {
   font-size: 14px;
   font-weight: 600;
-  color: #ffffff;
+  color: #111827;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -500,7 +519,7 @@ html, body {
 
 .item-subtitle {
   font-size: 12px;
-  color: var(--text-secondary);
+  color: #64748b;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -509,26 +528,27 @@ html, body {
 .item-dist {
   font-size: 12px;
   font-weight: 600;
-  color: var(--text-muted);
+  color: #94a3b8;
   font-family: var(--font-mono);
   flex: none;
   margin-left: 8px;
 }
 
-/* 4. Compact Maneuver HUD Card (Small, Sleek, Unobtrusive - Yandex Navigator Style) */
+/* 4. Compact Maneuver HUD Card (Mapsev Light Style) */
 .hud-maneuver-card {
   position: absolute;
   top: 16px;
   left: 20px;
   z-index: 60;
-  background: var(--accent-blue);
-  border-radius: 16px;
-  padding: 8px 16px;
+  background: #ffffff;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  border-radius: 20px;
+  padding: 10px 16px;
   display: flex;
   align-items: center;
-  gap: 12px;
-  box-shadow: 0 12px 30px rgba(0, 122, 255, 0.35);
-  max-width: 380px;
+  gap: 14px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1), 0 2px 6px rgba(0, 0, 0, 0.04);
+  max-width: 400px;
   transition: all 0.25s ease;
 }
 
@@ -539,16 +559,17 @@ html, body {
 }
 
 .maneuver-arrow-box {
-  width: 36px;
-  height: 36px;
-  background: rgba(255, 255, 255, 0.22);
-  border-radius: 10px;
+  width: 42px;
+  height: 42px;
+  background: #2563eb;
+  border-radius: 12px;
   display: grid;
   place-items: center;
   color: #ffffff;
-  font-size: 20px;
+  font-size: 22px;
   font-weight: 800;
   flex: none;
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.35);
 }
 
 .maneuver-info {
@@ -564,291 +585,386 @@ html, body {
 }
 
 .maneuver-dist-val {
-  font-size: 20px;
+  font-size: 22px;
   font-weight: 800;
+  color: #111827;
   letter-spacing: -0.5px;
 }
 
 .maneuver-street-name {
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 600;
-  color: rgba(255, 255, 255, 0.95);
+  color: #4b5563;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  max-width: 260px;
+  max-width: 280px;
 }
 
 /* Lane Guidance Pill */
 .lane-guidance-pill {
   position: absolute;
-  top: 74px;
+  top: 82px;
   left: 20px;
   z-index: 59;
-  background: rgba(0, 102, 255, 0.92);
-  border: 1px solid rgba(255, 255, 255, 0.3);
-  border-radius: 12px;
-  padding: 4px 12px;
+  background: #ffffff;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 14px;
+  padding: 6px 14px;
   display: flex;
   align-items: center;
   gap: 8px;
-  backdrop-filter: blur(16px);
-  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.4);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
 }
 
 .lane-arrow {
   font-size: 15px;
   font-weight: 800;
-  color: #ffffff;
-  opacity: 0.5;
+  color: #94a3b8;
 }
 
 .lane-arrow.active {
-  opacity: 1.0;
-  color: #ffffff;
+  color: #2563eb;
 }
 
-/* 5. Speedometer & Speed Limit HUD + Yandex Traffic Score & Sound Toggle (Top Right Cluster) */
+/* 5. Speedometer & Speed Limit HUD + Auxiliary Controls (Mapsev Architecture) */
 .speed-limit-hud {
   position: absolute;
   top: 16px;
-  right: 20px;
+  right: 18px;
   z-index: 60;
   display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 8px;
-}
-
-.speed-cluster-badge {
-  display: flex;
-  align-items: center;
-  background: var(--bg-surface);
-  border: 1px solid var(--border-subtle);
-  border-radius: 20px;
-  padding: 5px 12px 5px 14px;
-  backdrop-filter: blur(20px);
-  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.5);
+  align-items: flex-start;
   gap: 12px;
 }
 
-.current-speed-wrap {
+/* Twin Circles: Current Speed Circle + Speed Limit Sign (Screenshots 2 & 3) */
+.speed-cluster-badge {
   display: flex;
-  align-items: baseline;
-  gap: 3px;
+  align-items: center;
+  gap: 8px;
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  padding: 0;
+}
+
+.speed-current-circle {
+  width: 58px;
+  height: 58px;
+  border-radius: 50%;
+  background: #ffffff;
+  border: 1px solid rgba(0, 0, 0, 0.04);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12), 0 1px 3px rgba(0, 0, 0, 0.04);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
 }
 
 .current-speed-val {
-  font-size: 28px;
+  font-size: 32px;
   font-weight: 800;
-  color: #ffffff;
-  font-family: var(--font-mono);
+  color: #000000;
+  font-family: var(--font-main);
+  line-height: 1;
   letter-spacing: -1px;
 }
 
 .current-speed-unit {
-  font-size: 10px;
-  font-weight: 700;
-  color: var(--text-muted);
+  display: none;
 }
 
-/* Circular Speed Limit Sign */
+/* Circular Speed Limit Sign (Screenshots 2 & 3: European/Armenian Red Ring) */
 .speed-limit-circle {
-  width: 36px;
-  height: 36px;
+  width: 58px;
+  height: 58px;
   border-radius: 50%;
   background: #ffffff;
-  border: 3.5px solid #ef4444;
-  display: grid;
-  place-items: center;
-  color: #0b0f17;
-  font-size: 15px;
-  font-weight: 800;
-  font-family: var(--font-mono);
-}
-
-/* Top Right Auxiliary Row: Traffic Score Badge (8 баллов) + Sound Toggle Button */
-.top-aux-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-/* Yandex Traffic Score Badge (8 баллов) */
-.traffic-score-badge {
+  border: 5px solid #ff3b30;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12), 0 1px 3px rgba(0, 0, 0, 0.04);
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-  background: #ef4444;
-  color: #ffffff;
-  font-size: 16px;
+  color: #000000;
+  font-size: 26px;
   font-weight: 800;
-  font-family: var(--font-mono);
-  border: 2px solid #ffffff;
-  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.5);
-  cursor: pointer;
+  font-family: var(--font-main);
+  line-height: 1;
+  flex: none;
 }
 
-/* Sound / Speaker Toggle Button */
-.sound-toggle-btn {
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-  border: 1px solid var(--border-subtle);
-  background: var(--bg-surface);
-  color: var(--text-primary);
+/* Auxiliary Control Column: Charger, Lane/Traffic, Sound Toggle (Screenshots 2 & 3) */
+.top-aux-row {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: center;
+}
+
+.aux-btn {
+  width: 44px;
+  height: 44px;
+  border-radius: 14px;
+  border: none;
   display: grid;
   place-items: center;
   cursor: pointer;
-  backdrop-filter: blur(16px);
-  font-size: 16px;
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4);
-  transition: all 0.2s ease;
+  transition: all 0.18s ease;
+}
+
+.aux-dark-btn {
+  background: #2b2b2b;
+  color: #ffffff;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18);
+}
+
+.aux-dark-btn:hover {
+  background: #1a1a1a;
+  transform: scale(1.05);
+}
+
+.aux-dark-btn.active {
+  background: #16a34a;
+  color: #ffffff;
+  box-shadow: 0 4px 16px rgba(22, 163, 74, 0.4);
+}
+
+/* Vertical Traffic / Lane Badge (🚘 | 2) */
+.traffic-score-pill {
+  width: 44px;
+  padding: 6px 2px;
+  border-radius: 14px;
+  background: #ffffff;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.08);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  cursor: pointer;
+  transition: transform 0.15s ease;
+}
+
+.traffic-score-pill:hover {
+  transform: scale(1.05);
+}
+
+.traffic-car-icon {
+  font-size: 13px;
+  line-height: 1;
+}
+
+.traffic-divider {
+  width: 20px;
+  height: 1px;
+  background: #e2e8f0;
+}
+
+.traffic-num {
+  font-size: 15px;
+  font-weight: 800;
+  color: #1e293b;
+  font-family: var(--font-main);
+  line-height: 1;
+}
+
+/* Mapsev Style Sound / Voice Toggle Button (Screenshots 2 & 3) */
+.sound-toggle-btn {
+  width: 44px;
+  height: 44px;
+  border-radius: 14px;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  background: #ffffff;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.08);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  transition: all 0.18s ease;
+}
+
+.sound-toggle-btn:hover {
+  background: #f8fafc;
+  transform: scale(1.05);
 }
 
 .sound-toggle-btn.muted {
-  color: var(--text-muted);
-  background: rgba(239, 68, 68, 0.2);
-  border-color: #ef4444;
+  border-color: rgba(0, 102, 255, 0.25);
+  background: #ffffff;
 }
 
-/* Camera / Traffic Light Alert Badge */
+/* Traffic Camera / Signal Alert */
 .camera-alert-badge {
   display: flex;
   align-items: center;
   gap: 6px;
-  background: var(--bg-surface);
-  border: 1px solid var(--border-subtle);
+  background: #ffffff;
+  border: 1px solid rgba(0, 0, 0, 0.06);
   border-radius: 14px;
-  padding: 5px 10px;
-  backdrop-filter: blur(16px);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  padding: 6px 12px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.08);
 }
 
 .camera-alert-icon {
-  width: 18px;
-  height: 18px;
+  width: 20px;
+  height: 20px;
   border-radius: 50%;
-  background: #ef4444;
+  background: #ff3b30;
   display: grid;
   place-items: center;
   color: #fff;
-  font-size: 9px;
+  font-size: 10px;
 }
 
 .camera-alert-dist {
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 700;
-  color: #ffffff;
+  color: #111827;
   font-family: var(--font-mono);
 }
 
-/* 6. Bottom Navigation Status Bar with Yandex Traffic Progress Bar */
+/* 6. Bottom Navigation Status Bar (Mapsev Capsule Style - Screenshot 4) */
 .bottom-nav-bar {
   position: absolute;
   bottom: 24px;
-  right: 20px;
+  left: 50%;
+  transform: translateX(-50%);
   z-index: 60;
   display: flex;
   flex-direction: column;
-  background: var(--bg-surface);
-  border: 1px solid var(--border-subtle);
-  border-radius: 20px;
-  padding: 12px 18px;
-  gap: 10px;
-  backdrop-filter: blur(24px);
-  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.55);
-  transition: all 0.3s ease;
-  min-width: 320px;
+  background: #ffffff;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  border-radius: 24px;
+  padding: 8px 14px 12px 14px;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12), 0 2px 6px rgba(0, 0, 0, 0.04);
+  min-width: 380px;
+  max-width: 90vw;
+  transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.24s ease;
 }
 
 .bottom-nav-bar.hidden {
   opacity: 0;
   pointer-events: none;
-  transform: translateY(20px);
+  transform: translateX(-50%) translateY(24px);
 }
 
-.nav-metrics-top-row {
+.bottom-nav-handle {
+  width: 36px;
+  height: 4px;
+  background: #e2e8f0;
+  border-radius: 2px;
+  margin: 0 auto 8px auto;
+}
+
+.bottom-nav-content {
   display: flex;
   align-items: center;
   justify-content: space-between;
-}
-
-.nav-metrics {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  font-size: 15px;
-  font-weight: 600;
-  color: #ffffff;
-}
-
-.nav-metric-duration {
-  font-size: 18px;
-  font-weight: 800;
-  color: var(--accent-green);
+  gap: 14px;
 }
 
 .nav-cancel-btn {
-  width: 30px;
-  height: 30px;
+  width: 34px;
+  height: 34px;
   border-radius: 50%;
   border: none;
-  background: rgba(239, 68, 68, 0.2);
-  color: #ef4444;
+  background: #fef2f2;
+  color: #ff3b30;
   display: grid;
   place-items: center;
   cursor: pointer;
-  font-size: 13px;
-  font-weight: 800;
-  transition: all 0.2s ease;
+  flex: none;
+  transition: all 0.18s ease;
 }
 
 .nav-cancel-btn:hover {
-  background: #ef4444;
-  color: #ffffff;
+  background: #fee2e2;
+  transform: scale(1.06);
 }
 
-/* Yandex Navigator Route Progress Bar with Colored Traffic Segments */
-.route-progress-track {
-  position: relative;
-  width: 100%;
-  height: 6px;
-  border-radius: 3px;
-  background: rgba(255, 255, 255, 0.1);
-  overflow: visible;
-  margin-top: 2px;
-}
-
-.route-progress-bar {
+.nav-middle-info {
+  flex: 1;
   display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.nav-metrics-row {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.nav-metric-duration {
+  font-size: 19px;
+  font-weight: 800;
+  color: #111827;
+  letter-spacing: -0.5px;
+}
+
+.nav-metric-dist, .nav-metric-eta {
+  font-size: 15px;
+  font-weight: 500;
+  color: #6b7280;
+}
+
+.nav-battery-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 14px;
+  font-weight: 700;
+  color: #16a34a;
+  margin-left: 2px;
+}
+
+.nav-route-progress-wrap {
+  display: flex;
+  align-items: center;
   width: 100%;
-  height: 100%;
-  border-radius: 3px;
+}
+
+.nav-progress-origin-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #2563eb;
+  flex: none;
+}
+
+.nav-progress-track {
+  flex: 1;
+  height: 4px;
+  border-radius: 2px;
+  background: #e2e8f0;
   overflow: hidden;
+  margin-left: -2px;
 }
 
-.prog-seg {
+.nav-progress-fill {
   height: 100%;
+  background: #16a34a;
+  border-radius: 2px;
+  transition: width 0.3s ease-out;
 }
-.prog-seg.green { background: #22c55e; }
-.prog-seg.yellow { background: #eab308; }
-.prog-seg.amber { background: #f97316; }
-.prog-seg.red { background: #ef4444; }
 
-.prog-traveled-fill {
-  position: absolute;
-  top: 0;
-  left: 0;
-  height: 100%;
-  background: #94a3b8;
-  border-radius: 3px 0 0 3px;
-  z-index: 5;
-  pointer-events: none;
-  transition: width 0.25s ease-out;
+.nav-options-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: none;
+  background: #eff6ff;
+  color: #2563eb;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  flex: none;
+  transition: all 0.18s ease;
+}
+
+.nav-options-btn:hover {
+  background: #dbeafe;
+  transform: scale(1.06);
 }
 
 .prog-car-cursor {
@@ -917,13 +1033,11 @@ html, body {
   z-index: 75;
   width: 400px;
   max-width: calc(100vw - 90px);
-  background: var(--bg-surface);
-  border: 1px solid var(--border-subtle);
+  background: #ffffff;
+  border: 1px solid rgba(0, 0, 0, 0.08);
   border-radius: 22px;
   padding: 16px;
-  backdrop-filter: blur(28px);
-  -webkit-backdrop-filter: blur(28px);
-  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.75);
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.14), 0 2px 8px rgba(0, 0, 0, 0.04);
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -950,8 +1064,8 @@ html, body {
 .yt-search-row {
   display: flex;
   align-items: center;
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid var(--border-subtle);
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
   border-radius: 14px;
   padding: 6px 10px;
   gap: 8px;
@@ -962,7 +1076,7 @@ html, body {
   background: transparent;
   border: none;
   outline: none;
-  color: #ffffff;
+  color: #111827;
   font-size: 14px;
 }
 
@@ -972,7 +1086,7 @@ html, body {
   border-radius: 14px;
   overflow: hidden;
   background: #000;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
 }
 
 .yt-video-frame iframe {
@@ -997,13 +1111,13 @@ html, body {
   border-radius: 10px;
   font-size: 13px;
   cursor: pointer;
-  color: var(--text-secondary);
+  color: #4b5563;
   transition: background 0.15s ease;
 }
 
 .yt-song-item:hover, .yt-song-item.active {
-  background: rgba(255, 255, 255, 0.1);
-  color: #ffffff;
+  background: #f1f5f9;
+  color: #111827;
 }
 
 /* Large, Touch-Friendly Player Transport Controls */
@@ -1019,9 +1133,9 @@ html, body {
   width: 50px;
   height: 50px;
   border-radius: 50%;
-  border: 1px solid rgba(255, 255, 255, 0.16);
-  background: rgba(255, 255, 255, 0.08);
-  color: #ffffff;
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+  color: #1e293b;
   font-size: 20px;
   display: flex;
   align-items: center;
@@ -1032,7 +1146,7 @@ html, body {
   -webkit-tap-highlight-color: transparent;
 }
 .music-ctrl-btn:hover {
-  background: rgba(255, 255, 255, 0.2);
+  background: #f1f5f9;
   transform: scale(1.1);
 }
 .music-ctrl-btn:active {
@@ -1227,11 +1341,11 @@ html, body {
 .compact-card {
   width: 400px;
   max-width: 90vw;
-  background: var(--bg-card);
-  border: 1px solid var(--border-subtle);
+  background: #ffffff;
+  border: 1px solid rgba(0, 0, 0, 0.08);
   border-radius: 26px;
   padding: 24px;
-  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.7);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.14), 0 2px 8px rgba(0, 0, 0, 0.04);
   display: flex;
   flex-direction: column;
   gap: 18px;
@@ -1246,7 +1360,7 @@ html, body {
 .card-title {
   font-size: 18px;
   font-weight: 700;
-  color: #ffffff;
+  color: #111827;
 }
 
 .card-close-btn {
@@ -1254,8 +1368,8 @@ html, body {
   height: 32px;
   border-radius: 50%;
   border: none;
-  background: rgba(255, 255, 255, 0.08);
-  color: var(--text-secondary);
+  background: #f1f5f9;
+  color: #4b5563;
   display: grid;
   place-items: center;
   cursor: pointer;
@@ -1264,8 +1378,8 @@ html, body {
 }
 
 .card-close-btn:hover {
-  background: rgba(255, 255, 255, 0.16);
-  color: #fff;
+  background: #e2e8f0;
+  color: #0f172a;
 }
 
 .btn-primary-action {
@@ -1351,12 +1465,11 @@ html, body {
   z-index: 70;
   width: 380px;
   max-height: calc(100vh - 32px);
-  background: var(--bg-surface);
-  border: 1px solid var(--border-subtle);
+  background: #ffffff;
+  border: 1px solid rgba(0, 0, 0, 0.08);
   border-radius: 22px;
   padding: 16px;
-  backdrop-filter: blur(28px);
-  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.7);
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.12), 0 2px 8px rgba(0, 0, 0, 0.04);
   display: flex;
   flex-direction: column;
   gap: 14px;
@@ -1373,14 +1486,14 @@ html, body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  border-bottom: 1px solid var(--border-subtle);
+  border-bottom: 1px solid #f1f5f9;
   padding-bottom: 10px;
 }
 
 .alt-header-title {
   font-size: 16px;
   font-weight: 700;
-  color: var(--text-primary);
+  color: #111827;
 }
 
 .route-cards-container {
@@ -1390,8 +1503,8 @@ html, body {
 }
 
 .route-card {
-  background: rgba(255, 255, 255, 0.04);
-  border: 1.5px solid var(--border-subtle);
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
   border-radius: 16px;
   padding: 12px 14px;
   cursor: pointer;
@@ -1402,13 +1515,14 @@ html, body {
 }
 
 .route-card:hover {
-  background: rgba(255, 255, 255, 0.08);
+  background: #f1f5f9;
+  border-color: #cbd5e1;
 }
 
 .route-card.active {
-  background: rgba(2, 132, 199, 0.15);
-  border-color: #38bdf8;
-  box-shadow: 0 0 16px rgba(56, 189, 248, 0.25);
+  background: #eff6ff;
+  border-color: #2563eb;
+  box-shadow: 0 2px 12px rgba(37, 99, 235, 0.15);
 }
 
 .route-card.hidden {
@@ -1426,13 +1540,13 @@ html, body {
 }
 
 .card-badge.fastest {
-  background: #0284c7;
+  background: #2563eb;
   color: #ffffff;
 }
 
 .card-badge.via {
-  background: rgba(255, 255, 255, 0.12);
-  color: #ffffff;
+  background: #e2e8f0;
+  color: #334155;
 }
 
 .card-time-row {
@@ -1444,14 +1558,14 @@ html, body {
 .card-time {
   font-size: 22px;
   font-weight: 800;
-  color: #ffffff;
+  color: #111827;
   font-family: var(--font-mono);
 }
 
 .card-dist {
   font-size: 14px;
   font-weight: 600;
-  color: var(--text-secondary);
+  color: #4b5563;
 }
 
 .card-details-row {
@@ -1459,16 +1573,16 @@ html, body {
   align-items: center;
   gap: 12px;
   font-size: 12px;
-  color: var(--text-muted);
+  color: #64748b;
 }
 
 .card-battery {
-  color: #10b981;
+  color: #16a34a;
   font-weight: 700;
 }
 
 .card-tag {
-  color: var(--text-secondary);
+  color: #64748b;
 }
 
 /* Turn-by-Turn Maneuvers List inside Drawer */
@@ -1479,14 +1593,14 @@ html, body {
   flex: 1;
   max-height: 280px;
   overflow-y: auto;
-  border-top: 1px solid var(--border-subtle);
+  border-top: 1px solid #f1f5f9;
   padding-top: 10px;
 }
 
 .turn-list-title {
   font-size: 13px;
   font-weight: 700;
-  color: var(--text-secondary);
+  color: #64748b;
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }
@@ -1501,7 +1615,7 @@ html, body {
   align-items: center;
   gap: 12px;
   padding: 9px 6px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  border-bottom: 1px solid #f1f5f9;
 }
 
 .turn-step-item:last-child {
@@ -1512,7 +1626,7 @@ html, body {
   font-size: 18px;
   width: 26px;
   text-align: center;
-  color: #38bdf8;
+  color: #2563eb;
   flex-shrink: 0;
 }
 

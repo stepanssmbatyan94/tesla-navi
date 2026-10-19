@@ -99,6 +99,16 @@
     </button>
   </nav>
 
+  <!-- Attached Battery Pill (Mapsev Screenshot 1 Style) -->
+  <div id="dock-battery-badge" class="dock-battery-pill" title="Заряд батареи Tesla">
+    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="#16a34a" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="2" y="7" width="16" height="10" rx="2" ry="2"></rect>
+      <line x1="20" y1="11" x2="20" y2="13"></line>
+      <rect x="4" y="9" width="10" height="6" fill="#16a34a" rx="1"></rect>
+    </svg>
+    <span id="dock-battery-val">80%</span>
+  </div>
+
   <!-- 2. Sliding Search Drawer (Left Drawer, Sleek & Fully Closable) -->
   <aside id="search-drawer" class="search-drawer hidden">
     <div class="drawer-header">
@@ -274,20 +284,36 @@
   <!-- Lane Guidance Pill on Road (Only populated when real intersection lane data exists) -->
   <div id="lane-guidance-pill" class="lane-guidance-pill hidden"></div>
 
-  <!-- 4. Speedometer & Speed Limit HUD + Yandex Traffic Score & Sound Toggle -->
+  <!-- 4. Speedometer & Speed Limit HUD + Auxiliary Controls (Mapsev Architecture) -->
   <div class="speed-limit-hud">
+    <!-- Twin Circles: Current Speed Circle + Speed Limit Sign (Screenshots 2 & 3) -->
     <div class="speed-cluster-badge">
-      <div class="current-speed-wrap">
+      <div class="speed-current-circle" title="Текущая скорость">
         <span id="speed-current" class="current-speed-val">0</span>
-        <span class="current-speed-unit">км/ч</span>
       </div>
-      <div id="speed-limit-val" class="speed-limit-circle">60</div>
+      <div id="speed-limit-val" class="speed-limit-circle" title="Ограничение скорости">60</div>
     </div>
 
-    <!-- Top Right Auxiliary Row: Traffic Score Badge + Sound Toggle Button -->
+    <!-- Auxiliary Control Column: Charger, Lane/Traffic, Sound Toggle (Screenshots 2 & 3) -->
     <div class="top-aux-row">
-      <div id="traffic-score-badge" class="traffic-score-badge" title="Балл пробок">2</div>
-      <button id="btn-sound-toggle" class="sound-toggle-btn" title="Звук навигатора">🔊</button>
+      <button id="btn-quick-chargers" class="aux-btn aux-dark-btn" title="Зарядки EV">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+          <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+        </svg>
+      </button>
+      <div id="traffic-score-badge" class="traffic-score-pill" title="Балл пробок и полос">
+        <span class="traffic-car-icon">🚘</span>
+        <span class="traffic-divider"></span>
+        <span id="traffic-score-val" class="traffic-num">2</span>
+      </div>
+      <button id="btn-sound-toggle" class="sound-toggle-btn" title="Звук навигатора">
+        <!-- Default Sound ON SVG: clean black speaker icon -->
+        <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="#1e293b" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" fill="#1e293b"></polygon>
+          <path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path>
+          <path d="M19.07 4.93a10 10 0 0 1 0 14.14"></path>
+        </svg>
+      </button>
     </div>
 
     <!-- Traffic Camera / Signal Alert (Only shown when approaching real camera) -->
@@ -297,31 +323,40 @@
     </div>
   </div>
 
-  <!-- 5. Bottom Navigation Status Bar with Yandex Traffic Progress Bar -->
+  <!-- 5. Bottom Navigation Status Bar (Mapsev Capsule Style - Screenshot 4) -->
   <div id="bottom-nav-bar" class="bottom-nav-bar hidden">
-    <div class="nav-metrics-top-row">
-      <div class="nav-metrics">
-        <span id="nav-duration" class="nav-metric-duration">0 мин</span>
-        <span id="nav-distance">0 км</span>
-        <span id="nav-eta">--:--</span>
-        <span class="nav-battery-badge">🔋 82%</span>
-      </div>
+    <div class="bottom-nav-handle"></div>
+    <div class="bottom-nav-content">
       <button id="btn-cancel-nav" class="nav-cancel-btn" title="Отменить маршрут">
-        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#ff3b30" stroke-width="2.6" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
       </button>
-    </div>
 
-    <!-- Traffic Segments Progress Bar with Live Moving Cursor (Yandex Navigator Style) -->
-    <div class="route-progress-track">
-      <div class="route-progress-bar">
-        <div class="prog-seg green" style="width: 100%; background: #82ea0d;"></div>
+      <div class="nav-middle-info">
+        <div class="nav-metrics-row">
+          <span id="nav-duration" class="nav-metric-duration">0 мин</span>
+          <span id="nav-distance" class="nav-metric-dist">0 км</span>
+          <span id="nav-eta" class="nav-metric-eta">--:--</span>
+          <span class="nav-battery-pill">
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="#16a34a" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="16" height="10" rx="2" ry="2"/><line x1="20" y1="11" x2="20" y2="13"/><rect x="4" y="9" width="10" height="6" fill="#16a34a" rx="1"/></svg>
+            <span id="nav-battery-val">78%</span>
+          </span>
+        </div>
+
+        <div class="nav-route-progress-wrap">
+          <span class="nav-progress-origin-dot"></span>
+          <div class="nav-progress-track">
+            <div id="prog-traveled-fill" class="nav-progress-fill" style="width: 100%;"></div>
+          </div>
+        </div>
       </div>
-      <div id="prog-traveled-fill" class="prog-traveled-fill" style="width: 0%;"></div>
-      <div id="prog-car-cursor" class="prog-car-cursor" style="left: 0%;">
-        <svg viewBox="0 0 16 16" width="14" height="14">
-          <polygon points="3,2 13,8 3,14 6,8" fill="#fde047" stroke="#000" stroke-width="1.5" stroke-linejoin="round"/>
+
+      <button id="btn-nav-options" class="nav-options-btn" title="Маршрут">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none">
+          <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z" fill="#2563eb"/>
+          <circle cx="17" cy="7" r="4.5" fill="#2563eb"/>
+          <path d="M17 5v4M15 7h4" stroke="#ffffff" stroke-width="1.8" stroke-linecap="round"/>
         </svg>
-      </div>
+      </button>
     </div>
   </div>
 

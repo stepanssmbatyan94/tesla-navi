@@ -483,15 +483,47 @@ function initToolbarHandlers() {
     });
   }
 
-  // Sound / Voice Mute Toggle
+  // Sound / Voice Mute Toggle (Mapsev Style: Black Speaker ON / Electric Blue Slash OFF)
+  function updateSoundButtonState(voiceOn) {
+    const btn = document.getElementById('btn-sound-toggle');
+    if (!btn) return;
+    btn.classList.toggle('muted', !voiceOn);
+    if (voiceOn) {
+      btn.innerHTML = `
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="#1e293b" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" fill="#1e293b"></polygon>
+          <path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path>
+          <path d="M19.07 4.93a10 10 0 0 1 0 14.14"></path>
+        </svg>
+      `;
+      btn.title = 'Звук включен';
+    } else {
+      btn.innerHTML = `
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="#0066ff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+          <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" fill="#0066ff"></polygon>
+          <line x1="22" y1="2" x2="2" y2="22" stroke="#0066ff" stroke-width="2.6"></line>
+        </svg>
+      `;
+      btn.title = 'Звук выключен';
+    }
+  }
+
   const btnSoundToggle = document.getElementById('btn-sound-toggle');
   if (btnSoundToggle) {
     btnSoundToggle.addEventListener('click', () => {
       if (mapEngine) {
         const voiceOn = mapEngine.toggleVoice();
-        btnSoundToggle.classList.toggle('muted', !voiceOn);
-        btnSoundToggle.textContent = voiceOn ? '🔊' : '🔇';
+        updateSoundButtonState(voiceOn);
       }
+    });
+  }
+
+  // Quick EV Chargers button in top-right cluster
+  const btnQuickChargers = document.getElementById('btn-quick-chargers');
+  if (btnQuickChargers) {
+    btnQuickChargers.addEventListener('click', () => {
+      const btnChargers = document.getElementById('btn-toggle-chargers');
+      if (btnChargers) btnChargers.click();
     });
   }
 
@@ -984,6 +1016,8 @@ function showArrivalModal(dest) {
 
 // 8. EV Supercharger Pins on Map
 function toggleEvChargers(show) {
+  const btnQuick = document.getElementById('btn-quick-chargers');
+  if (btnQuick) btnQuick.classList.toggle('active', !!show);
   if (!mapEngine || !mapEngine.map) return;
 
   if (!show) {
@@ -1710,9 +1744,12 @@ function initDevMode() {
   function updateSimCar(targetDist) {
     simDistance = Math.max(0, Math.min(simTotalDist, targetDist));
     const pt = getPositionAtDistance(simDistance);
+    const curSpeed = isSimRunning ? Math.round(simSpeed) : 0;
     if (pt && mapEngine) {
-      mapEngine.updateCarPosition(pt.lat, pt.lng, pt.heading, isSimRunning ? simSpeed : 0);
+      mapEngine.updateCarPosition(pt.lat, pt.lng, pt.heading, curSpeed);
     }
+    const speedEl = document.getElementById('speed-current');
+    if (speedEl) speedEl.textContent = curSpeed;
 
     const pct = Math.min(100, Math.round((simDistance / simTotalDist) * 100));
     if (scrubSlider) scrubSlider.value = pct;
