@@ -1422,7 +1422,9 @@ class TeslaMapEngine {
             phrase = `In 250 meters ${turnText.toLowerCase()}${streetText}`;
           } else if (lang === 'hy') {
             const mod = (activeStep.modifier || '').toLowerCase();
-            if (mod.includes('left')) phrase = 'dist_250_left';
+            if (mod.includes('slight left') || mod.includes('keep left') || mod.includes('fork left')) phrase = 'dist_250_keep_left';
+            else if (mod.includes('slight right') || mod.includes('keep right') || mod.includes('fork right')) phrase = 'dist_250_keep_right';
+            else if (mod.includes('left')) phrase = 'dist_250_left';
             else if (mod.includes('right')) phrase = 'dist_250_right';
             else phrase = 'dist_250_straight';
           } else {
@@ -1548,8 +1550,18 @@ class TeslaMapEngine {
   getTurnSpeech(modifier) {
     const lang = window.CURRENT_LANG || 'ru';
     const dict = I18N[lang] || I18N.ru;
-    if (modifier && modifier.includes('left')) return dict.voiceTurnLeft;
-    if (modifier && modifier.includes('right')) return dict.voiceTurnRight;
+    const mod = (modifier || '').toLowerCase();
+    if (mod.includes('slight left') || mod.includes('keep left') || mod.includes('bear left') || mod.includes('fork left') || mod.includes('левее')) {
+      return dict.voiceKeepLeft || 'Держитесь левее';
+    }
+    if (mod.includes('slight right') || mod.includes('keep right') || mod.includes('bear right') || mod.includes('fork right') || mod.includes('правее')) {
+      return dict.voiceKeepRight || 'Держитесь правее';
+    }
+    if (mod.includes('uturn') || mod.includes('u-turn') || mod.includes('разворот')) {
+      return dict.voiceUTurn || 'Развернитесь';
+    }
+    if (mod.includes('left') || mod.includes('налево')) return dict.voiceTurnLeft;
+    if (mod.includes('right') || mod.includes('направо')) return dict.voiceTurnRight;
     return dict.voiceStraight;
   }
 
@@ -1716,9 +1728,18 @@ class TeslaMapEngine {
     } else if (primaryRoute.legs && primaryRoute.legs.length > 0) {
       primaryRoute.legs[0].steps.forEach(step => {
         const maneuver = step.maneuver || {};
+        const mod = (maneuver.modifier || '').toLowerCase();
+        let instruction = 'Двигайтесь прямо';
+        if (mod.includes('slight left') || mod.includes('keep left') || mod.includes('fork left')) instruction = `Держитесь левее${step.name ? ` на ${step.name}` : ''}`;
+        else if (mod.includes('slight right') || mod.includes('keep right') || mod.includes('fork right')) instruction = `Держитесь правее${step.name ? ` на ${step.name}` : ''}`;
+        else if (mod.includes('left')) instruction = `Поверните налево${step.name ? ` на ${step.name}` : ''}`;
+        else if (mod.includes('right')) instruction = `Поверните направо${step.name ? ` на ${step.name}` : ''}`;
+        else if (mod.includes('uturn')) instruction = 'Развернитесь';
+        else if (step.name) instruction = `Двигайтесь по ${step.name}`;
+
         this.routeSteps.push({
           name: step.name || destination.name,
-          instruction: `${maneuver.type || ''} ${maneuver.modifier || ''}`.trim(),
+          instruction: instruction,
           type: maneuver.type,
           modifier: maneuver.modifier,
           location: maneuver.location,

@@ -358,14 +358,14 @@ function getArmenianAudio(text, voiceChoice = 'gor') {
     file = 'dist_500_left.mp3';
   } else if ((t.includes('աջ') && (t.includes('500') || t.includes('հարյուր'))) || t === 'dist_500_right') {
     file = 'dist_500_right.mp3';
-  } else if (t.includes('ձախ') || t === 'turn_left') {
-    file = 'turn_left.mp3';
-  } else if (t.includes('աջ') || t === 'turn_right') {
-    file = 'turn_right.mp3';
   } else if (t.includes('պահեք ձախ') || t === 'keep_left') {
     file = 'keep_left.mp3';
   } else if (t.includes('պահեք աջ') || t === 'keep_right') {
     file = 'keep_right.mp3';
+  } else if (t.includes('ձախ') || t === 'turn_left') {
+    file = 'turn_left.mp3';
+  } else if (t.includes('աջ') || t === 'turn_right') {
+    file = 'turn_right.mp3';
   } else if (t.includes('ուղիղ') || t === 'straight') {
     file = 'straight.mp3';
   } else if (t.includes('վերահաշվարկ') || t === 'rerouting') {
@@ -585,15 +585,17 @@ function getArmenianAudio(text, voiceChoice = 'gor') {
               let modifier = 'straight';
               let type = 'turn';
 
-              if (actionVal.includes('LEFT')) {
-                modifier = (actionVal.includes('FORK') || actionVal.includes('EXIT')) ? 'slight left' : 'left';
-              } else if (actionVal.includes('RIGHT')) {
-                modifier = (actionVal.includes('FORK') || actionVal.includes('EXIT')) ? 'slight right' : 'right';
-              } else if (actionVal.includes('UTURN')) {
+              const isSlightOrKeep = actionVal.includes('SLIGHT') || actionVal.includes('KEEP') || actionVal.includes('BEAR') || actionVal.includes('FORK') || actionVal.includes('EXIT') || actionVal.includes('MERGE') || actionVal.includes('ЛЕВЕЕ') || actionVal.includes('ПРАВЕЕ') || actionVal.includes('ПЛАВН');
+
+              if (actionVal.includes('UTURN') || actionVal.includes('РАЗВОРОТ')) {
                 modifier = 'u-turn';
-              } else if (actionVal.includes('ROUNDABOUT')) {
+              } else if (actionVal.includes('ROUNDABOUT') || actionVal.includes('КРУГ')) {
                 modifier = 'roundabout';
                 type = 'roundabout';
+              } else if (actionVal.includes('LEFT') || actionVal.includes('ЛЕВЕЕ')) {
+                modifier = isSlightOrKeep ? 'slight left' : 'left';
+              } else if (actionVal.includes('RIGHT') || actionVal.includes('ПРАВЕЕ')) {
+                modifier = isSlightOrKeep ? 'slight right' : 'right';
               } else {
                 modifier = 'straight';
               }
@@ -601,10 +603,10 @@ function getArmenianAudio(text, voiceChoice = 'gor') {
               const streetName = sec.street || sec.text || '';
               // Authentic turn instruction
               let instruction = 'Двигайтесь прямо';
-              if (modifier === 'left') instruction = `Поверните налево${streetName ? ` на ${streetName}` : ''}`;
-              else if (modifier === 'right') instruction = `Поверните направо${streetName ? ` на ${streetName}` : ''}`;
-              else if (modifier === 'slight left') instruction = `Держитесь левее${streetName ? ` на ${streetName}` : ''}`;
+              if (modifier === 'slight left') instruction = `Держитесь левее${streetName ? ` на ${streetName}` : ''}`;
               else if (modifier === 'slight right') instruction = `Держитесь правее${streetName ? ` на ${streetName}` : ''}`;
+              else if (modifier === 'left') instruction = `Поверните налево${streetName ? ` на ${streetName}` : ''}`;
+              else if (modifier === 'right') instruction = `Поверните направо${streetName ? ` на ${streetName}` : ''}`;
               else if (modifier === 'u-turn') instruction = 'Развернитесь';
               else if (modifier === 'roundabout') instruction = 'Круговое движение';
               else if (streetName) instruction = `Двигайтесь по ${streetName}`;

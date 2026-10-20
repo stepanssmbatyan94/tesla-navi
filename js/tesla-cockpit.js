@@ -1825,13 +1825,13 @@ function updateManeuverHud(m) {
     svgIcon = `<svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="7"/><polyline points="15 5 12 2 9 5"/></svg>`;
   } else if (mod.includes('uturn') || mod.includes('u-turn')) {
     svgIcon = `<svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 19v-9a6 6 0 0 0-12 0v9"/><polyline points="9 16 6 19 3 16"/></svg>`;
-  } else if (mod.includes('slight left') || mod.includes('fork left')) {
+  } else if (mod.includes('slight left') || mod.includes('fork left') || mod.includes('keep left') || mod.includes('bear left') || mod.includes('левее')) {
     svgIcon = `<svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"><path d="M16 19l-4-9-5-5"/><polyline points="13 5 7 5 7 11"/></svg>`;
-  } else if (mod.includes('slight right') || mod.includes('fork right')) {
+  } else if (mod.includes('slight right') || mod.includes('fork right') || mod.includes('keep right') || mod.includes('bear right') || mod.includes('правее')) {
     svgIcon = `<svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 19l4-9 5-5"/><polyline points="11 5 17 5 17 11"/></svg>`;
-  } else if (mod.includes('left')) {
+  } else if (mod.includes('left') || mod.includes('налево')) {
     svgIcon = `<svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M18 19V11a4 4 0 0 0-4-4H5"/><polyline points="9 3 5 7 9 11"/></svg>`;
-  } else if (mod.includes('right')) {
+  } else if (mod.includes('right') || mod.includes('направо')) {
     svgIcon = `<svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M6 19V11a4 4 0 0 1 4-4h9"/><polyline points="15 3 19 7 15 11"/></svg>`;
   } else {
     svgIcon = `<svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="20" x2="12" y2="4"/><polyline points="6 10 12 4 18 10"/></svg>`;
@@ -1851,91 +1851,108 @@ function updateManeuverHud(m) {
 // Lane Guidance SVG Generator (Matching Yandex Navigator Road Sign - Screenshots 4 & 5)
 function getLaneColumnsHtml(modifier) {
   const mod = (modifier || '').toLowerCase();
-  if (mod.includes('left')) {
-    // Left lane: splits left & right (Left is bright white, right is faded)
-    // Right lane: right only (faded)
+  const isSlightLeft = mod.includes('slight left') || mod.includes('fork left') || mod.includes('keep left') || mod.includes('bear left') || mod.includes('левее');
+  const isSlightRight = mod.includes('slight right') || mod.includes('fork right') || mod.includes('keep right') || mod.includes('bear right') || mod.includes('правее');
+  const isUTurn = mod.includes('uturn') || mod.includes('u-turn') || mod.includes('разворот');
+  const isLeft = !isSlightLeft && (mod.includes('left') || mod.includes('налево'));
+  const isRight = !isSlightRight && (mod.includes('right') || mod.includes('направо'));
+
+  if (isSlightLeft) {
     return `
-      <div class="lane-col-item" title="Полоса 1: Поворот налево">
-        <svg viewBox="0 0 36 34" width="30" height="30" fill="none">
-          <line x1="18" y1="30" x2="18" y2="15" stroke="#ffffff" stroke-width="3.2" stroke-linecap="round"/>
-          <path d="M18 17a5.5 5.5 0 0 0-5.5-5.5H5" stroke="#ffffff" stroke-width="3.2" stroke-linecap="round"/>
-          <polyline points="9 7.5 4 11.5 9 15.5" stroke="#ffffff" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/>
-          <path d="M18 17a5.5 5.5 0 0 1 5.5-5.5h8" stroke="rgba(255,255,255,0.4)" stroke-width="3.2" stroke-linecap="round"/>
-          <polyline points="27 7.5 32 11.5 27 15.5" stroke="rgba(255,255,255,0.4)" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/>
+      <div class="lane-col-item is-active" title="Ваша полоса: Держитесь левее">
+        <svg viewBox="0 0 32 36" width="26" height="30" fill="none">
+          <line x1="20" y1="32" x2="20" y2="18" stroke="#ffffff" stroke-width="3.5" stroke-linecap="round"/>
+          <path d="M20 18l-8-9-4-3" stroke="#ffffff" stroke-width="3.5" stroke-linecap="round"/>
+          <polyline points="14 6 7 6 7 13" stroke="#ffffff" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>
         </svg>
+        <span class="lane-active-dot"></span>
       </div>
-      <div class="lane-col-item" title="Полоса 2: Только направо">
-        <svg viewBox="0 0 28 34" width="24" height="30" fill="none">
-          <path d="M8 30v-13a5.5 5.5 0 0 1 5.5-5.5h9.5" stroke="rgba(255,255,255,0.4)" stroke-width="3.2" stroke-linecap="round"/>
-          <polyline points="18 7.5 23 11.5 18 15.5" stroke="rgba(255,255,255,0.4)" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/>
+      <div class="lane-col-item is-faded" title="Другая полоса: Прямо">
+        <svg viewBox="0 0 24 36" width="20" height="30" fill="none">
+          <line x1="12" y1="32" x2="12" y2="9" stroke="rgba(255,255,255,0.35)" stroke-width="3" stroke-linecap="round"/>
+          <polyline points="7 14 12 8 17 14" stroke="rgba(255,255,255,0.35)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
         </svg>
       </div>
     `;
-  } else if (mod.includes('right')) {
-    // Left lane: straight + left (faded)
-    // Right lane: straight + right (Right is bright white, straight is faded)
+  } else if (isSlightRight) {
     return `
-      <div class="lane-col-item" title="Полоса 1: Прямо и налево">
-        <svg viewBox="0 0 34 34" width="28" height="30" fill="none">
-          <line x1="20" y1="30" x2="20" y2="7" stroke="rgba(255,255,255,0.4)" stroke-width="3.2" stroke-linecap="round"/>
-          <polyline points="15 12 20 6 25 12" stroke="rgba(255,255,255,0.4)" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/>
-          <path d="M20 18a5.5 5.5 0 0 0-5.5-5.5H6" stroke="rgba(255,255,255,0.4)" stroke-width="3.2" stroke-linecap="round"/>
-          <polyline points="10 8.5 5 12.5 10 16.5" stroke="rgba(255,255,255,0.4)" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/>
+      <div class="lane-col-item is-faded" title="Другая полоса: Прямо">
+        <svg viewBox="0 0 24 36" width="20" height="30" fill="none">
+          <line x1="12" y1="32" x2="12" y2="9" stroke="rgba(255,255,255,0.35)" stroke-width="3" stroke-linecap="round"/>
+          <polyline points="7 14 12 8 17 14" stroke="rgba(255,255,255,0.35)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
         </svg>
       </div>
-      <div class="lane-col-item" title="Полоса 2: Поворот направо">
-        <svg viewBox="0 0 34 34" width="28" height="30" fill="none">
-          <line x1="14" y1="30" x2="14" y2="7" stroke="rgba(255,255,255,0.4)" stroke-width="3.2" stroke-linecap="round"/>
-          <polyline points="9 12 14 6 19 12" stroke="rgba(255,255,255,0.4)" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/>
-          <path d="M14 18a5.5 5.5 0 0 1 5.5-5.5h8" stroke="#ffffff" stroke-width="3.2" stroke-linecap="round"/>
-          <polyline points="23 8.5 28 12.5 23 16.5" stroke="#ffffff" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/>
+      <div class="lane-col-item is-active" title="Ваша полоса: Держитесь правее">
+        <svg viewBox="0 0 32 36" width="26" height="30" fill="none">
+          <line x1="12" y1="32" x2="12" y2="18" stroke="#ffffff" stroke-width="3.5" stroke-linecap="round"/>
+          <path d="M12 18l8-9 4-3" stroke="#ffffff" stroke-width="3.5" stroke-linecap="round"/>
+          <polyline points="18 6 25 6 25 13" stroke="#ffffff" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <span class="lane-active-dot"></span>
+      </div>
+    `;
+  } else if (isLeft) {
+    return `
+      <div class="lane-col-item is-active" title="Ваша полоса: Поворот налево">
+        <svg viewBox="0 0 32 36" width="26" height="30" fill="none">
+          <line x1="20" y1="32" x2="20" y2="17" stroke="#ffffff" stroke-width="3.5" stroke-linecap="round"/>
+          <path d="M20 17a6 6 0 0 0-6-6H6" stroke="#ffffff" stroke-width="3.5" stroke-linecap="round"/>
+          <polyline points="11 6 5 11 11 16" stroke="#ffffff" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <span class="lane-active-dot"></span>
+      </div>
+      <div class="lane-col-item is-faded" title="Другая полоса: Прямо">
+        <svg viewBox="0 0 24 36" width="20" height="30" fill="none">
+          <line x1="12" y1="32" x2="12" y2="9" stroke="rgba(255,255,255,0.35)" stroke-width="3" stroke-linecap="round"/>
+          <polyline points="7 14 12 8 17 14" stroke="rgba(255,255,255,0.35)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
         </svg>
       </div>
     `;
-  } else if (mod.includes('slight left') || mod.includes('fork left')) {
+  } else if (isRight) {
     return `
-      <div class="lane-col-item" title="Полоса 1: Левее">
-        <svg viewBox="0 0 34 34" width="28" height="30" fill="none">
-          <line x1="20" y1="30" x2="20" y2="17" stroke="#ffffff" stroke-width="3.2" stroke-linecap="round"/>
-          <path d="M20 17l-6-8-5-3" stroke="#ffffff" stroke-width="3.2" stroke-linecap="round"/>
-          <polyline points="13 6 8 6 8 11" stroke="#ffffff" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/>
+      <div class="lane-col-item is-faded" title="Другая полоса: Прямо">
+        <svg viewBox="0 0 24 36" width="20" height="30" fill="none">
+          <line x1="12" y1="32" x2="12" y2="9" stroke="rgba(255,255,255,0.35)" stroke-width="3" stroke-linecap="round"/>
+          <polyline points="7 14 12 8 17 14" stroke="rgba(255,255,255,0.35)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
         </svg>
       </div>
-      <div class="lane-col-item" title="Полоса 2: Прямо">
-        <svg viewBox="0 0 24 34" width="20" height="30" fill="none">
-          <line x1="12" y1="30" x2="12" y2="7" stroke="rgba(255,255,255,0.4)" stroke-width="3.2" stroke-linecap="round"/>
-          <polyline points="7 12 12 6 17 12" stroke="rgba(255,255,255,0.4)" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/>
+      <div class="lane-col-item is-active" title="Ваша полоса: Поворот направо">
+        <svg viewBox="0 0 32 36" width="26" height="30" fill="none">
+          <line x1="12" y1="32" x2="12" y2="17" stroke="#ffffff" stroke-width="3.5" stroke-linecap="round"/>
+          <path d="M12 17a6 6 0 0 1 6-6h8" stroke="#ffffff" stroke-width="3.5" stroke-linecap="round"/>
+          <polyline points="21 6 27 11 21 16" stroke="#ffffff" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>
         </svg>
+        <span class="lane-active-dot"></span>
       </div>
     `;
-  } else if (mod.includes('slight right') || mod.includes('fork right')) {
+  } else if (isUTurn) {
     return `
-      <div class="lane-col-item" title="Полоса 1: Прямо">
-        <svg viewBox="0 0 24 34" width="20" height="30" fill="none">
-          <line x1="12" y1="30" x2="12" y2="7" stroke="rgba(255,255,255,0.4)" stroke-width="3.2" stroke-linecap="round"/>
-          <polyline points="7 12 12 6 17 12" stroke="rgba(255,255,255,0.4)" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/>
+      <div class="lane-col-item is-active" title="Ваша полоса: Разворот">
+        <svg viewBox="0 0 32 36" width="26" height="30" fill="none">
+          <path d="M22 32V16a7 7 0 0 0-14 0v12" stroke="#ffffff" stroke-width="3.5" stroke-linecap="round"/>
+          <polyline points="13 24 8 29 3 24" stroke="#ffffff" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>
         </svg>
+        <span class="lane-active-dot"></span>
       </div>
-      <div class="lane-col-item" title="Полоса 2: Правее">
-        <svg viewBox="0 0 34 34" width="28" height="30" fill="none">
-          <line x1="14" y1="30" x2="14" y2="17" stroke="#ffffff" stroke-width="3.2" stroke-linecap="round"/>
-          <path d="M14 17l6-8 5-3" stroke="#ffffff" stroke-width="3.2" stroke-linecap="round"/>
-          <polyline points="21 6 26 6 26 11" stroke="#ffffff" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/>
+      <div class="lane-col-item is-faded" title="Другая полоса: Прямо">
+        <svg viewBox="0 0 24 36" width="20" height="30" fill="none">
+          <line x1="12" y1="32" x2="12" y2="9" stroke="rgba(255,255,255,0.35)" stroke-width="3" stroke-linecap="round"/>
+          <polyline points="7 14 12 8 17 14" stroke="rgba(255,255,255,0.35)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
         </svg>
       </div>
     `;
   } else {
     return `
-      <div class="lane-col-item" title="Полоса 1: Прямо">
-        <svg viewBox="0 0 24 34" width="20" height="30" fill="none">
-          <line x1="12" y1="30" x2="12" y2="7" stroke="#ffffff" stroke-width="3.2" stroke-linecap="round"/>
-          <polyline points="7 12 12 6 17 12" stroke="#ffffff" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/>
+      <div class="lane-col-item is-active" title="Полоса 1: Прямо">
+        <svg viewBox="0 0 24 36" width="20" height="30" fill="none">
+          <line x1="12" y1="32" x2="12" y2="9" stroke="#ffffff" stroke-width="3.5" stroke-linecap="round"/>
+          <polyline points="7 14 12 8 17 14" stroke="#ffffff" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>
         </svg>
       </div>
-      <div class="lane-col-item" title="Полоса 2: Прямо">
-        <svg viewBox="0 0 24 34" width="20" height="30" fill="none">
-          <line x1="12" y1="30" x2="12" y2="7" stroke="#ffffff" stroke-width="3.2" stroke-linecap="round"/>
-          <polyline points="7 12 12 6 17 12" stroke="#ffffff" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/>
+      <div class="lane-col-item is-active" title="Полоса 2: Прямо">
+        <svg viewBox="0 0 24 36" width="20" height="30" fill="none">
+          <line x1="12" y1="32" x2="12" y2="9" stroke="#ffffff" stroke-width="3.5" stroke-linecap="round"/>
+          <polyline points="7 14 12 8 17 14" stroke="#ffffff" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>
         </svg>
       </div>
     `;
@@ -1948,10 +1965,18 @@ function renderLaneGuidance(m) {
 
   const rawDist = (typeof m.distanceMeters === 'number') ? m.distanceMeters : ((typeof m.rawDistance === 'number') ? m.rawDistance : 100);
   const mod = (m.modifier || '').toLowerCase();
-  const isTurn = mod.includes('left') || mod.includes('right') || mod.includes('uturn') || mod.includes('fork');
+  const isTurn = mod.includes('left') || mod.includes('right') || mod.includes('uturn') || mod.includes('fork') || mod.includes('roundabout') || mod.includes('левее') || mod.includes('правее');
 
-  if (rawDist <= 500 && (isTurn || rawDist <= 250)) {
-    lanePill.innerHTML = getLaneColumnsHtml(m.modifier);
+  // Activate lane guidance within 700m of turn or within 400m of next maneuver
+  if (rawDist <= 700 && (isTurn || rawDist <= 400)) {
+    lanePill.innerHTML = `
+      <div class="lane-guidance-badge">
+        <span class="lane-badge-text">Полоса для поворота:</span>
+      </div>
+      <div class="lane-guidance-arrows">
+        ${getLaneColumnsHtml(m.modifier)}
+      </div>
+    `;
     lanePill.classList.remove('hidden');
 
     // Also render on-road callout bubble directly at the intersection node on the map

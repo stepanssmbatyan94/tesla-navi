@@ -417,8 +417,12 @@ html, body {
   pointer-events: none;
 }
 
-/* Circular Compass Button (Anchored to Right-Bottom Corner / Right Map Controls) */
+/* Circular Compass Button (Anchored to Very Bottom Right Corner) */
 .map-compass-btn {
+  position: absolute;
+  right: 20px;
+  bottom: 24px;
+  z-index: 85;
   width: 48px;
   height: 48px;
   border-radius: 50%;
@@ -1164,20 +1168,21 @@ html, body {
 }
 
 /* 4. Compact Maneuver HUD Card (Mapsev Light Style) */
+/* 4. Compact Maneuver HUD Card (Mapsev Light Style) */
 .hud-maneuver-card {
   position: absolute;
   top: 16px;
   left: 20px;
   z-index: 60;
   background: #ffffff;
-  border: 1px solid rgba(0, 0, 0, 0.06);
+  border: 1px solid rgba(0, 0, 0, 0.08);
   border-radius: 20px;
-  padding: 10px 16px;
+  padding: 12px 16px;
   display: flex;
-  align-items: center;
-  gap: 14px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1), 0 2px 6px rgba(0, 0, 0, 0.04);
-  max-width: 400px;
+  flex-direction: column;
+  gap: 8px;
+  box-shadow: 0 8px 26px rgba(0, 0, 0, 0.12), 0 2px 6px rgba(0, 0, 0, 0.05);
+  max-width: 420px;
   transition: all 0.25s ease;
 }
 
@@ -1187,9 +1192,15 @@ html, body {
   transform: translateY(-16px);
 }
 
+.maneuver-card-main {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
 .maneuver-arrow-box {
-  width: 42px;
-  height: 42px;
+  width: 44px;
+  height: 44px;
   background: #2563eb;
   border-radius: 12px;
   display: grid;
@@ -1227,31 +1238,77 @@ html, body {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  max-width: 280px;
+  max-width: 320px;
 }
 
-/* Authentic Yandex Navigator Lane Guidance Sign (Screenshots 4 & 5) */
+/* Authentic Yandex Navigator Lane Guidance Sign (Integrated directly below street name) */
 .lane-guidance-pill {
-  position: absolute;
-  top: 96px;
-  left: 20px;
-  z-index: 59;
   background: #0066ff;
-  border-radius: 14px;
-  padding: 6px 14px;
+  border-radius: 12px;
+  padding: 6px 12px;
   display: flex;
   align-items: center;
-  gap: 12px;
-  box-shadow: 0 6px 22px rgba(0, 102, 255, 0.45), 0 2px 6px rgba(0, 0, 0, 0.15);
-  transition: opacity 0.25s ease, transform 0.25s ease;
+  justify-content: space-between;
+  gap: 10px;
+  box-shadow: 0 4px 14px rgba(0, 102, 255, 0.35);
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.lane-guidance-pill.hidden {
+  display: none !important;
+}
+
+.lane-guidance-badge {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.lane-badge-text {
+  font-size: 11px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.92);
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.lane-guidance-arrows {
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 
 .lane-col-item {
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  min-width: 26px;
-  height: 32px;
+  min-width: 32px;
+  height: 38px;
+  padding: 2px 4px;
+  border-radius: 6px;
+  transition: all 0.15s ease;
+}
+
+.lane-col-item.is-active {
+  background: rgba(255, 255, 255, 0.22);
+  border: 1.5px solid #ffffff;
+  box-shadow: 0 0 10px rgba(255, 255, 255, 0.4);
+}
+
+.lane-col-item.is-faded {
+  opacity: 0.45;
+}
+
+.lane-active-dot {
+  display: block;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #ffffff;
+  box-shadow: 0 0 6px #ffffff;
+  margin-top: 2px;
 }
 
 /* Authentic Yandex Road Lane Bubble Marker (Floating with pointer tail on the road) */

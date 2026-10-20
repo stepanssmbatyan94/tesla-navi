@@ -24,7 +24,7 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
   <!-- Tesla Cockpit CSS -->
-  <link rel="stylesheet" href="css/tesla-display.css?v=12">
+  <link rel="stylesheet" href="css/tesla-display.css?v=13">
 </head>
 <body>
 
@@ -435,17 +435,18 @@
 
   <!-- 3. Top Maneuver HUD Card (Compact Yandex Navigator Style) -->
   <div id="hud-maneuver-card" class="hud-maneuver-card hidden">
-    <div id="maneuver-arrow-box" class="maneuver-arrow-box">↗</div>
-    <div class="maneuver-info">
-      <div class="maneuver-dist-row">
-        <span id="maneuver-dist" class="maneuver-dist-val">800 м</span>
+    <div class="maneuver-card-main">
+      <div id="maneuver-arrow-box" class="maneuver-arrow-box">↗</div>
+      <div class="maneuver-info">
+        <div class="maneuver-dist-row">
+          <span id="maneuver-dist" class="maneuver-dist-val">800 м</span>
+        </div>
+        <span id="maneuver-street" class="maneuver-street-name">ул. Монте Мелконян</span>
       </div>
-      <span id="maneuver-street" class="maneuver-street-name">ул. Монте Мелконян</span>
     </div>
+    <!-- Lane Guidance Row docked directly inside the Maneuver card for 100% road clarity -->
+    <div id="lane-guidance-pill" class="lane-guidance-pill hidden"></div>
   </div>
-
-  <!-- Lane Guidance Pill on Road (Only populated when real intersection lane data exists) -->
-  <div id="lane-guidance-pill" class="lane-guidance-pill hidden"></div>
 
   <!-- 4. Speedometer & Speed Limit HUD + Auxiliary Controls (Mapsev Architecture) -->
   <div class="speed-limit-hud">
@@ -548,19 +549,19 @@
         <path d="M4 12L20 4L12 20L10.5 13.5L4 12Z" fill="#1e293b" stroke="#1e293b" stroke-width="2" stroke-linejoin="round"/>
       </svg>
     </button>
-
-    <!-- Compass / Heading-Up Toggle Button (Moved to Right Bottom Corner) -->
-    <button id="btn-compass" class="map-compass-btn active" title="Компас (Поворот карты по ходу движения)">
-      <div id="compass-needle" class="compass-arrow-wrap">
-        <svg viewBox="0 0 24 24" width="24" height="24" fill="none">
-          <polygon points="12,2 17,12 12,9" fill="#ef4444"/>
-          <polygon points="12,2 7,12 12,9" fill="#dc2626"/>
-          <polygon points="12,22 17,12 12,15" fill="#ffffff"/>
-          <polygon points="12,22 7,12 12,15" fill="#e2e8f0"/>
-        </svg>
-      </div>
-    </button>
   </div>
+
+  <!-- Compass / Heading-Up Toggle Button (Anchored to Very Bottom Right Corner) -->
+  <button id="btn-compass" class="map-compass-btn active" title="Компас (Поворот карты по ходу движения)">
+    <div id="compass-needle" class="compass-arrow-wrap">
+      <svg viewBox="0 0 24 24" width="24" height="24" fill="none">
+        <polygon points="12,2 17,12 12,9" fill="#ef4444"/>
+        <polygon points="12,2 7,12 12,9" fill="#dc2626"/>
+        <polygon points="12,22 17,12 12,15" fill="#ffffff"/>
+        <polygon points="12,22 7,12 12,15" fill="#e2e8f0"/>
+      </svg>
+    </div>
+  </button>
 
   <!-- 6. Compact Modals -->
 
@@ -923,9 +924,9 @@
   </div>
 
   <!-- Scripts -->
-  <script src="js/config.js?v=12"></script>
-  <script src="js/realtime.js?v=12"></script>
-  <script src="js/maps/map-engine.js?v=12"></script>
-  <script src="js/tesla-cockpit.js?v=12"></script>
+  <script src="js/config.js?v=13"></script>
+  <script src="js/realtime.js?v=13"></script>
+  <script src="js/maps/map-engine.js?v=13"></script>
+  <script src="js/tesla-cockpit.js?v=13"></script>
 </body>
 </html>
