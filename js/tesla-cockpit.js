@@ -444,6 +444,7 @@ async function updateLiveTrafficBadge() {
 
 // 4. Map Engine Initialization
 async function initMap() {
+  const urlParams = new URLSearchParams(window.location.search);
   let activeProvider = urlParams.get('provider') || localStorage.getItem('tesla_map_provider') || 'maplibre';
   if (activeProvider === 'osm') {
     activeProvider = 'maplibre';
