@@ -387,6 +387,8 @@ class TeslaMapEngine {
           });
           this.map.geoObjects.add(placemark);
           this.cameraMarkers.push(placemark);
+        }
+      });
     }
   }
 
