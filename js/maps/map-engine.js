@@ -163,7 +163,7 @@ class TeslaMapEngine {
         center: [this.center.lng, this.center.lat],
         zoom: this.navZoom,
         minZoom: 3,
-        maxZoom: 19,
+        maxZoom: 23,
         pitch: 0, // Clean flat 2D like Mapsev & Yandex Navigator
         bearing: 0,
         attributionControl: false,
@@ -340,13 +340,13 @@ class TeslaMapEngine {
           autoFitToViewport: 'always',
           yandexMapDisablePoiInteractivity: true,
           minZoom: 4,
-          maxZoom: 18
+          maxZoom: 21
         });
 
         try {
           this.map.options.set({
             minZoom: 4,
-            maxZoom: 18
+            maxZoom: 21
           });
         } catch (e) {}
 
@@ -395,7 +395,7 @@ class TeslaMapEngine {
               );
               if (curDist > 10 && pinchStartDist > 10) {
                 const deltaZoom = Math.log2(curDist / pinchStartDist);
-                const targetZoom = Math.min(18, Math.max(4, +(pinchStartZoom + deltaZoom).toFixed(2)));
+                const targetZoom = Math.min(21, Math.max(4, +(pinchStartZoom + deltaZoom).toFixed(2)));
                 if (Math.abs(targetZoom - this.navZoom) >= 0.05) {
                   this.navZoom = targetZoom;
                   const recenterBtn = document.getElementById('floating-recenter-btn');
@@ -733,21 +733,8 @@ class TeslaMapEngine {
         });
       }
     } else if (this.provider === 'yandex') {
-      const container = document.getElementById(this.containerId);
       const markerEl = document.querySelector('#yandex-car-marker .tesla-car-arrow');
-      if (this.isHeadingUp) {
-        if (markerEl) markerEl.style.transform = `rotate(${this.currentHeading.toFixed(1)}deg)`;
-        if (container) {
-          container.classList.add('yandex-rotate');
-          container.style.transform = `rotate(${-this.currentHeading.toFixed(1)}deg)`;
-        }
-      } else {
-        if (markerEl) markerEl.style.transform = `rotate(${this.currentHeading.toFixed(1)}deg)`;
-        if (container) {
-          container.classList.remove('yandex-rotate');
-          container.style.transform = 'none';
-        }
-      }
+      if (markerEl) markerEl.style.transform = `rotate(${this.currentHeading.toFixed(1)}deg)`;
     }
     return this.isHeadingUp;
   }
@@ -983,35 +970,16 @@ class TeslaMapEngine {
     } else if (this.provider === 'yandex' && this.carMarker && this.map) {
       this.carMarker.geometry.setCoordinates([displayLat, displayLng]);
       const markerEl = document.querySelector('#yandex-car-marker .tesla-car-arrow');
-      const container = document.getElementById(this.containerId);
-
-      if (this.isHeadingUp) {
-        // Deadband filter: only update CSS transform if heading changed by >= 0.35 deg or first render
-        const headingDelta = Math.abs(this.currentHeading - (this.lastYandexRenderedHeading ?? -999));
-        if (headingDelta >= 0.35) {
-          this.lastYandexRenderedHeading = this.currentHeading;
-          if (markerEl) markerEl.style.transform = `rotate(${this.currentHeading.toFixed(1)}deg)`;
-          if (container) {
-            container.classList.add('yandex-rotate');
-            container.style.transform = `rotate(${-this.currentHeading.toFixed(1)}deg)`;
-          }
-        }
-      } else {
-        this.lastYandexRenderedHeading = null;
-        if (markerEl) markerEl.style.transform = `rotate(${this.currentHeading.toFixed(1)}deg)`;
-        if (container) {
-          container.classList.remove('yandex-rotate');
-          container.style.transform = 'none';
-        }
-      }
+      if (markerEl) markerEl.style.transform = `rotate(${this.currentHeading.toFixed(1)}deg)`;
 
       if (this.followCar) {
         if (!this.isUserPinching) {
           const now = performance.now();
-          // Throttled smooth camera pan: prevents DOM thrashing and lag on Yandex 2.1
-          if (!this.lastYandexCenterTime || (now - this.lastYandexCenterTime >= 160)) {
+          // Instant lockstep setCenter throttled to 40ms (~25fps)
+          // Eliminates easing cancellation hitch and keeps map locked to vehicle with zero jitter!
+          if (!this.lastYandexCenterTime || (now - this.lastYandexCenterTime >= 40)) {
             this.lastYandexCenterTime = now;
-            this.map.panTo([displayLat, displayLng], { duration: 160, checkZoomRange: false, delay: 0 });
+            this.map.setCenter([displayLat, displayLng], this.navZoom, { duration: 0, checkZoomRange: false });
           }
         }
       }

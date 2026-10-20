@@ -1840,21 +1840,22 @@ function initChargingStationsDrawer() {
     });
   }
 
-  // Left sidebar lightning button: toggles drawing pins on the map ("левый рисует или не рисует на карте")
+  // Left sidebar lightning button: opens/closes the charging stations list drawer
   if (btnToolbar) {
     btnToolbar.addEventListener('click', () => {
-      toggleEvChargers(!chargersVisible);
-    });
-  }
-
-  // Right sidebar lightning button: opens/closes the list drawer ("правый сайдбар дает список")
-  if (btnQuick) {
-    btnQuick.addEventListener('click', () => {
       if (drawer && !drawer.classList.contains('hidden')) {
         closeChargingStationsDrawer();
       } else {
         openChargingStationsDrawer();
       }
+    });
+  }
+
+  // Right sidebar lightning button: toggles drawing pins/markers on the map
+  if (btnQuick) {
+    btnQuick.addEventListener('click', () => {
+      toggleEvChargers(!chargersVisible);
+      btnQuick.classList.toggle('active', chargersVisible);
     });
   }
 
@@ -1876,7 +1877,7 @@ function openChargingStationsDrawer() {
   document.getElementById('pairing-modal')?.classList.add('hidden');
 
   drawer.classList.remove('hidden');
-  document.getElementById('btn-quick-chargers')?.classList.add('active');
+  document.getElementById('btn-toggle-chargers')?.classList.add('active');
 
   // Render stations with live distances
   renderChargingStationsList();
@@ -1885,7 +1886,7 @@ function openChargingStationsDrawer() {
 function closeChargingStationsDrawer() {
   const drawer = document.getElementById('charging-stations-drawer');
   if (drawer) drawer.classList.add('hidden');
-  document.getElementById('btn-quick-chargers')?.classList.remove('active');
+  document.getElementById('btn-toggle-chargers')?.classList.remove('active');
 }
 
 function renderChargingStationsList() {
