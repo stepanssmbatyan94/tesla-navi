@@ -60,12 +60,7 @@ class TeslaMapEngine {
     container.innerHTML = '';
 
     if (this.provider === 'maplibre' && window.maplibregl) {
-      try {
-        await this.initMapLibre();
-      } catch (err) {
-        console.warn('MapLibre initialization warning:', err);
-        await this.initLeaflet();
-      }
+      await this.initMapLibre();
     } else if (this.provider === 'yandex' && window.ymaps) {
       await this.initYandex();
     } else {
@@ -168,7 +163,7 @@ class TeslaMapEngine {
         center: [this.center.lng, this.center.lat],
         zoom: this.navZoom,
         minZoom: 3,
-        maxZoom: 23,
+        maxZoom: 19.5,
         pitch: 0, // Clean flat 2D like Mapsev & Yandex Navigator
         bearing: 0,
         attributionControl: false,
@@ -234,7 +229,6 @@ class TeslaMapEngine {
 
         // Apply Authentic Mapsev & Yandex Navigator Road Palette (Refs: refs/map/)
         this.applyMapsevRoadColors();
-        this.map.on('styledata', () => this.applyMapsevRoadColors());
 
         // Render Traffic Lights and Speed Cameras
         this.renderTrafficPoints();
@@ -1850,7 +1844,8 @@ class TeslaMapEngine {
 
   // Apply Authentic Mapsev & Yandex Navigator Road Palette (Refs: refs/map/)
   applyMapsevRoadColors() {
-    if (!this.map || this.provider !== 'maplibre') return;
+    if (!this.map || this.provider !== 'maplibre' || this._isApplyingColors) return;
+    this._isApplyingColors = true;
     try {
       const style = this.map.getStyle();
       if (!style || !style.layers) return;
@@ -1916,6 +1911,8 @@ class TeslaMapEngine {
       });
     } catch (err) {
       console.warn('Mapsev road palette application error:', err);
+    } finally {
+      this._isApplyingColors = false;
     }
   }
 }
