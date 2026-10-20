@@ -545,6 +545,7 @@ async function initMap() {
   });
 
   await mapEngine.init();
+  window.mapEngine = mapEngine;
   updateCommuteEtas();
   updateLiveTrafficBadge();
   setInterval(updateLiveTrafficBadge, 45000); // Live poll Yandex Traffic every 45s
@@ -652,10 +653,12 @@ function initToolbarHandlers() {
   // Route Alternatives Drawer Handlers (IMG_3693)
   const card0 = document.getElementById('route-card-0');
   const card1 = document.getElementById('route-card-1');
+  const card2 = document.getElementById('route-card-2');
   if (card0) {
     card0.addEventListener('click', () => {
       card0.classList.add('active');
       if (card1) card1.classList.remove('active');
+      if (card2) card2.classList.remove('active');
       if (mapEngine) mapEngine.selectRouteIndex(0);
     });
   }
@@ -663,7 +666,16 @@ function initToolbarHandlers() {
     card1.addEventListener('click', () => {
       card1.classList.add('active');
       if (card0) card0.classList.remove('active');
+      if (card2) card2.classList.remove('active');
       if (mapEngine) mapEngine.selectRouteIndex(1);
+    });
+  }
+  if (card2) {
+    card2.addEventListener('click', () => {
+      card2.classList.add('active');
+      if (card0) card0.classList.remove('active');
+      if (card1) card1.classList.remove('active');
+      if (mapEngine) mapEngine.selectRouteIndex(2);
     });
   }
 
@@ -1688,22 +1700,52 @@ function showRouteAlternativesDrawer(route) {
   const drawer = document.getElementById('route-alternatives-drawer');
   if (!drawer) return;
 
-  // Card 0: Primary / Fastest
-  document.getElementById('route-0-time').textContent = route.duration;
-  document.getElementById('route-0-dist').textContent = route.distance;
-  const card0 = document.getElementById('route-card-0');
-  card0.classList.add('active');
+  const allRoutes = route.allRoutes || [];
+  const activeIdx = route.activeRouteIndex || 0;
+  const r0 = allRoutes[0] || route;
+  const r1 = allRoutes[1];
+  const r2 = allRoutes[2];
 
-  // Card 1: Alternative Route
+  // Card 0: Primary / Fastest
+  const card0 = document.getElementById('route-card-0');
+  if (card0) {
+    document.getElementById('route-0-time').textContent = r0.duration;
+    document.getElementById('route-0-dist').textContent = r0.distance;
+    card0.classList.toggle('active', activeIdx === 0);
+  }
+
+  // Card 1: Alternative Route 1
   const card1 = document.getElementById('route-card-1');
-  if (route.alternative) {
-    card1.classList.remove('hidden');
-    card1.classList.remove('active');
-    document.getElementById('route-1-badge').textContent = route.alternative.name;
-    document.getElementById('route-1-time').textContent = route.alternative.duration;
-    document.getElementById('route-1-dist').textContent = `${route.alternative.distance} · ${route.alternative.diffMins} мин`;
-  } else {
-    card1.classList.add('hidden');
+  if (card1) {
+    if (r1) {
+      card1.classList.remove('hidden');
+      card1.classList.toggle('active', activeIdx === 1);
+      const badge1 = document.getElementById('route-1-badge');
+      if (badge1) badge1.textContent = r1.summary;
+      const time1 = document.getElementById('route-1-time');
+      if (time1) time1.textContent = r1.duration;
+      const dist1 = document.getElementById('route-1-dist');
+      if (dist1) dist1.textContent = `${r1.distance} · ${r1.diffMins}`;
+    } else {
+      card1.classList.add('hidden');
+    }
+  }
+
+  // Card 2: Alternative Route 2
+  const card2 = document.getElementById('route-card-2');
+  if (card2) {
+    if (r2) {
+      card2.classList.remove('hidden');
+      card2.classList.toggle('active', activeIdx === 2);
+      const badge2 = document.getElementById('route-2-badge');
+      if (badge2) badge2.textContent = r2.summary;
+      const time2 = document.getElementById('route-2-time');
+      if (time2) time2.textContent = r2.duration;
+      const dist2 = document.getElementById('route-2-dist');
+      if (dist2) dist2.textContent = `${r2.distance} · ${r2.diffMins}`;
+    } else {
+      card2.classList.add('hidden');
+    }
   }
 
   // Populate Turn-by-Turn list matching IMG_3693

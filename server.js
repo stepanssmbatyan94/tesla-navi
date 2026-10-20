@@ -600,13 +600,16 @@ function getArmenianAudio(text, voiceChoice = 'gor') {
                 modifier = 'straight';
               }
 
-              const streetName = sec.street || sec.text || '';
-              // Authentic turn instruction
+              const rawStreet = (sec.street || '').trim();
+              const isValidStreet = rawStreet.length > 2 && !/^(straight|right|left|roundabout|u-turn|fork)/i.test(rawStreet);
+              const streetName = isValidStreet ? rawStreet : '';
+
+              // Authentic turn instruction (clean Russian voice grammar)
               let instruction = 'Двигайтесь прямо';
-              if (modifier === 'slight left') instruction = `Держитесь левее${streetName ? ` на ${streetName}` : ''}`;
-              else if (modifier === 'slight right') instruction = `Держитесь правее${streetName ? ` на ${streetName}` : ''}`;
-              else if (modifier === 'left') instruction = `Поверните налево${streetName ? ` на ${streetName}` : ''}`;
-              else if (modifier === 'right') instruction = `Поверните направо${streetName ? ` на ${streetName}` : ''}`;
+              if (modifier === 'slight left') instruction = streetName ? `Держитесь левее на ${streetName}` : 'Держитесь левее';
+              else if (modifier === 'slight right') instruction = streetName ? `Держитесь правее на ${streetName}` : 'Держитесь правее';
+              else if (modifier === 'left') instruction = streetName ? `Поверните налево на ${streetName}` : 'Поверните налево';
+              else if (modifier === 'right') instruction = streetName ? `Поверните направо на ${streetName}` : 'Поверните направо';
               else if (modifier === 'u-turn') instruction = 'Развернитесь';
               else if (modifier === 'roundabout') instruction = 'Круговое движение';
               else if (streetName) instruction = `Двигайтесь по ${streetName}`;
@@ -647,8 +650,13 @@ function getArmenianAudio(text, voiceChoice = 'gor') {
               };
             });
 
+            // Collect street names along route
+            const cleanStreets = (rawSections.map(s => s.street).filter(Boolean).filter((v, i, a) => a.indexOf(v) === i))
+              .filter(st => st.length > 3 && !/^(straight|right|left|roundabout|u-turn|подъезд|двор)/i.test(st));
+
             return {
               index: idx,
+              cleanStreets: cleanStreets,
               distance: r.distance?.value || 0,
               duration: r.durationInTraffic || r.duration || 0,
               durationWithoutTraffic: r.duration || 0,
@@ -657,6 +665,28 @@ function getArmenianAudio(text, voiceChoice = 'gor') {
               steps: steps,
               specialRoadPoints: r.specialRoadPoints || []
             };
+          });
+
+          // Sort routes so the fastest route (lowest duration) is guaranteed to be at index 0
+          parsedRoutes.sort((a, b) => a.duration - b.duration);
+
+          // Assign human-friendly distinctive summaries (e.g. "через ул. Теряна", "через просп. Мясникяна")
+          const usedViaStreets = new Set();
+          parsedRoutes.forEach((r, i) => {
+            r.index = i;
+            let via = '';
+            if (i === 0) {
+              // Primary fastest route: use major/longest street
+              via = r.cleanStreets.find(s => s.length > 7) || r.cleanStreets[1] || r.cleanStreets[0] || '';
+            } else {
+              // Alternative route: find the street that has not been used yet
+              via = r.cleanStreets.find(s => !usedViaStreets.has(s) && s.length > 4) ||
+                    r.cleanStreets.find(s => s.length > 6) ||
+                    r.cleanStreets[0] || '';
+            }
+            if (via) usedViaStreets.add(via);
+            r.summary = via ? `через ${via}` : `Маршрут ${i + 1}`;
+            delete r.cleanStreets; // Clean up temporary array
           });
 
           res.writeHead(200, { 'Content-Type': 'application/json' });

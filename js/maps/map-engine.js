@@ -1027,16 +1027,17 @@ class TeslaMapEngine {
     return { x: x1 + t * dx, y: y1 + t * dy, t };
   }
 
-  // Snap GPS Coordinate to Active Route Polyline (Map Matching)
-  snapToActiveRoute(lat, lng) {
-    if (!this.routeCoordinates || this.routeCoordinates.length < 2) {
-      return { snapped: false, lat, lng, bearing: null, dist: 0 };
+  // Snap GPS Coordinate to Active Route Polyline (Map Matching with Heading Gating)
+  snapToActiveRoute(lat, lng, rawHeading = null, speed = 0) {
+    if (!this.activeRoute || !this.routeCoordinates || this.routeCoordinates.length < 2 || this.isRerouting) {
+      return { snapped: false, lat, lng, bearing: null, dist: 0, headingDiff: 0 };
     }
 
     let minDistance = Infinity;
     let bestPoint = { lat, lng };
     let bestBearing = null;
     let bestSegIndex = 0;
+    let bestHeadingDiff = 0;
 
     const totalSegs = this.routeCoordinates.length - 1;
     let searchStart = 0;
@@ -1064,7 +1065,7 @@ class TeslaMapEngine {
     }
 
     // Fallback to full search if not within localized window
-    if (minDistance > 45 && searchStart > 0) {
+    if (minDistance > 35 && searchStart > 0) {
       for (let i = 0; i < totalSegs; i++) {
         const p1 = this.routeCoordinates[i];
         const p2 = this.routeCoordinates[i + 1];
@@ -1079,8 +1080,23 @@ class TeslaMapEngine {
       }
     }
 
-    // If within 40m of road centerline -> snap to road
-    if (minDistance <= 40) {
+    // Calculate heading difference between vehicle movement and road segment tangent
+    if (rawHeading != null && !isNaN(rawHeading) && bestBearing != null) {
+      let diff = Math.abs((rawHeading - bestBearing + 360) % 360);
+      if (diff > 180) diff = 360 - diff;
+      bestHeadingDiff = diff;
+    }
+
+    // Intelligent Road Snap Criteria:
+    // 1. If car is driving (speed >= 8 km/h): only snap if within 20m AND heading aligns with road (diff <= 45°)
+    //    If heading differs > 45° (car turned onto a cross street), DO NOT SNAP!
+    // 2. If crawling/stopping (speed < 8 km/h): snap if within 16m
+    const isMoving = speed >= 8 && rawHeading != null && !isNaN(rawHeading);
+    const allowSnap = isMoving
+      ? (minDistance <= 20 && bestHeadingDiff <= 45)
+      : (minDistance <= 16);
+
+    if (allowSnap) {
       let roadBearing = bestBearing;
       let snappedDist = null;
       if (this.routeCumulativeDistances && this.routeCumulativeDistances.length > bestSegIndex) {
@@ -1091,7 +1107,7 @@ class TeslaMapEngine {
         if (p1 && p2) {
           const projT = this.projectPointToSegment(lng, lat, p1[0], p1[1], p2[0], p2[1]).t;
           snappedDist = segDist + (projT * segLen);
-          const aheadPt = this.getPositionAtDistance(snappedDist + 24);
+          const aheadPt = this.getPositionAtDistance(snappedDist + 22);
           if (aheadPt) {
             roadBearing = this.calculateBearing(bestPoint.lat, bestPoint.lng, aheadPt.lat, aheadPt.lng);
           }
@@ -1104,11 +1120,21 @@ class TeslaMapEngine {
         bearing: roadBearing,
         dist: minDistance,
         segIndex: bestSegIndex,
-        routeDistance: snappedDist
+        routeDistance: snappedDist,
+        headingDiff: bestHeadingDiff
       };
     }
 
-    return { snapped: false, lat, lng, bearing: null, dist: minDistance, segIndex: bestSegIndex, routeDistance: null };
+    return {
+      snapped: false,
+      lat,
+      lng,
+      bearing: null,
+      dist: minDistance,
+      segIndex: bestSegIndex,
+      routeDistance: null,
+      headingDiff: bestHeadingDiff
+    };
   }
 
   // Primary Position Update Handler with Movement Bearing & Road Snapping
@@ -1134,14 +1160,14 @@ class TeslaMapEngine {
       this.lastRawPosition = { lat, lng, time: Date.now() };
     }
 
-    // 2. Road Snapping (Map Matching)
+    // 2. Road Snapping (Map Matching with Heading Gating)
     let displayLat = lat;
     let displayLng = lng;
     let isOffRoute = false;
     let distToRoute = 0;
 
-    if (this.activeRoute && this.routeCoordinates && this.routeCoordinates.length >= 2) {
-      const snap = this.snapToActiveRoute(lat, lng);
+    if (this.activeRoute && this.routeCoordinates && this.routeCoordinates.length >= 2 && !this.isRerouting) {
+      const snap = this.snapToActiveRoute(lat, lng, targetHeading, speed);
       distToRoute = snap.dist;
       if (snap.segIndex != null) {
         this.currentSegIndex = snap.segIndex;
@@ -1156,9 +1182,15 @@ class TeslaMapEngine {
         if (isRealFix) {
           this.simulatedNavDistance = (snap.routeDistance != null) ? snap.routeDistance : (this.routeCumulativeDistances?.[snap.segIndex] || 0);
         }
-      } else if (distToRoute > 45) {
-        isOffRoute = true;
+      } else {
+        // Driver has departed from the route polyline:
+        // Distance exceeds corridor (> 20m), OR turned off (> 12m with heading deviation > 45°)
+        if (distToRoute > 20 || (distToRoute > 12 && snap.headingDiff > 45)) {
+          isOffRoute = true;
+        }
       }
+    } else if (this.isRerouting) {
+      isOffRoute = true;
     }
 
     // Anti-Jitter Deadband & Smoothing (Prevents nervous sub-pixel shaking)
@@ -1172,10 +1204,10 @@ class TeslaMapEngine {
         // Ignore lateral micro-noise during driving
         displayLat = this.currentPosition.lat;
         displayLng = this.currentPosition.lng;
-      } else if (!this.activeRoute) {
-        // Free driving: smooth 30% EMA filter to eliminate lateral zig-zag
-        displayLat = this.currentPosition.lat + (displayLat - this.currentPosition.lat) * 0.30;
-        displayLng = this.currentPosition.lng + (displayLng - this.currentPosition.lng) * 0.30;
+      } else if (!this.activeRoute || isOffRoute || this.isRerouting) {
+        // Free driving / Off-route: smooth 35% EMA filter to eliminate lateral zig-zag while accurately tracking the car
+        displayLat = this.currentPosition.lat + (displayLat - this.currentPosition.lat) * 0.35;
+        displayLng = this.currentPosition.lng + (displayLng - this.currentPosition.lng) * 0.35;
       }
     }
 
@@ -1258,10 +1290,17 @@ class TeslaMapEngine {
       if (this.followCar && !this.isUserPinching) {
         if (!this._isYandexCentering) {
           this._isYandexCentering = true;
-          this.map.setCenter([displayLat, displayLng], this.navZoom, { duration: 0, checkZoomRange: false })
-            .always(() => {
-              this._isYandexCentering = false;
-            });
+          // Pan map without passing fixed zoom on every frame to avoid heavy tile re-layouts
+          const centerPromise = this.map.setCenter([displayLat, displayLng], undefined, { duration: 0, checkZoomRange: false });
+          if (centerPromise) {
+            if (typeof centerPromise.always === 'function') {
+              centerPromise.always(() => { this._isYandexCentering = false; });
+            } else if (typeof centerPromise.then === 'function') {
+              centerPromise.then(() => { this._isYandexCentering = false; }, () => { this._isYandexCentering = false; });
+            }
+          }
+          // Guaranteed failsafe release timeout
+          setTimeout(() => { this._isYandexCentering = false; }, 200);
         }
       }
     } else if (this.carMarker && window.L && this.provider === 'osm') {
@@ -1295,15 +1334,16 @@ class TeslaMapEngine {
   trackNavigationProgress(currentLat, currentLng, isOffRoute = false, distToRoute = 0, speed = 0, isRealFix = true) {
     if (!this.activeRoute) return;
 
-    // Off-route automatic rerouting: ONLY on genuine GPS fixes, NEVER on dead-reckoning extrapolation!
-    if (isRealFix && this.isNavigating && speed >= 5 && isOffRoute && distToRoute > 45) {
-      this.offRouteCounter++;
-      if (this.offRouteCounter >= 4 && !this.isRerouting) {
+    // Off-route automatic rerouting: ONLY on genuine GPS fixes!
+    // Triggers instantly after 2 consecutive ticks (~1.5s) of staying off-route, exactly like Yandex Navigator
+    if (isRealFix && this.isNavigating && isOffRoute && !this.isRerouting) {
+      this.offRouteCounter = (this.offRouteCounter || 0) + 1;
+      if (this.offRouteCounter >= 2) {
         this.recalculateRoute(currentLat, currentLng);
         return;
       }
-    } else {
-      this.offRouteCounter = Math.max(0, this.offRouteCounter - 1);
+    } else if (!isOffRoute) {
+      this.offRouteCounter = 0;
     }
 
     const dest = this.activeRoute.destination;
@@ -1538,14 +1578,16 @@ class TeslaMapEngine {
     }
   }
 
-  // Automatic Off-Route Rerouting from current road
+  // Automatic Off-Route Rerouting from current road (authentic Yandex Navigator behaviour)
   async recalculateRoute(lat, lng) {
     if (!this.activeRoute || !this.activeRoute.destination || this.isRerouting) return;
     this.isRerouting = true;
     console.log('[MapEngine] Deviated from route. Recalculating from current road...');
     const lang = window.CURRENT_LANG || 'ru';
     const dict = I18N[lang] || I18N.ru;
-    this.speakVoice(dict.voiceRerouting || 'Перестраиваю маршрут');
+
+    this.playNavChime();
+    this.speakVoice(dict.voiceRerouting || 'Маршрут перестроен');
 
     try {
       const dest = this.activeRoute.destination;
@@ -1566,7 +1608,7 @@ class TeslaMapEngine {
       this.offRouteCounter = 0;
       setTimeout(() => {
         this.isRerouting = false;
-      }, 3500);
+      }, 2000);
     }
   }
 
@@ -1697,12 +1739,13 @@ class TeslaMapEngine {
     return segments.filter(s => s.coords.length >= 2);
   }
 
-  // Parse Yandex or OSRM route data and render on map
-  applyRouteData(data, destination) {
+  // Parse Yandex or OSRM route data and render on map (with full route alternatives support)
+  applyRouteData(data, destination, activeIndex = 0) {
     this.rawRouteData = data;
+    this.activeRouteIndex = activeIndex;
     const isYandex = data.source === 'yandex';
-    const primaryRoute = data.routes[0];
-    const coordinates = isYandex ? primaryRoute.coordinates : primaryRoute.geometry.coordinates; // [lng, lat]
+    const primaryRoute = (data.routes && data.routes[activeIndex]) ? data.routes[activeIndex] : data.routes[0];
+    const coordinates = isYandex ? primaryRoute.coordinates : (primaryRoute.geometry?.coordinates || primaryRoute.coordinates); // [lng, lat]
     this.routeCoordinates = coordinates;
     const durationSec = primaryRoute.duration;
     const distanceMeters = primaryRoute.distance;
@@ -1717,13 +1760,6 @@ class TeslaMapEngine {
       this.routeCumulativeDistances.push(this.routeCumulativeDistances[i] + d);
     }
     this.totalRouteMeters = this.routeCumulativeDistances[this.routeCumulativeDistances.length - 1] || distanceMeters;
-
-    // Alternative Route
-    this.hasAlternative = data.routes.length > 1;
-    this.alternativeRoute = this.hasAlternative ? data.routes[1] : null;
-    this.alternativeCoordinates = this.hasAlternative
-      ? (isYandex ? this.alternativeRoute.coordinates : this.alternativeRoute.geometry.coordinates)
-      : null;
 
     // Traffic segments (100% genuine Yandex real-time traffic colors)
     const trafficSegments = isYandex ? primaryRoute.segments : null;
@@ -1782,9 +1818,33 @@ class TeslaMapEngine {
       });
     }
 
+    // Prepare list of all routes for cards (up to 3 routes)
+    const fastestDurationSec = data.routes[0]?.duration || durationSec;
+    const allRoutes = (data.routes || []).slice(0, 3).map((r, i) => {
+      const diffMins = Math.round((r.duration - fastestDurationSec) / 60);
+      return {
+        index: i,
+        summary: r.summary || (i === 0 ? 'Самый быстрый' : `Вариант ${i + 1}`),
+        duration: `${Math.round(r.duration / 60)} мин`,
+        distance: r.distance >= 1000 ? `${(r.distance / 1000).toFixed(1)} км` : `${Math.round(r.distance)} м`,
+        diffMins: diffMins > 0 ? `+${diffMins} мин` : '0 мин'
+      };
+    });
+
+    // Alternative lines on map (all routes other than activeIndex)
+    const altLines = [];
+    (data.routes || []).forEach((r, idx) => {
+      if (idx !== activeIndex && idx < 3) {
+        const altCoords = isYandex ? r.coordinates : (r.geometry?.coordinates || r.coordinates);
+        if (altCoords && altCoords.length >= 2) {
+          altLines.push({ index: idx, coordinates: altCoords });
+        }
+      }
+    });
+
     // 1. Render on MAPLIBRE GL JS
     if (this.provider === 'maplibre' && this.map) {
-      this.renderMapLibreRoute(coordinates, destination, this.alternativeCoordinates, trafficSegments);
+      this.renderMapLibreRoute(coordinates, destination, altLines, trafficSegments);
     }
     // 2. Render on YANDEX MAPS
     else if (this.provider === 'yandex' && this.map && window.ymaps) {
@@ -1801,28 +1861,18 @@ class TeslaMapEngine {
     const etaHours = String(etaDate.getHours()).padStart(2, '0');
     const etaMins = String(etaDate.getMinutes()).padStart(2, '0');
 
-    // Parse alternative info
-    let altInfo = null;
-    if (this.hasAlternative && this.alternativeRoute) {
-      const altDurationSec = this.alternativeRoute.duration;
-      const altDistMeters = this.alternativeRoute.distance;
-      const diffMins = Math.round((altDurationSec - durationSec) / 60);
-      const diffSign = diffMins >= 0 ? `+${diffMins}` : `${diffMins}`;
-      altInfo = {
-        name: this.alternativeRoute.legs && this.alternativeRoute.legs[0]?.summary ? `через ${this.alternativeRoute.legs[0].summary}` : 'Альтернативный маршрут',
-        duration: `${Math.round(altDurationSec / 60)} мин`,
-        distance: altDistMeters >= 1000 ? `${(altDistMeters / 1000).toFixed(1)} км` : `${Math.round(altDistMeters)} м`,
-        diffMins: diffSign
-      };
-    }
-
     const routeInfo = {
       distance: distanceMeters >= 1000 ? `${(distanceMeters / 1000).toFixed(1)} км` : `${Math.round(distanceMeters)} м`,
       duration: `${Math.round(durationSec / 60)} мин`,
       eta: `${etaHours}:${etaMins}`,
       name: destination.name || 'Маршрут',
+      summary: primaryRoute.summary || (activeIndex === 0 ? 'Самый быстрый' : `Вариант ${activeIndex + 1}`),
       steps: this.routeSteps,
-      trafficSegments: (trafficSegments && trafficSegments.length > 0) ? trafficSegments : this.generateTrafficSegments(coordinates)
+      trafficSegments: (trafficSegments && trafficSegments.length > 0) ? trafficSegments : this.generateTrafficSegments(coordinates),
+      allRoutes: allRoutes,
+      activeRouteIndex: activeIndex,
+      alternatives: allRoutes.filter(r => r.index !== activeIndex),
+      alternative: allRoutes[1] || null
     };
     this.trafficSegments = routeInfo.trafficSegments;
 
@@ -1844,7 +1894,7 @@ class TeslaMapEngine {
       const data = await res.json();
 
       if (data && data.success && data.routes && data.routes.length > 0) {
-        const routeInfo = this.applyRouteData(data, destination);
+        const routeInfo = this.applyRouteData(data, destination, 0);
         this.onRouteCalculated(routeInfo);
         return routeInfo;
       }
@@ -1856,21 +1906,21 @@ class TeslaMapEngine {
 
   // Switch between Primary and Alternative Route
   selectRouteIndex(index) {
-    if (!this.rawRouteData || !this.rawRouteData.routes[index]) return;
-    const selected = this.rawRouteData.routes[index];
-    const other = this.rawRouteData.routes[index === 0 ? 1 : 0];
-
-    // Swap
-    this.rawRouteData.routes = [selected, other].filter(Boolean);
-    const routeInfo = this.applyRouteData(this.rawRouteData, this.activeRoute.destination);
+    if (!this.rawRouteData || !this.rawRouteData.routes || !this.rawRouteData.routes[index]) return;
+    const routeInfo = this.applyRouteData(this.rawRouteData, this.activeRoute.destination, index);
     if (routeInfo) {
       this.onRouteCalculated(routeInfo);
     }
   }
 
-  // Render Route on MapLibre GL with Yandex Navigator Styling & Alternative Blue Route
-  renderMapLibreRoute(coordinates, destination, alternativeCoordinates = null, trafficSegments = null) {
-    // Clear old layers
+  // Render Route on MapLibre GL with Yandex Navigator Styling & Alternative Blue Routes
+  renderMapLibreRoute(coordinates, destination, alternatives = null, trafficSegments = null) {
+    // Clear old alternative layers (alt 0, 1, 2, etc.)
+    for (let a = 0; a < 5; a++) {
+      if (this.map.getLayer(`route-alt-casing-${a}`)) this.map.removeLayer(`route-alt-casing-${a}`);
+      if (this.map.getLayer(`route-alt-line-${a}`)) this.map.removeLayer(`route-alt-line-${a}`);
+      if (this.map.getSource(`route-alt-${a}`)) this.map.removeSource(`route-alt-${a}`);
+    }
     if (this.map.getLayer('route-alt-casing')) this.map.removeLayer('route-alt-casing');
     if (this.map.getLayer('route-alt-line')) this.map.removeLayer('route-alt-line');
     if (this.map.getSource('route-alt')) this.map.removeSource('route-alt');
@@ -1882,40 +1932,44 @@ class TeslaMapEngine {
     }
     if (this.map.getSource('route-full')) this.map.removeSource('route-full');
 
-    // 1. Alternative Route (Cyan Blue line underneath, like Mapsev & Yandex)
-    if (alternativeCoordinates && alternativeCoordinates.length > 0) {
-      this.map.addSource('route-alt', {
+    // 1. Alternative Routes (Cyan Blue lines underneath, like MapsEV & Yandex)
+    const altList = Array.isArray(alternatives) ? alternatives : (alternatives ? [{ coordinates: alternatives, index: 1 }] : []);
+    altList.forEach((alt, aIdx) => {
+      const altCoords = alt.coordinates || alt;
+      if (!altCoords || altCoords.length < 2) return;
+      const srcId = `route-alt-${aIdx}`;
+      this.map.addSource(srcId, {
         type: 'geojson',
         data: {
           type: 'Feature',
-          geometry: { type: 'LineString', coordinates: alternativeCoordinates }
+          geometry: { type: 'LineString', coordinates: altCoords }
         }
       });
 
       this.map.addLayer({
-        id: 'route-alt-casing',
+        id: `route-alt-casing-${aIdx}`,
         type: 'line',
-        source: 'route-alt',
+        source: srcId,
         layout: { 'line-join': 'round', 'line-cap': 'round' },
         paint: {
           'line-color': '#0f172a',
-          'line-width': 8,
-          'line-opacity': 0.8
+          'line-width': 7.5,
+          'line-opacity': 0.75
         }
       });
 
       this.map.addLayer({
-        id: 'route-alt-line',
+        id: `route-alt-line-${aIdx}`,
         type: 'line',
-        source: 'route-alt',
+        source: srcId,
         layout: { 'line-join': 'round', 'line-cap': 'round' },
         paint: {
-          'line-color': '#0284c7', // Vibrant Sky/Cyan Blue
-          'line-width': 5.5,
-          'line-opacity': 0.85
+          'line-color': aIdx === 0 ? '#0284c7' : '#0ea5e9', // Vibrant Sky/Cyan Blue
+          'line-width': 5.0,
+          'line-opacity': 0.80
         }
       });
-    }
+    });
 
     // 2. Primary Route Dark Navy Casing
     this.map.addSource('route-full', {
