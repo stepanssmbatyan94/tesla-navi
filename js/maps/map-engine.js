@@ -387,8 +387,53 @@ class TeslaMapEngine {
           });
           this.map.geoObjects.add(placemark);
           this.cameraMarkers.push(placemark);
-        }
-      });
+    }
+  }
+
+  // On-Road Lane Callout Marker (speech bubble anchored at upcoming turn)
+  renderRoadLaneMarker(location, modifier) {
+    if (!this.map || !location) return;
+    if (this.provider === 'maplibre' && window.maplibregl) {
+      if (!this.roadLaneMarkerEl) {
+        this.roadLaneMarkerEl = document.createElement('div');
+        this.roadLaneMarkerEl.className = 'map-lane-callout-marker';
+        this.roadLaneMarker = new window.maplibregl.Marker({
+          element: this.roadLaneMarkerEl,
+          anchor: 'bottom-left'
+        });
+      }
+      if (typeof getLaneColumnsHtml === 'function') {
+        this.roadLaneMarkerEl.innerHTML = getLaneColumnsHtml(modifier);
+      }
+      this.roadLaneMarker.setLngLat([location[0], location[1]]).addTo(this.map);
+    } else if (this.provider === 'yandex' && window.ymaps && this.map.geoObjects) {
+      if (this.yandexRoadLaneMarker) {
+        this.map.geoObjects.remove(this.yandexRoadLaneMarker);
+        this.yandexRoadLaneMarker = null;
+      }
+      if (typeof getLaneColumnsHtml === 'function') {
+        const inner = getLaneColumnsHtml(modifier);
+        const html = `<div class="map-lane-callout-marker" style="transform: translate(-10%, -100%);">${inner}</div>`;
+        const Layout = window.ymaps.templateLayoutFactory.createClass(html);
+        this.yandexRoadLaneMarker = new window.ymaps.Placemark([location[1], location[0]], {}, {
+          iconLayout: Layout,
+          iconImageSize: [90, 44],
+          iconImageOffset: [0, 0]
+        });
+        this.map.geoObjects.add(this.yandexRoadLaneMarker);
+      }
+    }
+  }
+
+  clearRoadLaneMarker() {
+    if (this.roadLaneMarker) {
+      this.roadLaneMarker.remove();
+      this.roadLaneMarker = null;
+      this.roadLaneMarkerEl = null;
+    }
+    if (this.yandexRoadLaneMarker && this.map && this.map.geoObjects) {
+      this.map.geoObjects.remove(this.yandexRoadLaneMarker);
+      this.yandexRoadLaneMarker = null;
     }
   }
 
@@ -1051,14 +1096,15 @@ class TeslaMapEngine {
       targetHeading = rawHeading;
     } else if (isStationary) {
       targetHeading = this.currentHeading; // Completely freeze heading when stationary to prevent twitching
-    } else if (rawHeading != null && !isNaN(rawHeading) && rawHeading > 0 && speed > 2.5) {
-      targetHeading = rawHeading;
     } else if (isRealFix && this.lastRawPosition) {
       const distMoved = this.calculateDistance(this.lastRawPosition.lat, this.lastRawPosition.lng, lat, lng);
-      if (distMoved >= 2.5) {
+      // Require at least 6m baseline to compute stable bearing without lateral jitter
+      if (distMoved >= 6.0) {
         targetHeading = this.calculateBearing(this.lastRawPosition.lat, this.lastRawPosition.lng, lat, lng);
         this.lastRawPosition = { lat, lng, time: Date.now() };
       }
+    } else if (rawHeading != null && !isNaN(rawHeading) && rawHeading > 0 && speed > 2.5) {
+      targetHeading = rawHeading;
     } else if (isRealFix) {
       this.lastRawPosition = { lat, lng, time: Date.now() };
     }
@@ -1078,11 +1124,9 @@ class TeslaMapEngine {
       if (snap.snapped) {
         displayLat = snap.lat;
         displayLng = snap.lng;
+        // Strictly lock vehicle arrow to the road polyline tangent while driving along route
         if (snap.bearing !== null && !isStationary) {
-          let angleDiff = Math.abs(((targetHeading - snap.bearing) % 360 + 540) % 360 - 180);
-          if (angleDiff < 85) {
-            targetHeading = snap.bearing;
-          }
+          targetHeading = snap.bearing;
         }
         if (isRealFix) {
           this.simulatedNavDistance = (snap.routeDistance != null) ? snap.routeDistance : (this.routeCumulativeDistances?.[snap.segIndex] || 0);
@@ -1099,28 +1143,23 @@ class TeslaMapEngine {
         // Stop micro-wandering when car is stationary at light/parking
         displayLat = this.currentPosition.lat;
         displayLng = this.currentPosition.lng;
-      } else if (shiftDist < 0.85 && !window.IS_SIMULATOR_RUNNING) {
-        // Ignore sub-meter micro-noise
+      } else if (shiftDist < 1.4 && !this.activeRoute && !window.IS_SIMULATOR_RUNNING) {
+        // Ignore lateral micro-noise during driving
         displayLat = this.currentPosition.lat;
         displayLng = this.currentPosition.lng;
       } else if (!this.activeRoute) {
-        // Free driving: smooth 35% EMA filter to prevent zig-zag
-        displayLat = this.currentPosition.lat + (displayLat - this.currentPosition.lat) * 0.35;
-        displayLng = this.currentPosition.lng + (displayLng - this.currentPosition.lng) * 0.35;
+        // Free driving: smooth 30% EMA filter to eliminate lateral zig-zag
+        displayLat = this.currentPosition.lat + (displayLat - this.currentPosition.lat) * 0.30;
+        displayLng = this.currentPosition.lng + (displayLng - this.currentPosition.lng) * 0.30;
       }
     }
 
-    // 3. Smooth Heading with Deadband
+    // 3. Smooth Heading with Deadband (Zero wobble within 3.2 degrees)
     if (!isStationary) {
       const angleDiff = ((targetHeading - this.currentHeading) % 360 + 540) % 360 - 180;
-      // Deadband: within 2.2 degrees, do not twitch
-      if (Math.abs(angleDiff) >= 2.2) {
-        const smoothFactor = window.IS_SIMULATOR_RUNNING ? 0.09 : 0.08;
-        let delta = angleDiff * smoothFactor;
-        const maxAngularStep = 1.25;
-        if (delta > maxAngularStep) delta = maxAngularStep;
-        if (delta < -maxAngularStep) delta = -maxAngularStep;
-        this.currentHeading = (this.currentHeading + delta + 360) % 360;
+      if (Math.abs(angleDiff) >= 3.2) {
+        const factor = window.IS_SIMULATOR_RUNNING ? 0.35 : 0.25;
+        this.currentHeading = (this.currentHeading + angleDiff * factor + 360) % 360;
       }
     }
 
@@ -1365,6 +1404,7 @@ class TeslaMapEngine {
         modifier: activeStep.modifier || 'straight',
         type: activeStep.type || 'turn',
         speedLimit: currentSpeedLimit,
+        location: activeStep.location || null,
         lanes: activeStep.lanes || null
       });
 
@@ -2067,6 +2107,7 @@ class TeslaMapEngine {
   cancelRoute() {
     this.activeRoute = null;
     this.isNavigating = false;
+    this.clearRoadLaneMarker();
     this.lastProgressIndex = 0;
     this.routeCoordinates = [];
     this.alternativeCoordinates = null;

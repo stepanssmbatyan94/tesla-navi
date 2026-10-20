@@ -1112,40 +1112,48 @@ html, body {
   left: 20px;
   z-index: 59;
   background: #0066ff;
-  border: 2.5px solid #ffffff;
-  border-radius: 12px;
-  padding: 6px 12px;
+  border-radius: 14px;
+  padding: 6px 14px;
   display: flex;
   align-items: center;
-  gap: 8px;
-  box-shadow: 0 6px 20px rgba(0, 102, 255, 0.45), 0 2px 6px rgba(0, 0, 0, 0.15);
+  gap: 12px;
+  box-shadow: 0 6px 22px rgba(0, 102, 255, 0.45), 0 2px 6px rgba(0, 0, 0, 0.15);
+  transition: opacity 0.25s ease, transform 0.25s ease;
 }
 
-.lane-arrow-sign {
+.lane-col-item {
   display: flex;
   align-items: center;
   justify-content: center;
-  min-width: 20px;
-  height: 24px;
-  opacity: 0.35;
-  color: #ffffff;
-  transition: opacity 0.2s ease, transform 0.2s ease;
+  min-width: 26px;
+  height: 32px;
 }
 
-.lane-arrow-sign.active {
-  opacity: 1;
-  color: #ffffff;
-  transform: scale(1.1);
+/* Authentic Yandex Road Lane Bubble Marker (Floating with pointer tail on the road) */
+.map-lane-callout-marker {
+  position: relative;
+  background: #0066ff;
+  border-radius: 14px;
+  padding: 6px 14px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  box-shadow: 0 8px 24px rgba(0, 102, 255, 0.55), 0 2px 8px rgba(0, 0, 0, 0.25);
+  pointer-events: none;
+  z-index: 35;
+  transform: translate(-15%, -115%);
 }
 
-.lane-arrow-sign svg {
-  width: 22px;
-  height: 24px;
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 2.8;
-  stroke-linecap: round;
-  stroke-linejoin: round;
+.map-lane-callout-marker::after {
+  content: '';
+  position: absolute;
+  bottom: -8px;
+  left: 18px;
+  width: 0;
+  height: 0;
+  border-left: 7px solid transparent;
+  border-right: 7px solid transparent;
+  border-top: 9px solid #0066ff;
 }
 
 /* 5. Speedometer & Speed Limit HUD + Auxiliary Controls (Mapsev Architecture) */
@@ -2454,7 +2462,8 @@ html, body {
 .tesla-car-arrow {
   position: relative;
   z-index: 2;
-  transition: none;
+  transition: transform 0.22s cubic-bezier(0.2, 0.9, 0.4, 1);
+  will-change: transform;
 }
 
 .yandex-dest-pin {
