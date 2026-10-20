@@ -85,7 +85,7 @@ async function getOrSynthesizeSpeech(text, voiceChoice = 'auto', lang = 'ru') {
   }
 }
 
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 8085;
 
 const MIME_TYPES = {
   '.html': 'text/html; charset=utf-8',
@@ -685,6 +685,25 @@ function getArmenianAudio(text, voiceChoice = 'gor') {
     } catch (osrmErr) {
       res.writeHead(500, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ error: osrmErr.message }));
+    }
+    return;
+  }
+
+  // API: /api/speed-cameras (185 Verified Real Speed Cameras for Yerevan / Armenia)
+  if (pathname === '/api/speed-cameras') {
+    try {
+      const camerasPath = path.join(__dirname, 'data', 'yerevan-cameras-clean.json');
+      if (fs.existsSync(camerasPath)) {
+        const data = fs.readFileSync(camerasPath, 'utf8');
+        res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'public, max-age=86400' });
+        res.end(data);
+      } else {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify([]));
+      }
+    } catch (e) {
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: e.message }));
     }
     return;
   }

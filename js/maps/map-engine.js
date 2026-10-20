@@ -53,6 +53,9 @@ class TeslaMapEngine {
       { type: 'light', lat: 40.1875, lng: 44.4750, name: 'Tsitsernakaberd Junction' },
       { type: 'light', lat: 40.1905, lng: 44.5020, name: 'Baghramyan / Proshyan' }
     ];
+
+    // Load full verified speed camera database for Yerevan (185 real speed cameras)
+    this.loadRealSpeedCameras();
   }
 
   async init() {
@@ -284,37 +287,109 @@ class TeslaMapEngine {
     });
   }
 
-  // Render Traffic Lights (🚦) and Speed Cameras with 60 km/h Signs (📷)
-  renderTrafficPoints() {
-    this.trafficPoints.forEach(point => {
-      const el = document.createElement('div');
-      if (point.type === 'light') {
-        el.className = 'traffic-light-pill-icon';
-        el.innerHTML = `
-          <div class="tl-box">
-            <span class="tl-dot red"></span>
-            <span class="tl-dot yellow"></span>
-            <span class="tl-dot green"></span>
-          </div>
-        `;
-        const marker = new window.maplibregl.Marker({ element: el })
-          .setLngLat([point.lng, point.lat])
-          .addTo(this.map);
-        this.trafficLightMarkers.push(marker);
-      } else {
-        el.className = 'speed-cam-cluster-marker';
-        el.innerHTML = `
-          <div class="speed-cam-sign-circle">
-            <span class="speed-cam-sign-val">${point.limit || 60}</span>
-          </div>
-          <div class="speed-cam-icon-bubble">📷</div>
-        `;
-        const marker = new window.maplibregl.Marker({ element: el, anchor: 'center' })
-          .setLngLat([point.lng, point.lat])
-          .addTo(this.map);
-        this.cameraMarkers.push(marker);
+  // Load full verified speed camera database for Yerevan (185 real speed cameras)
+  async loadRealSpeedCameras() {
+    try {
+      const res = await fetch('/api/speed-cameras');
+      if (res.ok) {
+        const cams = await res.json();
+        if (Array.isArray(cams) && cams.length > 0) {
+          const lights = this.trafficPoints.filter(p => p.type === 'light');
+          const realCamPoints = cams.map(c => ({
+            type: 'camera',
+            lat: c.lat,
+            lng: c.lng,
+            limit: c.limit || 60,
+            direction: c.direction,
+            name: c.name || `Камера ${c.limit || 60} км/ч`
+          }));
+          this.trafficPoints = [...lights, ...realCamPoints];
+          if (this.map) {
+            this.renderTrafficPoints();
+          }
+        }
       }
-    });
+    } catch (e) {
+      console.warn('[MapEngine] Could not load speed cameras:', e);
+    }
+  }
+
+  // Render Traffic Lights (🚦) and Speed Cameras (📷) matching Yandex Navigator
+  renderTrafficPoints() {
+    if (!this.map) return;
+
+    // Clear previous markers
+    if (this.trafficLightMarkers) {
+      this.trafficLightMarkers.forEach(m => {
+        if (typeof m.remove === 'function') m.remove();
+        else if (this.map.geoObjects && typeof this.map.geoObjects.remove === 'function') this.map.geoObjects.remove(m);
+      });
+      this.trafficLightMarkers = [];
+    }
+    if (this.cameraMarkers) {
+      this.cameraMarkers.forEach(m => {
+        if (typeof m.remove === 'function') m.remove();
+        else if (this.map.geoObjects && typeof this.map.geoObjects.remove === 'function') this.map.geoObjects.remove(m);
+      });
+      this.cameraMarkers = [];
+    }
+
+    if (this.provider === 'maplibre' && window.maplibregl) {
+      this.trafficPoints.forEach(point => {
+        const el = document.createElement('div');
+        if (point.type === 'light') {
+          el.className = 'traffic-light-pill-icon';
+          el.innerHTML = `
+            <div class="tl-box">
+              <span class="tl-dot red"></span>
+              <span class="tl-dot yellow"></span>
+              <span class="tl-dot green"></span>
+            </div>
+          `;
+          const marker = new window.maplibregl.Marker({ element: el })
+            .setLngLat([point.lng, point.lat])
+            .addTo(this.map);
+          this.trafficLightMarkers.push(marker);
+        } else {
+          el.className = 'map-speed-camera-pin';
+          el.innerHTML = `
+            <div class="camera-map-badge" title="Камера контроля скорости ${point.limit || 60} км/ч">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="#1e293b">
+                <path d="M4 4h3l2-2h6l2 2h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2zm8 3a5 5 0 1 0 0 10 5 5 0 0 0 0-10zm0 2a3 3 0 1 1 0 6 3 3 0 0 1 0-6z"/>
+              </svg>
+            </div>
+          `;
+          const marker = new window.maplibregl.Marker({ element: el, anchor: 'center' })
+            .setLngLat([point.lng, point.lat])
+            .addTo(this.map);
+          this.cameraMarkers.push(marker);
+        }
+      });
+    } else if (this.provider === 'yandex' && window.ymaps && this.map.geoObjects) {
+      const CamLayout = window.ymaps.templateLayoutFactory.createClass(
+        `<div class="map-speed-camera-pin" style="transform: translate(-50%, -50%);">
+          <div class="camera-map-badge">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="#1e293b">
+              <path d="M4 4h3l2-2h6l2 2h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2zm8 3a5 5 0 1 0 0 10 5 5 0 0 0 0-10zm0 2a3 3 0 1 1 0 6 3 3 0 0 1 0-6z"/>
+            </svg>
+          </div>
+        </div>`
+      );
+
+      this.trafficPoints.forEach(point => {
+        if (point.type === 'camera') {
+          const placemark = new window.ymaps.Placemark([point.lat, point.lng], {
+            hintContent: `Камера контроля скорости ${point.limit || 60} км/ч`
+          }, {
+            iconLayout: CamLayout,
+            iconImageSize: [28, 28],
+            iconImageOffset: [0, 0]
+          });
+          this.map.geoObjects.add(placemark);
+          this.cameraMarkers.push(placemark);
+        }
+      });
+    }
   }
 
   // 2. Yandex Maps 2.1 Fallback Implementation
@@ -356,6 +431,7 @@ class TeslaMapEngine {
 
         const containerEl = document.getElementById(this.containerId);
         this.isUserPinching = false;
+        this.isUserTouching = false;
         let touchStartPos = null;
         let pinchStartDist = null;
         let pinchStartZoom = null;
@@ -363,6 +439,8 @@ class TeslaMapEngine {
 
         if (containerEl) {
           containerEl.addEventListener('touchstart', (e) => {
+            this.isUserTouching = true;
+            this.clearAutoFollowTimer();
             if (e.touches.length >= 2) {
               this.isUserPinching = true;
               if (pinchTimeout) clearTimeout(pinchTimeout);
@@ -401,18 +479,19 @@ class TeslaMapEngine {
             } else if (e.touches.length === 1 && touchStartPos && !this.isUserPinching) {
               const dx = e.touches[0].clientX - touchStartPos.x;
               const dy = e.touches[0].clientY - touchStartPos.y;
-              if (Math.hypot(dx, dy) > 20) {
+              if (Math.hypot(dx, dy) > 55) {
                 // User intentionally dragged map with 1 finger to pan away
                 this.followCar = false;
                 const recenterBtn = document.getElementById('floating-recenter-btn');
                 if (recenterBtn) recenterBtn.classList.remove('hidden');
                 if (this.onUserPan) this.onUserPan();
-                this.resetAutoFollowTimer();
+                this.startAutoFollowTimer();
               }
             }
           }, { passive: false });
 
           containerEl.addEventListener('touchend', (e) => {
+            this.isUserTouching = false;
             if (e.touches.length === 0) {
               touchStartPos = null;
               pinchStartDist = null;
@@ -426,6 +505,9 @@ class TeslaMapEngine {
                   }
                 }, 150);
               }
+              if (!this.followCar) {
+                this.startAutoFollowTimer();
+              }
             } else if (e.touches.length === 1 && this.isUserPinching) {
               touchStartPos = null;
             }
@@ -435,6 +517,7 @@ class TeslaMapEngine {
           containerEl.addEventListener('mousedown', (e) => {
             if (e.button === 0) {
               mouseDownPos = { x: e.clientX, y: e.clientY };
+              this.clearAutoFollowTimer();
             }
           }, { passive: true });
 
@@ -442,18 +525,21 @@ class TeslaMapEngine {
             if (mouseDownPos && e.buttons === 1) {
               const dx = e.clientX - mouseDownPos.x;
               const dy = e.clientY - mouseDownPos.y;
-              if (Math.hypot(dx, dy) > 20) {
+              if (Math.hypot(dx, dy) > 55) {
                 this.followCar = false;
                 const recenterBtn = document.getElementById('floating-recenter-btn');
                 if (recenterBtn) recenterBtn.classList.remove('hidden');
                 if (this.onUserPan) this.onUserPan();
-                this.resetAutoFollowTimer();
+                this.startAutoFollowTimer();
               }
             }
           }, { passive: true });
 
           window.addEventListener('mouseup', () => {
             mouseDownPos = null;
+            if (!this.followCar) {
+              this.startAutoFollowTimer();
+            }
           }, { passive: true });
         }
 
@@ -592,12 +678,23 @@ class TeslaMapEngine {
     }
   }
 
-  // Clear auto-follow recovery timer (recenter button stays visible until user clicks it)
-  resetAutoFollowTimer() {
+  // Auto-follow recovery timer: automatically restores car follow after 6s of user inactivity
+  startAutoFollowTimer() {
+    this.clearAutoFollowTimer();
+    this.autoFollowTimer = setTimeout(() => {
+      this.recenter();
+    }, 6000);
+  }
+
+  clearAutoFollowTimer() {
     if (this.autoFollowTimer) {
       clearTimeout(this.autoFollowTimer);
       this.autoFollowTimer = null;
     }
+  }
+
+  resetAutoFollowTimer() {
+    this.clearAutoFollowTimer();
   }
 
   // Zoom In map (anchored strictly on vehicle position with perspective padding)
@@ -947,15 +1044,18 @@ class TeslaMapEngine {
   // Primary Position Update Handler with Movement Bearing & Road Snapping
   updateCarPosition(lat, lng, rawHeading = 0, speed = 0, isRealFix = true) {
     let targetHeading = this.currentHeading;
+    const isStationary = speed < 2.5 && !window.IS_SIMULATOR_RUNNING;
 
     // 1. Calculate Real Movement Bearing from GPS updates
     if (window.IS_SIMULATOR_RUNNING && rawHeading != null && !isNaN(rawHeading)) {
       targetHeading = rawHeading;
-    } else if (rawHeading != null && !isNaN(rawHeading) && rawHeading > 0 && speed > 2) {
+    } else if (isStationary) {
+      targetHeading = this.currentHeading; // Completely freeze heading when stationary to prevent twitching
+    } else if (rawHeading != null && !isNaN(rawHeading) && rawHeading > 0 && speed > 2.5) {
       targetHeading = rawHeading;
     } else if (isRealFix && this.lastRawPosition) {
       const distMoved = this.calculateDistance(this.lastRawPosition.lat, this.lastRawPosition.lng, lat, lng);
-      if (distMoved >= 1.5) {
+      if (distMoved >= 2.5) {
         targetHeading = this.calculateBearing(this.lastRawPosition.lat, this.lastRawPosition.lng, lat, lng);
         this.lastRawPosition = { lat, lng, time: Date.now() };
       }
@@ -978,7 +1078,7 @@ class TeslaMapEngine {
       if (snap.snapped) {
         displayLat = snap.lat;
         displayLng = snap.lng;
-        if (snap.bearing !== null) {
+        if (snap.bearing !== null && !isStationary) {
           let angleDiff = Math.abs(((targetHeading - snap.bearing) % 360 + 540) % 360 - 180);
           if (angleDiff < 85) {
             targetHeading = snap.bearing;
@@ -992,15 +1092,38 @@ class TeslaMapEngine {
       }
     }
 
-    // 3. Smooth Heading with Inertial Angular Rate Limiting
-    const angleDiff = ((targetHeading - this.currentHeading) % 360 + 540) % 360 - 180;
-    const smoothFactor = window.IS_SIMULATOR_RUNNING ? 0.09 : 0.08;
-    let delta = angleDiff * smoothFactor;
-    // Physical angular velocity clamp: maximum 1.25 degrees per frame (~75 deg/sec at 60fps)
-    const maxAngularStep = 1.25;
-    if (delta > maxAngularStep) delta = maxAngularStep;
-    if (delta < -maxAngularStep) delta = -maxAngularStep;
-    this.currentHeading = (this.currentHeading + delta + 360) % 360;
+    // Anti-Jitter Deadband & Smoothing (Prevents nervous sub-pixel shaking)
+    if (this.currentPosition) {
+      const shiftDist = this.calculateDistance(this.currentPosition.lat, this.currentPosition.lng, displayLat, displayLng);
+      if (isStationary && shiftDist < 3.5) {
+        // Stop micro-wandering when car is stationary at light/parking
+        displayLat = this.currentPosition.lat;
+        displayLng = this.currentPosition.lng;
+      } else if (shiftDist < 0.85 && !window.IS_SIMULATOR_RUNNING) {
+        // Ignore sub-meter micro-noise
+        displayLat = this.currentPosition.lat;
+        displayLng = this.currentPosition.lng;
+      } else if (!this.activeRoute) {
+        // Free driving: smooth 35% EMA filter to prevent zig-zag
+        displayLat = this.currentPosition.lat + (displayLat - this.currentPosition.lat) * 0.35;
+        displayLng = this.currentPosition.lng + (displayLng - this.currentPosition.lng) * 0.35;
+      }
+    }
+
+    // 3. Smooth Heading with Deadband
+    if (!isStationary) {
+      const angleDiff = ((targetHeading - this.currentHeading) % 360 + 540) % 360 - 180;
+      // Deadband: within 2.2 degrees, do not twitch
+      if (Math.abs(angleDiff) >= 2.2) {
+        const smoothFactor = window.IS_SIMULATOR_RUNNING ? 0.09 : 0.08;
+        let delta = angleDiff * smoothFactor;
+        const maxAngularStep = 1.25;
+        if (delta > maxAngularStep) delta = maxAngularStep;
+        if (delta < -maxAngularStep) delta = -maxAngularStep;
+        this.currentHeading = (this.currentHeading + delta + 360) % 360;
+      }
+    }
+
     this.currentPosition = {
       lat: displayLat,
       lng: displayLng,
@@ -1055,15 +1178,26 @@ class TeslaMapEngine {
       const markerEl = document.querySelector('#yandex-car-marker .tesla-car-arrow');
       if (markerEl) markerEl.style.transform = `rotate(${this.currentHeading.toFixed(1)}deg)`;
 
-      if (this.followCar) {
-        if (!this.isUserPinching) {
-          const now = performance.now();
-          // Instant lockstep setCenter throttled to 40ms (~25fps)
-          // Eliminates easing cancellation hitch and keeps map locked to vehicle with zero jitter!
-          if (!this.lastYandexCenterTime || (now - this.lastYandexCenterTime >= 40)) {
-            this.lastYandexCenterTime = now;
-            this.map.setCenter([displayLat, displayLng], this.navZoom, { duration: 0, checkZoomRange: false });
-          }
+      // Auto-recover followCar when vehicle is moving and user isn't interacting
+      if (!this.followCar && speed > 4 && !this.isUserTouching && !this.isUserPinching) {
+        this.movingWithoutTouchFrames = (this.movingWithoutTouchFrames || 0) + 1;
+        if (this.movingWithoutTouchFrames > 15) { // ~1.5 - 2s of driving
+          this.followCar = true;
+          this.movingWithoutTouchFrames = 0;
+          const recenterBtn = document.getElementById('floating-recenter-btn');
+          if (recenterBtn) recenterBtn.classList.add('hidden');
+        }
+      } else {
+        this.movingWithoutTouchFrames = 0;
+      }
+
+      if (this.followCar && !this.isUserPinching) {
+        if (!this._isYandexCentering) {
+          this._isYandexCentering = true;
+          this.map.setCenter([displayLat, displayLng], this.navZoom, { duration: 0, checkZoomRange: false })
+            .always(() => {
+              this._isYandexCentering = false;
+            });
         }
       }
     } else if (this.carMarker && window.L && this.provider === 'osm') {
@@ -1073,9 +1207,11 @@ class TeslaMapEngine {
       if (this.followCar && this.map) this.map.setView([displayLat, displayLng], this.map.getZoom(), { animate: false });
     }
 
-    // 5. Track Progress & Check Off-Route Rerouting
+    // 5. Track Progress & Check Off-Route Rerouting / Free Driving Camera Alerts
     if (this.activeRoute && this.routeSteps.length > 0) {
       this.trackNavigationProgress(displayLat, displayLng, isOffRoute, distToRoute, speed, isRealFix);
+    } else {
+      this.checkFreeDrivingCameraAlert(displayLat, displayLng, speed);
     }
   }
 
@@ -1259,26 +1395,77 @@ class TeslaMapEngine {
       }
     }
 
-    // 5. Proximity to speed cameras (Only show if camera < 600m, else hide)
+    // 5. Proximity to speed cameras: strictly along the active route ahead
     let nearestCameraDist = Infinity;
-    const allCameras = [
-      ...this.trafficPoints.filter(p => p.type === 'camera'),
-      ...(this.specialRoadPoints || []).filter(p => p.type === 'camera' || p.type === 'speed_cam')
-    ];
+    let upcomingCameraLimit = null;
 
-    for (const cam of allCameras) {
-      const camLat = cam.lat || cam.location?.[1];
-      const camLng = cam.lng || cam.location?.[0];
-      if (camLat && camLng) {
-        const d = this.calculateDistance(currentLat, currentLng, camLat, camLng);
-        if (d < 600 && d < nearestCameraDist) {
-          nearestCameraDist = Math.round(d);
+    if (this.routeCoordinates && this.routeCoordinates.length > 1) {
+      const totalSegs = this.routeCoordinates.length - 1;
+      const currentSeg = this.currentSegIndex || 0;
+
+      for (const cam of this.trafficPoints.filter(p => p.type === 'camera')) {
+        for (let i = currentSeg; i < Math.min(totalSegs, currentSeg + 60); i++) {
+          const p1 = this.routeCoordinates[i];
+          const p2 = this.routeCoordinates[i + 1];
+          const proj = this.projectPointToSegment(cam.lng, cam.lat, p1[0], p1[1], p2[0], p2[1]);
+          const perpDist = this.calculateDistance(cam.lat, cam.lng, proj.y, proj.x);
+          // Strict corridor: camera must be within 24m of the route polyline
+          if (perpDist <= 24) {
+            const segDist = this.routeCumulativeDistances?.[i] || 0;
+            const segLen = Math.max(0.1, (this.routeCumulativeDistances?.[i + 1] || (segDist + 1)) - segDist);
+            const camRouteDist = segDist + (proj.t * segLen);
+            const currentRouteDist = this.simulatedNavDistance || (this.routeCumulativeDistances?.[currentSeg] || 0);
+            const distAlongRoute = camRouteDist - currentRouteDist;
+
+            if (distAlongRoute > 15 && distAlongRoute < 550 && distAlongRoute < nearestCameraDist) {
+              nearestCameraDist = Math.round(distAlongRoute);
+              upcomingCameraLimit = cam.limit || 60;
+            }
+            break;
+          }
         }
       }
     }
 
-    if (nearestCameraDist < 600) {
-      this.onCameraAlert({ visible: true, distance: this.formatNavDistance(nearestCameraDist) });
+    if (nearestCameraDist < 550) {
+      this.onCameraAlert({
+        visible: true,
+        distance: this.formatNavDistance(nearestCameraDist),
+        distanceMeters: nearestCameraDist,
+        limit: upcomingCameraLimit
+      });
+    } else {
+      this.onCameraAlert({ visible: false });
+    }
+  }
+
+  // Free Driving Camera Proximity Check (When no active route is built)
+  checkFreeDrivingCameraAlert(currentLat, currentLng, speed) {
+    let nearestCameraDist = Infinity;
+    let upcomingCameraLimit = null;
+
+    for (const cam of this.trafficPoints.filter(p => p.type === 'camera')) {
+      const d = this.calculateDistance(currentLat, currentLng, cam.lat, cam.lng);
+      if (d > 15 && d < 450) {
+        const bearingToCam = this.calculateBearing(currentLat, currentLng, cam.lat, cam.lng);
+        const angleDiff = Math.abs(((bearingToCam - this.currentHeading) % 360 + 540) % 360 - 180);
+        if (angleDiff <= 28) {
+          const perp = d * Math.sin((angleDiff * Math.PI) / 180);
+          if (perp <= 24 && d < nearestCameraDist) {
+            nearestCameraDist = Math.round(d);
+            upcomingCameraLimit = cam.limit || 60;
+          }
+        }
+      }
+    }
+
+    if (nearestCameraDist < 450) {
+      this.onCameraAlert({
+        visible: true,
+        distance: this.formatNavDistance(nearestCameraDist),
+        distanceMeters: nearestCameraDist,
+        limit: upcomingCameraLimit
+      });
     } else {
       this.onCameraAlert({ visible: false });
     }

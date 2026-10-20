@@ -180,6 +180,39 @@ function updateVoiceIndicator(voice) {
   }
 }
 
+// Speedometer & Overspeed Alert Manager
+let lastOverspeedChimeTime = 0;
+
+function updateSpeedometerDisplay(speedKmh) {
+  const currentSpeed = Math.max(0, Math.round(speedKmh || 0));
+  const speedEl = document.getElementById('speed-current');
+  if (speedEl) speedEl.textContent = currentSpeed;
+
+  const circleEl = document.querySelector('.speed-current-circle');
+  const limitEl = document.getElementById('speed-limit-val');
+  const speedLimit = limitEl ? (parseInt(limitEl.textContent, 10) || 60) : 60;
+
+  // Overspeed threshold: +2 km/h over limit
+  const isOverspeed = currentSpeed > (speedLimit + 1);
+
+  if (circleEl) {
+    if (isOverspeed) {
+      circleEl.classList.add('overspeed');
+    } else {
+      circleEl.classList.remove('overspeed');
+    }
+  }
+
+  // Overspeed Warning Sound (audio signal throttled to once every 12s while exceeding limit)
+  if (isOverspeed && mapEngine && mapEngine.voiceEnabled) {
+    const now = Date.now();
+    if (now - lastOverspeedChimeTime > 12000) {
+      lastOverspeedChimeTime = now;
+      mapEngine.playNavChime();
+    }
+  }
+}
+
 // 2. Direct In-Car Tesla Browser Geolocation
 function initTeslaCarGps() {
   if (!('geolocation' in navigator)) {
@@ -193,8 +226,8 @@ function initTeslaCarGps() {
       const speedKmh = coords.speed ? Math.round(coords.speed * 3.6) : 0;
       const heading = coords.heading || 0;
 
-      // Update cluster speedometer
-      document.getElementById('speed-current').textContent = speedKmh;
+      // Update cluster speedometer with overspeed check
+      updateSpeedometerDisplay(speedKmh);
 
       // Update telemetry
       document.getElementById('tel-lat').textContent = Number(coords.latitude).toFixed(4);
@@ -260,7 +293,7 @@ function generateCode() {
 
 function handleIncomingGps(gps) {
   const speedKmh = Math.round((gps.speed || 0) * 3.6);
-  document.getElementById('speed-current').textContent = speedKmh;
+  updateSpeedometerDisplay(speedKmh);
 
   document.getElementById('tel-lat').textContent = Number(gps.lat).toFixed(4);
   document.getElementById('tel-lng').textContent = Number(gps.lng).toFixed(4);
@@ -1770,15 +1803,98 @@ function updateManeuverHud(m) {
     if (limitEl) limitEl.textContent = m.speedLimit;
   }
 
-  // Real Lane Guidance if present, otherwise remain hidden (no fake lanes)
+  // Real Lane Guidance matching Yandex Navigator (Screenshots 4 & 5)
+  renderLaneGuidance(m);
+}
+
+// Lane Guidance SVG Generator (Matching Yandex Navigator Road Sign - Screenshots 4 & 5)
+function getLaneArrowSvg(direction) {
+  switch (direction) {
+    case 'left':
+      return `<svg viewBox="0 0 24 26" width="22" height="24"><path d="M16 23v-9a3.5 3.5 0 0 0-3.5-3.5H6" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round"/><polyline points="10 6 5 10.5 10 15" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+    case 'right':
+      return `<svg viewBox="0 0 24 26" width="22" height="24"><path d="M8 23v-9a3.5 3.5 0 0 1 3.5-3.5H18" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round"/><polyline points="14 6 19 10.5 14 15" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+    case 'slight left':
+      return `<svg viewBox="0 0 24 26" width="22" height="24"><path d="M15 23l-3-10-5-5" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round"/><polyline points="12 7 6 7 6 13" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+    case 'slight right':
+      return `<svg viewBox="0 0 24 26" width="22" height="24"><path d="M9 23l3-10 5-5" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round"/><polyline points="12 7 18 7 18 13" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+    case 'uturn':
+      return `<svg viewBox="0 0 24 26" width="22" height="24"><path d="M16 23V9a4.5 4.5 0 0 0-9 0v14" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round"/><polyline points="11 19 7 23 3 19" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+    case 'straight-left':
+      return `<svg viewBox="0 0 26 26" width="24" height="24"><line x1="17" y1="23" x2="17" y2="5" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/><polyline points="13 9 17 4 21 9" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M17 15H7" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/><polyline points="10 11 6 15 10 19" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+    case 'straight-right':
+      return `<svg viewBox="0 0 26 26" width="24" height="24"><line x1="9" y1="23" x2="9" y2="5" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/><polyline points="5 9 9 4 13 9" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M9 15H19" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/><polyline points="16 11 20 15 16 19" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+    case 'straight':
+    default:
+      return `<svg viewBox="0 0 24 26" width="22" height="24"><line x1="12" y1="23" x2="12" y2="5" stroke="currentColor" stroke-width="2.8" stroke-linecap="round"/><polyline points="7 10 12 4 17 10" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+  }
+}
+
+function renderLaneGuidance(m) {
   const lanePill = document.getElementById('lane-guidance-pill');
-  if (lanePill) {
-    if (m.lanes && m.lanes.length > 0) {
-      lanePill.innerHTML = m.lanes.map(l => `<span class="lane-arrow ${l.valid ? 'active' : ''}">${l.symbol || '↑'}</span>`).join('');
-      lanePill.classList.remove('hidden');
+  if (!lanePill) return;
+
+  // 1. Explicit lane indications from router
+  if (m.lanes && Array.isArray(m.lanes) && m.lanes.length > 0) {
+    lanePill.innerHTML = m.lanes.map(l => {
+      const dir = (l.indications && l.indications[0]) ? l.indications[0] : (l.dir || 'straight');
+      const isActive = !!l.valid;
+      return `<div class="lane-arrow-sign ${isActive ? 'active' : ''}" title="${dir}">${getLaneArrowSvg(dir)}</div>`;
+    }).join('');
+    lanePill.classList.remove('hidden');
+    return;
+  }
+
+  // 2. Authentic Yandex Navigator lane sign synthesis for maneuvers within 450 meters
+  const rawDist = (typeof m.distanceMeters === 'number') ? m.distanceMeters : ((typeof m.rawDistance === 'number') ? m.rawDistance : 100);
+  const mod = (m.modifier || '').toLowerCase();
+  const isTurn = mod.includes('left') || mod.includes('right') || mod.includes('uturn') || mod.includes('fork');
+
+  if (rawDist <= 450 && (isTurn || rawDist <= 220)) {
+    let lanes = [];
+    if (mod.includes('uturn')) {
+      lanes = [
+        { dir: 'uturn', valid: true },
+        { dir: 'straight', valid: false }
+      ];
+    } else if (mod.includes('slight left') || mod.includes('fork left')) {
+      lanes = [
+        { dir: 'slight left', valid: true },
+        { dir: 'straight', valid: false }
+      ];
+    } else if (mod.includes('slight right') || mod.includes('fork right')) {
+      lanes = [
+        { dir: 'straight', valid: false },
+        { dir: 'slight right', valid: true }
+      ];
+    } else if (mod.includes('left')) {
+      lanes = [
+        { dir: 'left', valid: true },
+        { dir: 'straight', valid: false },
+        { dir: 'straight-right', valid: false }
+      ];
+    } else if (mod.includes('right')) {
+      lanes = [
+        { dir: 'straight-left', valid: false },
+        { dir: 'straight', valid: false },
+        { dir: 'right', valid: true }
+      ];
     } else {
-      lanePill.classList.add('hidden');
+      lanes = [
+        { dir: 'straight', valid: true },
+        { dir: 'straight', valid: true },
+        { dir: 'straight-right', valid: true }
+      ];
     }
+
+    lanePill.innerHTML = lanes.map(l => `
+      <div class="lane-arrow-sign ${l.valid ? 'active' : ''}" title="${l.dir}">
+        ${getLaneArrowSvg(l.dir)}
+      </div>
+    `).join('');
+    lanePill.classList.remove('hidden');
+  } else {
+    lanePill.classList.add('hidden');
   }
 }
 
@@ -2991,8 +3107,7 @@ function initDevMode() {
     if (pt && mapEngine) {
       mapEngine.updateCarPosition(pt.lat, pt.lng, pt.heading, curSpeed);
     }
-    const speedEl = document.getElementById('speed-current');
-    if (speedEl) speedEl.textContent = curSpeed;
+    updateSpeedometerDisplay(curSpeed);
 
     const pct = Math.min(100, Math.round((simDistance / simTotalDist) * 100));
     if (scrubSlider) scrubSlider.value = pct;

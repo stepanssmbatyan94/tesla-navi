@@ -24,7 +24,7 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
   <!-- Tesla Cockpit CSS -->
-  <link rel="stylesheet" href="css/tesla-display.css?v=6">
+  <link rel="stylesheet" href="css/tesla-display.css?v=8">
 </head>
 <body>
 
@@ -425,15 +425,7 @@
 
   <!-- 4. Speedometer & Speed Limit HUD + Auxiliary Controls (Mapsev Architecture) -->
   <div class="speed-limit-hud">
-    <!-- Twin Circles: Current Speed Circle + Speed Limit Sign (Screenshots 2 & 3) -->
-    <div class="speed-cluster-badge">
-      <div class="speed-current-circle" title="Текущая скорость">
-        <span id="speed-current" class="current-speed-val">0</span>
-      </div>
-      <div id="speed-limit-val" class="speed-limit-circle" title="Ограничение скорости">60</div>
-    </div>
-
-    <!-- Auxiliary Control Column: Charger, Lane/Traffic, Sound Toggle (Screenshots 2 & 3) -->
+    <!-- Auxiliary Control Column: Fixed at right edge (Charger, Lane/Traffic, Sound Toggle) -->
     <div class="top-aux-row">
       <button id="btn-quick-chargers" class="aux-btn aux-dark-btn" title="Зарядки EV">
         <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
@@ -455,7 +447,15 @@
       </button>
     </div>
 
-    <!-- Traffic Camera / Signal Alert (Only shown when approaching real camera) -->
+    <!-- Twin Circles: Current Speed Circle + Speed Limit Sign (Screenshots 2 & 3) -->
+    <div class="speed-cluster-badge">
+      <div class="speed-current-circle" title="Текущая скорость">
+        <span id="speed-current" class="current-speed-val">0</span>
+      </div>
+      <div id="speed-limit-val" class="speed-limit-circle" title="Ограничение скорости">60</div>
+    </div>
+
+    <!-- Traffic Camera / Signal Alert (Only shown when approaching real camera along route) -->
     <div id="camera-alert-badge" class="camera-alert-badge hidden">
       <div class="camera-alert-icon">📷</div>
       <span id="camera-alert-dist" class="camera-alert-dist"></span>
@@ -885,7 +885,7 @@
   <!-- Scripts -->
   <script src="js/config.js"></script>
   <script src="js/realtime.js"></script>
-  <script src="js/maps/map-engine.js?v=7"></script>
-  <script src="js/tesla-cockpit.js?v=7"></script>
+  <script src="js/maps/map-engine.js?v=8"></script>
+  <script src="js/tesla-cockpit.js?v=8"></script>
 </body>
 </html>

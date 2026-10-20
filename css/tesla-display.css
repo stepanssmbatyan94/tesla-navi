@@ -1105,30 +1105,47 @@ html, body {
   max-width: 280px;
 }
 
-/* Lane Guidance Pill */
+/* Authentic Yandex Navigator Lane Guidance Sign (Screenshots 4 & 5) */
 .lane-guidance-pill {
   position: absolute;
-  top: 82px;
+  top: 96px;
   left: 20px;
   z-index: 59;
-  background: #ffffff;
-  border: 1px solid rgba(0, 0, 0, 0.08);
-  border-radius: 14px;
-  padding: 6px 14px;
+  background: #0066ff;
+  border: 2.5px solid #ffffff;
+  border-radius: 12px;
+  padding: 6px 12px;
   display: flex;
   align-items: center;
   gap: 8px;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+  box-shadow: 0 6px 20px rgba(0, 102, 255, 0.45), 0 2px 6px rgba(0, 0, 0, 0.15);
 }
 
-.lane-arrow {
-  font-size: 15px;
-  font-weight: 800;
-  color: #94a3b8;
+.lane-arrow-sign {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 24px;
+  opacity: 0.35;
+  color: #ffffff;
+  transition: opacity 0.2s ease, transform 0.2s ease;
 }
 
-.lane-arrow.active {
-  color: #2563eb;
+.lane-arrow-sign.active {
+  opacity: 1;
+  color: #ffffff;
+  transform: scale(1.1);
+}
+
+.lane-arrow-sign svg {
+  width: 22px;
+  height: 24px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
 /* 5. Speedometer & Speed Limit HUD + Auxiliary Controls (Mapsev Architecture) */
@@ -1138,6 +1155,7 @@ html, body {
   right: 18px;
   z-index: 60;
   display: flex;
+  flex-direction: row-reverse; /* Pinned strictly to right edge: elements expand leftwards */
   align-items: flex-start;
   gap: 12px;
 }
@@ -1151,6 +1169,7 @@ html, body {
   border: none;
   box-shadow: none;
   padding: 0;
+  flex: none;
 }
 
 .speed-current-circle {
@@ -1164,6 +1183,31 @@ html, body {
   align-items: center;
   justify-content: center;
   flex: none;
+  transition: border-color 0.25s ease, background 0.25s ease, box-shadow 0.25s ease;
+}
+
+/* Over-speed Warning Pulse (Red alert when exceeding speed limit) */
+.speed-current-circle.overspeed {
+  border: 3.5px solid #ef4444;
+  background: #fef2f2;
+  box-shadow: 0 0 18px rgba(239, 68, 68, 0.55), 0 4px 14px rgba(0, 0, 0, 0.15);
+  animation: overspeed-pulse 0.9s infinite alternate ease-in-out;
+}
+
+.speed-current-circle.overspeed .current-speed-val {
+  color: #dc2626;
+  font-weight: 800;
+}
+
+@keyframes overspeed-pulse {
+  from {
+    transform: scale(1);
+    box-shadow: 0 0 10px rgba(239, 68, 68, 0.35);
+  }
+  to {
+    transform: scale(1.06);
+    box-shadow: 0 0 22px rgba(239, 68, 68, 0.7);
+  }
 }
 
 .current-speed-val {
@@ -2923,9 +2967,99 @@ html, body {
 /* Yandex Maps 2.1 Aesthetic enhancement matching Mapsev light mode */
 .ymaps-2-1-79-map canvas,
 .ymaps-2-1-79-map ymaps[class*="tile"],
+/* Authentic Yandex Navigator Speed Camera Map Pins (Screenshots 4 & 5) */
+.map-speed-camera-pin {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  cursor: pointer;
+  z-index: 25;
+  filter: drop-shadow(0 2px 5px rgba(0, 0, 0, 0.28));
+  transition: transform 0.2s ease;
+}
+
+.map-speed-camera-pin:hover {
+  transform: scale(1.18);
+}
+
+.camera-map-badge {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: #ffffff;
+  border: 2px solid #1e293b;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
+  position: relative;
+}
+
+.camera-map-badge svg {
+  width: 14px;
+  height: 14px;
+  fill: #1e293b;
+}
+
+/* Red ring when camera is active ahead along the current route */
+.camera-map-badge.active-route-camera {
+  border: 2.5px solid #ef4444;
+  box-shadow: 0 0 12px rgba(239, 68, 68, 0.6), 0 2px 6px rgba(0, 0, 0, 0.25);
+  animation: camera-pulse 1.2s infinite alternate ease-in-out;
+}
+
+.camera-map-badge.active-route-camera svg {
+  fill: #dc2626;
+}
+
+@keyframes camera-pulse {
+  from {
+    transform: scale(1);
+    box-shadow: 0 0 8px rgba(239, 68, 68, 0.4);
+  }
+  to {
+    transform: scale(1.12);
+    box-shadow: 0 0 16px rgba(239, 68, 68, 0.8);
+  }
+}
+
+/* Yandex Maps 2.1 Aesthetic enhancement matching Mapsev light mode */
+.ymaps-2-1-79-map canvas,
+.ymaps-2-1-79-map ymaps[class*="tile"],
 .ymaps-2-1-79-map img {
   filter: contrast(1.08) saturate(0.8) brightness(1.02) hue-rotate(-6deg);
 }
+
+/* Suppress Yandex Maps 2.1 promo links ("Создать свою карту", "Как добраться", taxi, promo banners) */
+ymaps[class*="-gotoymaps"],
+ymaps[class*="-gototaxi"],
+ymaps[class*="-gototech"],
+ymaps[class*="-float-button"],
+ymaps[class*="-map-tools"],
+ymaps[class*="copyright__promo"],
+ymaps[class*="copyrights-promo"],
+ymaps[class*="copyright__link"],
+.ymaps-2-1-79-map-tools,
+.ymaps-2-1-79-float-button,
+.ymaps-2-1-79-gotoymaps,
+.ymaps-2-1-79-gototaxi,
+.ymaps-2-1-79-copyright__promo,
+.ymaps-2-1-79-copyright__link,
+.ymaps-2-1-79-map-copyrights-promo,
+a[href*="maps.yandex"],
+a[href*="yandex.ru/maps"],
+a[href*="constructor"],
+a[href*="api-maps"],
+a[href*="nmaps.yandex"],
+ymaps[class*="copyright"] a[target="_blank"] {
+  display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+
 
 
 
