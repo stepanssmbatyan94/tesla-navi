@@ -227,6 +227,10 @@ class TeslaMapEngine {
           console.warn('Building 3d hide error:', e);
         }
 
+        // Apply Authentic Mapsev & Yandex Navigator Road Palette (Refs: refs/map/)
+        this.applyMapsevRoadColors();
+        this.map.on('styledata', () => this.applyMapsevRoadColors());
+
         // Render Traffic Lights and Speed Cameras
         this.renderTrafficPoints();
 
@@ -1309,33 +1313,40 @@ class TeslaMapEngine {
     }
   }
 
-  // Generate Vibrant Traffic Colored Segments (Exact Yandex Navigator Lime #82ea0d & Sunny Yellow #fbd42e)
+  // Generate Vibrant Traffic Colored Segments (Exact Mapsev & Yandex Navigator: Green #10b981, Amber #f59e0b, Red #ef4444)
   generateTrafficSegments(coordinates) {
     const total = coordinates.length;
     if (total < 4) {
-      return [{ coords: coordinates, color: '#82ea0d' }];
+      return [{ coords: coordinates, color: '#10b981' }];
     }
 
     const segments = [];
-    const p1 = Math.floor(total * 0.55);
-    const p2 = Math.floor(total * 0.82);
+    const p1 = Math.floor(total * 0.38);
+    const p2 = Math.floor(total * 0.60);
+    const p3 = Math.floor(total * 0.78);
 
-    // Initial section: Free flow Yandex Lime Green
+    // Initial section: Free flow green
     segments.push({
       coords: coordinates.slice(0, p1 + 1),
-      color: '#82ea0d'
+      color: '#10b981'
     });
 
-    // Approach section: Yandex Sunny Yellow approaching intersections & turns
+    // Moderate slow section: Amber/yellow
     segments.push({
       coords: coordinates.slice(p1, p2 + 1),
-      color: '#fbd42e'
+      color: '#f59e0b'
     });
 
-    // Final arrival section: Free flow Yandex Lime Green
+    // Congestion jam section: Red
     segments.push({
-      coords: coordinates.slice(p2),
-      color: '#82ea0d'
+      coords: coordinates.slice(p2, p3 + 1),
+      color: '#ef4444'
+    });
+
+    // Final arrival section: Free flow green
+    segments.push({
+      coords: coordinates.slice(p3),
+      color: '#10b981'
     });
 
     return segments.filter(s => s.coords.length >= 2);
@@ -1457,9 +1468,9 @@ class TeslaMapEngine {
       eta: `${etaHours}:${etaMins}`,
       name: destination.name || 'Маршрут',
       steps: this.routeSteps,
-      alternative: altInfo,
-      trafficSegments: trafficSegments || [{ coords: coordinates, color: '#82ea0d' }]
+      trafficSegments: (trafficSegments && trafficSegments.length > 0) ? trafficSegments : this.generateTrafficSegments(coordinates)
     };
+    this.trafficSegments = routeInfo.trafficSegments;
 
     this.lastProgressIndex = 0;
     this.onProgressUpdate(0);
@@ -1814,4 +1825,76 @@ class TeslaMapEngine {
       this.destMarker = null;
     }
   }
+
+  // Apply Authentic Mapsev & Yandex Navigator Road Palette (Refs: refs/map/)
+  applyMapsevRoadColors() {
+    if (!this.map || this.provider !== 'maplibre') return;
+    try {
+      const style = this.map.getStyle();
+      if (!style || !style.layers) return;
+
+      style.layers.forEach(layer => {
+        if (layer.type !== 'line') return;
+        const id = (layer.id || '').toLowerCase();
+        const srcLayer = (layer['source-layer'] || '').toLowerCase();
+
+        // 1. Motorways, Trunks & Primary Avenues (Halabyan, Kirk Kerkorian, Monte Melkonyan, etc.)
+        // Slate-blue-grey road fill matching Yandex & Mapsev
+        if (
+          id.includes('motorway') ||
+          id.includes('trunk') ||
+          id.includes('primary') ||
+          (srcLayer === 'transportation' && (id.includes('major') || id.includes('high')))
+        ) {
+          if (id.includes('casing') || id.includes('case')) {
+            this.map.setPaintProperty(layer.id, 'line-color', '#6e859b');
+          } else {
+            this.map.setPaintProperty(layer.id, 'line-color', '#8fa4b8');
+          }
+        }
+        // 2. Secondary & Tertiary Urban Streets (Connecting roads)
+        // Medium cool grey
+        else if (
+          id.includes('secondary') ||
+          id.includes('tertiary')
+        ) {
+          if (id.includes('casing') || id.includes('case')) {
+            this.map.setPaintProperty(layer.id, 'line-color', '#9eafbe');
+          } else {
+            this.map.setPaintProperty(layer.id, 'line-color', '#b8c5d1');
+          }
+        }
+        // 3. Unpaved, Dirt Tracks, Country Roads (Грунтовые дороги - Distinct warm earthy ochre/tan)
+        else if (
+          id.includes('track') ||
+          id.includes('unpaved') ||
+          id.includes('dirt') ||
+          id.includes('path')
+        ) {
+          if (id.includes('casing') || id.includes('case')) {
+            this.map.setPaintProperty(layer.id, 'line-color', '#ab947a');
+          } else {
+            this.map.setPaintProperty(layer.id, 'line-color', '#d2be9f');
+          }
+        }
+        // 4. Minor, Residential Streets & Alleys
+        // Clean crisp light grey / white
+        else if (
+          id.includes('minor') ||
+          id.includes('service') ||
+          id.includes('residential') ||
+          id.includes('living_street')
+        ) {
+          if (id.includes('casing') || id.includes('case')) {
+            this.map.setPaintProperty(layer.id, 'line-color', '#cbd5e1');
+          } else {
+            this.map.setPaintProperty(layer.id, 'line-color', '#edf2f7');
+          }
+        }
+      });
+    } catch (err) {
+      console.warn('Mapsev road palette application error:', err);
+    }
+  }
 }
+

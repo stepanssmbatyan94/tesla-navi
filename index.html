@@ -143,7 +143,9 @@
             </div>
             <div class="commute-right-actions">
               <span id="home-eta-badge" class="commute-eta-badge">12 мин</span>
-              <button class="commute-edit-btn" id="btn-edit-home" title="Настроить Дом">✏️</button>
+              <button class="commute-edit-btn" id="btn-edit-home" title="Настроить Дом">
+                <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="#64748b" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+              </button>
             </div>
           </div>
           <div id="home-address-sub" class="commute-address-sub">ул. Амиряна, 18</div>
@@ -157,7 +159,9 @@
             </div>
             <div class="commute-right-actions">
               <span id="work-eta-badge" class="commute-eta-badge">19 мин</span>
-              <button class="commute-edit-btn" id="btn-edit-work" title="Настроить Работу">✏️</button>
+              <button class="commute-edit-btn" id="btn-edit-work" title="Настроить Работу">
+                <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="#64748b" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+              </button>
             </div>
           </div>
           <div id="work-address-sub" class="commute-address-sub">ул. Акоп Акопян, 3</div>
@@ -471,16 +475,16 @@
           <span id="nav-duration" class="nav-metric-duration">0 мин</span>
           <span id="nav-distance" class="nav-metric-dist">0 км</span>
           <span id="nav-eta" class="nav-metric-eta">--:--</span>
-          <span class="nav-battery-pill">
-            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="#16a34a" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="16" height="10" rx="2" ry="2"/><line x1="20" y1="11" x2="20" y2="13"/><rect x="4" y="9" width="10" height="6" fill="#16a34a" rx="1"/></svg>
+          <span class="nav-battery-pill" title="Запас батареи по прибытию">
+            <span class="nav-battery-outline"><span id="nav-battery-level-bar" class="nav-battery-level" style="width: 78%;"></span></span>
             <span id="nav-battery-val">78%</span>
           </span>
         </div>
 
         <div class="nav-route-progress-wrap">
-          <span class="nav-progress-origin-dot"></span>
-          <div class="nav-progress-track">
-            <div id="prog-traveled-fill" class="nav-progress-fill" style="width: 100%;"></div>
+          <div id="nav-progress-track" class="nav-progress-track">
+            <div id="nav-traffic-segments-bar" class="nav-traffic-segments-bar"></div>
+            <div id="nav-progress-car-knob" class="nav-progress-car-knob" style="left: 0%;"></div>
           </div>
         </div>
       </div>

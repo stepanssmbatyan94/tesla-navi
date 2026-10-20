@@ -13,6 +13,9 @@ let youtubeQueue = [];
 let currentTrackIndex = -1;
 let isMusicPlaying = false;
 let currentTrackInfo = null;
+let currentYtQuery = '';
+let currentYtContinuationToken = null;
+let isYtLoadingMore = false;
 
 // Yerevan EV Supercharging Stations Hubs (CPS, Flash, PlugShare, Dalma)
 const EV_CHARGERS = [
@@ -461,16 +464,14 @@ async function initMap() {
       if (recenterBtn) recenterBtn.classList.remove('hidden');
     },
     onProgressUpdate: (progress) => {
+      const knob = document.getElementById('nav-progress-car-knob');
       const cursor = document.getElementById('prog-car-cursor');
       const traveledFill = document.getElementById('prog-traveled-fill');
       if (typeof progress === 'object') {
         const pct = Math.min(100, Math.max(0, progress.percent !== undefined ? progress.percent : 0));
-        if (cursor) {
-          cursor.style.left = `${Math.min(96, pct)}%`;
-        }
-        if (traveledFill) {
-          traveledFill.style.width = `${pct}%`;
-        }
+        if (knob) knob.style.left = `${pct}%`;
+        if (cursor) cursor.style.left = `${Math.min(96, pct)}%`;
+        if (traveledFill) traveledFill.style.width = `${pct}%`;
         if (progress.remainingDistance) {
           const el = document.getElementById('nav-distance');
           if (el) el.textContent = progress.remainingDistance;
@@ -485,6 +486,7 @@ async function initMap() {
         }
       } else {
         const pct = Math.min(100, Math.max(0, progress || 0));
+        if (knob) knob.style.left = `${pct}%`;
         if (cursor) cursor.style.left = `${Math.min(96, pct)}%`;
         if (traveledFill) traveledFill.style.width = `${pct}%`;
       }
@@ -1317,16 +1319,12 @@ function getSearchHistory() {
     const raw = localStorage.getItem(SEARCH_HISTORY_KEY);
     if (raw) {
       const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      if (Array.isArray(parsed)) return parsed;
     }
   } catch (e) {
     console.warn('Failed to parse search history:', e);
   }
-  return [
-    { name: 'Kirk Kerkorian Street, 29/14', address: 'Yerevan, Armenia', lat: 40.189551, lng: 44.468663 },
-    { name: 'Kirk Kerkorian Street', address: 'Yerevan, Armenia', lat: 40.188200, lng: 44.471500 },
-    { name: 'Hakob Hakobyan Street', address: 'Arabkir, Yerevan', lat: 40.198213, lng: 44.492887 }
-  ];
+  return []; // Empty by default: zero hardcoded history
 }
 
 function saveSearchHistory(history) {
@@ -1661,31 +1659,28 @@ function showRouteAlternativesDrawer(route) {
   drawer.classList.remove('hidden');
 }
 
-// 7. Navigation HUD Displays
+// 7. Navigation HUD Displays (Mapsev Capsule Style & Traffic Progress Bar)
 function renderTrafficProgressBar(segments) {
-  const barContainer = document.querySelector('.route-progress-bar');
+  const barContainer = document.getElementById('nav-traffic-segments-bar') || document.querySelector('.route-progress-bar');
   if (!barContainer) return;
   barContainer.innerHTML = '';
 
-  if (!segments || segments.length === 0) {
-    barContainer.innerHTML = '<div class="prog-seg green" style="width: 100%; background: #82ea0d;"></div>';
-    return;
-  }
+  const segs = (segments && segments.length > 0) ? segments : [
+    { coords: new Array(40), color: '#10b981' },
+    { coords: new Array(25), color: '#f59e0b' },
+    { coords: new Array(15), color: '#ef4444' },
+    { coords: new Array(20), color: '#10b981' }
+  ];
 
-  // Count total coordinates across all segments
-  const totalPoints = segments.reduce((sum, s) => sum + (s.coords ? s.coords.length : 1), 0);
-  if (totalPoints <= 0) {
-    barContainer.innerHTML = '<div class="prog-seg green" style="width: 100%; background: #82ea0d;"></div>';
-    return;
-  }
+  const totalPoints = segs.reduce((sum, s) => sum + (s.coords ? s.coords.length : 1), 0);
 
-  segments.forEach(seg => {
+  segs.forEach(seg => {
     const pts = seg.coords ? seg.coords.length : 1;
-    const widthPct = (pts / totalPoints) * 100;
     const segDiv = document.createElement('div');
-    segDiv.className = 'prog-seg';
-    segDiv.style.width = `${widthPct.toFixed(2)}%`;
-    segDiv.style.background = seg.color || '#82ea0d';
+    segDiv.className = 'nav-traffic-seg';
+    segDiv.style.flex = `${pts}`;
+    segDiv.style.height = '100%';
+    segDiv.style.background = seg.color || '#10b981';
     barContainer.appendChild(segDiv);
   });
 }
@@ -1705,13 +1700,15 @@ function showNavigationHud(route) {
   document.getElementById('nav-distance').textContent = route.distance;
   document.getElementById('nav-eta').textContent = route.eta;
 
-  // Reset progress car cursor and traveled fill to 0% at route start
+  // Reset progress car knob and cursor to 0% at route start
+  const knob = document.getElementById('nav-progress-car-knob');
+  if (knob) knob.style.left = '0%';
   const cursor = document.getElementById('prog-car-cursor');
   if (cursor) cursor.style.left = '0%';
   const traveledFill = document.getElementById('prog-traveled-fill');
   if (traveledFill) traveledFill.style.width = '0%';
 
-  // Render authentic live traffic segments on the bottom progress bar
+  // Render authentic live traffic segments on the bottom progress bar (Mapsev Screenshot 3)
   renderTrafficProgressBar(route.trafficSegments);
 }
 
@@ -1768,6 +1765,8 @@ function cancelActiveNavigation() {
   if (camBadge) camBadge.classList.add('hidden');
   const altDrawer = document.getElementById('route-alternatives-drawer');
   if (altDrawer) altDrawer.classList.add('hidden');
+  const knob = document.getElementById('nav-progress-car-knob');
+  if (knob) knob.style.left = '0%';
   const cursor = document.getElementById('prog-car-cursor');
   if (cursor) cursor.style.left = '0%';
   const traveledFill = document.getElementById('prog-traveled-fill');
@@ -1792,18 +1791,24 @@ function toggleEvChargers(show) {
   const btnQuick = document.getElementById('btn-quick-chargers');
   if (btnQuick) btnQuick.classList.toggle('active', !!show);
   if (!mapEngine || !mapEngine.map) return;
+  chargersVisible = !!show;
+  document.getElementById('btn-toggle-chargers')?.classList.toggle('active', chargersVisible);
 
-  if (!show) {
+  if (!chargersVisible) {
     activeChargersMarkers.forEach(m => m.remove());
     activeChargersMarkers = [];
     return;
   }
 
+  // Clear any existing before re-rendering
+  activeChargersMarkers.forEach(m => m.remove());
+  activeChargersMarkers = [];
+
   EV_CHARGERS.forEach(charger => {
     const el = document.createElement('div');
     el.className = 'tesla-dest-pin';
     el.innerHTML = `
-      <div style="width: 32px; height: 32px; border-radius: 50%; background: #10b981; border: 2.5px solid #fff; display: grid; place-items: center; color: #fff; font-size: 14px; font-weight: 800; box-shadow: 0 4px 12px rgba(16,185,129,0.5);">
+      <div style="width: 32px; height: 32px; border-radius: 50%; background: #10b981; border: 2.5px solid #fff; display: grid; place-items: center; color: #fff; font-size: 14px; font-weight: 800; box-shadow: 0 4px 12px rgba(16,185,129,0.5); cursor: pointer;">
         ⚡
       </div>
     `;
@@ -1828,25 +1833,28 @@ function initChargingStationsDrawer() {
   const dockBatteryBadge = document.getElementById('dock-battery-badge');
   const btnQuick = document.getElementById('btn-quick-chargers');
 
+  // Bottom dock battery badge opens the full list drawer
   if (dockBatteryBadge) {
     dockBatteryBadge.addEventListener('click', () => {
       openChargingStationsDrawer();
     });
   }
 
+  // Left sidebar lightning button: toggles drawing pins on the map ("левый рисует или не рисует на карте")
   if (btnToolbar) {
     btnToolbar.addEventListener('click', () => {
+      toggleEvChargers(!chargersVisible);
+    });
+  }
+
+  // Right sidebar lightning button: opens/closes the list drawer ("правый сайдбар дает список")
+  if (btnQuick) {
+    btnQuick.addEventListener('click', () => {
       if (drawer && !drawer.classList.contains('hidden')) {
         closeChargingStationsDrawer();
       } else {
         openChargingStationsDrawer();
       }
-    });
-  }
-
-  if (btnQuick) {
-    btnQuick.addEventListener('click', () => {
-      openChargingStationsDrawer();
     });
   }
 
@@ -1868,19 +1876,16 @@ function openChargingStationsDrawer() {
   document.getElementById('pairing-modal')?.classList.add('hidden');
 
   drawer.classList.remove('hidden');
-  document.getElementById('btn-toggle-chargers')?.classList.add('active');
+  document.getElementById('btn-quick-chargers')?.classList.add('active');
 
   // Render stations with live distances
   renderChargingStationsList();
-
-  // Show EV pins on map
-  toggleEvChargers(true);
 }
 
 function closeChargingStationsDrawer() {
   const drawer = document.getElementById('charging-stations-drawer');
   if (drawer) drawer.classList.add('hidden');
-  document.getElementById('btn-toggle-chargers')?.classList.remove('active');
+  document.getElementById('btn-quick-chargers')?.classList.remove('active');
 }
 
 function renderChargingStationsList() {
@@ -2236,7 +2241,7 @@ function initWeatherAndMusic() {
   if (btnMiniInfoExpand) btnMiniInfoExpand.addEventListener('click', expandToFullPlayer);
   if (btnMiniClose) btnMiniClose.addEventListener('click', stopAndCloseAllMusic);
 
-  // Render 10-20 recommendations matching Mapsev Screenshots 3, 4, 5
+  // Render recommendations with Infinite Scroll support
   function renderRecommendations(tracks) {
     if (!ytResultsList) return;
     ytResultsList.innerHTML = '';
@@ -2245,7 +2250,13 @@ function initWeatherAndMusic() {
       return;
     }
 
-    tracks.forEach((track, idx) => {
+    appendRecommendations(tracks, 0);
+  }
+
+  function appendRecommendations(tracks, startIndex) {
+    if (!ytResultsList) return;
+    tracks.forEach((track, offset) => {
+      const idx = startIndex + offset;
       const item = document.createElement('div');
       item.className = `yt-result-item ${idx === currentTrackIndex ? 'playing' : ''}`;
       item.dataset.id = track.id;
@@ -2274,6 +2285,48 @@ function initWeatherAndMusic() {
     });
   }
 
+  // Infinite Scroll fetcher for YouTube
+  async function loadMoreYtResults() {
+    if (isYtLoadingMore || !currentYtContinuationToken || !ytResultsList) return;
+    isYtLoadingMore = true;
+
+    let loaderEl = document.getElementById('yt-infinite-loader');
+    if (!loaderEl) {
+      loaderEl = document.createElement('div');
+      loaderEl.id = 'yt-infinite-loader';
+      loaderEl.style.cssText = 'text-align: center; padding: 12px; color: #94a3b8; font-size: 12px; font-weight: 500;';
+      loaderEl.innerHTML = '<span style="display:inline-block; animation: spin 1s infinite linear;">↻</span> Загрузка...';
+      ytResultsList.appendChild(loaderEl);
+    }
+
+    try {
+      const res = await fetch(`/api/yt-search?continuation=${encodeURIComponent(currentYtContinuationToken)}`);
+      const data = await res.json();
+      if (data.results && data.results.length > 0) {
+        currentYtContinuationToken = data.continuationToken || null;
+        const startIndex = youtubeQueue.length;
+        youtubeQueue.push(...data.results);
+        appendRecommendations(data.results, startIndex);
+      } else {
+        currentYtContinuationToken = null;
+      }
+    } catch (err) {
+      console.warn('Infinite scroll YouTube fetch error:', err);
+    } finally {
+      isYtLoadingMore = false;
+      document.getElementById('yt-infinite-loader')?.remove();
+    }
+  }
+
+  // Infinite scroll listener on YouTube results list
+  if (ytResultsList) {
+    ytResultsList.addEventListener('scroll', () => {
+      if (ytResultsList.scrollTop + ytResultsList.clientHeight >= ytResultsList.scrollHeight - 140) {
+        loadMoreYtResults();
+      }
+    });
+  }
+
   // Live YouTube Search & Immediate Auto-Play of First Result (User Explicit Requirement)
   async function handleYtSearch(customQuery) {
     const q = (customQuery !== undefined ? customQuery : (ytSearchInput ? ytSearchInput.value : '')).trim();
@@ -2292,16 +2345,20 @@ function initWeatherAndMusic() {
     }
 
     if (btnYtSearchGo) btnYtSearchGo.textContent = '...';
+    currentYtQuery = q;
+    currentYtContinuationToken = null;
+    isYtLoadingMore = false;
 
     try {
       const res = await fetch(`/api/yt-search?q=${encodeURIComponent(q)}`);
       const data = await res.json();
       if (data.results && data.results.length > 0) {
         youtubeQueue = data.results;
+        currentYtContinuationToken = data.continuationToken || null;
         currentTrackIndex = 0;
         currentTrackInfo = youtubeQueue[0];
 
-        // 1. Render all 10-20 recommendations below matching Screenshot 3 & 4
+        // 1. Render all 20 results with infinite scroll capability
         renderRecommendations(youtubeQueue);
 
         // 2. Immediately auto-play the 1st song (User requirement)

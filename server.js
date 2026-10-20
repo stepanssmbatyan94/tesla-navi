@@ -804,44 +804,99 @@ function getArmenianAudio(text, voiceChoice = 'gor') {
     return;
   }
 
-  // API 4: /api/yt-search (Live YouTube Search & Recommendations for Tesla Cockpit)
+  // API 4: /api/yt-search (Live YouTube Search with Infinite Scroll Pagination)
   if (pathname === '/api/yt-search') {
-    const q = (parsedUrl.searchParams.get('q') || 'trending music').trim();
+    const q = (parsedUrl.searchParams.get('q') || '').trim();
+    const continuation = (parsedUrl.searchParams.get('continuation') || '').trim();
+
     try {
-      const ytUrl = 'https://www.youtube.com/results?search_query=' + encodeURIComponent(q);
-      const ytRes = await fetch(ytUrl, {
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-          'Accept-Language': 'ru-RU,ru;q=0.9,en-US;q=0.8,en;q=0.7,hy;q=0.6'
-        }
-      });
-      const html = await ytRes.text();
-      const dataMatch = html.match(/var ytInitialData = ({.*?});<\/script>/);
       const results = [];
-      if (dataMatch) {
-        const data = JSON.parse(dataMatch[1]);
-        const contents = data.contents?.twoColumnSearchResultsRenderer?.primaryContents?.sectionListRenderer?.contents?.[0]?.itemSectionRenderer?.contents || [];
-        for (const item of contents) {
-          const v = item.videoRenderer;
-          if (v && v.videoId) {
-            const title = v.title?.runs?.[0]?.text || '';
-            const duration = v.lengthText?.simpleText || '';
-            const channel = v.ownerText?.runs?.[0]?.text || v.shortBylineText?.runs?.[0]?.text || '';
-            const thumbObj = v.thumbnail?.thumbnails?.[v.thumbnail.thumbnails.length - 1] || v.thumbnail?.thumbnails?.[0];
-            const thumbnail = thumbObj ? thumbObj.url : `https://i.ytimg.com/vi/${v.videoId}/hqdefault.jpg`;
-            if (title) {
-              results.push({ id: v.videoId, title, duration, channel, thumbnail });
+      let nextContinuationToken = null;
+
+      if (continuation) {
+        // Fetch next page via YouTube InnerTube Search API
+        const ytRes = await fetch('https://www.youtube.com/youtubei/v1/search?prettyPrint=false', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+          },
+          body: JSON.stringify({
+            context: {
+              client: { clientName: 'WEB', clientVersion: '2.20240101.00.00', hl: 'ru', gl: 'AM' }
+            },
+            continuation
+          })
+        });
+        const data = await ytRes.json();
+        const actions = data.onResponseReceivedCommands?.[0]?.appendContinuationItemsAction?.continuationItems || [];
+        for (const act of actions) {
+          if (act.itemSectionRenderer?.contents) {
+            for (const item of act.itemSectionRenderer.contents) {
+              const v = item.videoRenderer;
+              if (v && v.videoId) {
+                const title = v.title?.runs?.[0]?.text || '';
+                const duration = v.lengthText?.simpleText || '';
+                const channel = v.ownerText?.runs?.[0]?.text || v.shortBylineText?.runs?.[0]?.text || '';
+                const thumbObj = v.thumbnail?.thumbnails?.[v.thumbnail.thumbnails.length - 1] || v.thumbnail?.thumbnails?.[0];
+                const thumbnail = thumbObj ? thumbObj.url : `https://i.ytimg.com/vi/${v.videoId}/hqdefault.jpg`;
+                if (title) {
+                  results.push({ id: v.videoId, title, duration, channel, thumbnail });
+                }
+              }
             }
-            if (results.length >= 20) break;
+          }
+          if (act.continuationItemRenderer) {
+            nextContinuationToken = act.continuationItemRenderer.continuationEndpoint?.continuationCommand?.token || null;
+          }
+        }
+      } else {
+        // Initial HTML search query
+        const searchQuery = q || 'trending music';
+        const ytUrl = 'https://www.youtube.com/results?search_query=' + encodeURIComponent(searchQuery);
+        const ytRes = await fetch(ytUrl, {
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Accept-Language': 'ru-RU,ru;q=0.9,en-US;q=0.8,en;q=0.7,hy;q=0.6'
+          }
+        });
+        const html = await ytRes.text();
+        const dataMatch = html.match(/var ytInitialData = ({.*?});<\/script>/);
+        if (dataMatch) {
+          const data = JSON.parse(dataMatch[1]);
+          const sectionList = data.contents?.twoColumnSearchResultsRenderer?.primaryContents?.sectionListRenderer?.contents || [];
+          for (const section of sectionList) {
+            const contents = section.itemSectionRenderer?.contents || [];
+            for (const item of contents) {
+              const v = item.videoRenderer;
+              if (v && v.videoId) {
+                const title = v.title?.runs?.[0]?.text || '';
+                const duration = v.lengthText?.simpleText || '';
+                const channel = v.ownerText?.runs?.[0]?.text || v.shortBylineText?.runs?.[0]?.text || '';
+                const thumbObj = v.thumbnail?.thumbnails?.[v.thumbnail.thumbnails.length - 1] || v.thumbnail?.thumbnails?.[0];
+                const thumbnail = thumbObj ? thumbObj.url : `https://i.ytimg.com/vi/${v.videoId}/hqdefault.jpg`;
+                if (title) {
+                  results.push({ id: v.videoId, title, duration, channel, thumbnail });
+                }
+              }
+            }
+            if (section.continuationItemRenderer) {
+              nextContinuationToken = section.continuationItemRenderer.continuationEndpoint?.continuationCommand?.token || null;
+            }
+          }
+          const lastItem = sectionList[sectionList.length - 1];
+          if (lastItem && lastItem.continuationItemRenderer) {
+            nextContinuationToken = lastItem.continuationItemRenderer.continuationEndpoint?.continuationCommand?.token || nextContinuationToken;
           }
         }
       }
+
       res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ success: true, results }));
+      res.end(JSON.stringify({ success: true, results, continuationToken: nextContinuationToken }));
     } catch (e) {
       console.warn('YouTube search fetch warning:', e.message);
       res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ success: false, error: e.message, results: [] }));
+      res.end(JSON.stringify({ success: false, error: e.message, results: [], continuationToken: null }));
     }
     return;
   }
