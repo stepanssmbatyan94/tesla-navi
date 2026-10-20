@@ -21,7 +21,7 @@ class TeslaMapEngine {
     this.routePolyline = null;
     this.followCar = true;
     this.isHeadingUp = true; // True = map turns with car, False = North-up
-    this.is3D = false; // Default clean flat 2D like Mapsev & Yandex Navigator
+    this.is3D = true; // 3D Perspective Driving View with 3D buildings
     this.voiceEnabled = true;
 
     this.currentPosition = { lat: this.center.lat, lng: this.center.lng, heading: 0, speed: 0 };
@@ -164,7 +164,7 @@ class TeslaMapEngine {
         zoom: this.navZoom,
         minZoom: 3,
         maxZoom: 19.5,
-        pitch: 0, // Clean flat 2D like Mapsev & Yandex Navigator
+        pitch: CONFIG.navigationPitch || 48, // 3D Perspective Driving View (MapsEV & Yandex 3D)
         bearing: 0,
         attributionControl: false,
         fadeDuration: 0
@@ -215,16 +215,15 @@ class TeslaMapEngine {
       });
 
       this.map.on('load', () => {
-        // Remove/hide bulky 3D extruded building blocks so map stays completely clean & unobstructed
+        // Enable and style 3D Extruded Buildings (MapsEV / Yandex 3D Architecture)
         try {
-          const layers = this.map.getStyle().layers || [];
-          layers.forEach(layer => {
-            if (layer.type === 'fill-extrusion' || layer.id.includes('3d') || layer.id.includes('building-extrusion')) {
-              this.map.setLayoutProperty(layer.id, 'visibility', 'none');
-            }
-          });
+          if (this.map.getLayer('building-3d')) {
+            this.map.setLayoutProperty('building-3d', 'visibility', 'visible');
+            this.map.setPaintProperty('building-3d', 'fill-extrusion-opacity', 0.88);
+            this.map.setPaintProperty('building-3d', 'fill-extrusion-color', '#ebe6dc');
+          }
         } catch (e) {
-          console.warn('Building 3d hide error:', e);
+          console.warn('Building 3d setup error:', e);
         }
 
         // Apply Authentic Mapsev & Yandex Navigator Road Palette (Refs: refs/map/)
@@ -944,7 +943,7 @@ class TeslaMapEngine {
             center: [displayLng, displayLat],
             zoom: this.navZoom,
             bearing: this.currentHeading,
-            pitch: 35,
+            pitch: CONFIG.navigationPitch || 48,
             padding: navPadding
           });
         }
