@@ -787,18 +787,18 @@ function initToolbarHandlers() {
     btn.addEventListener('click', () => pairingModal.classList.add('hidden'));
   });
 
-  // Map Engine Switcher: 3D Vector (MapLibre) vs Yandex Live Traffic (Яндекс)
+  // Map Engine Switcher: MapLibre Vector vs Yandex Live Traffic (Яндекс)
   const btnToggleProvider = document.getElementById('btn-toggle-provider');
   const providerIndicator = document.getElementById('provider-indicator');
   const activeProv = new URLSearchParams(window.location.search).get('provider') || localStorage.getItem('tesla_map_provider') || 'maplibre';
   if (providerIndicator) {
-    providerIndicator.textContent = activeProv === 'yandex' ? 'ЯН' : '3D';
+    providerIndicator.textContent = activeProv === 'yandex' ? 'ЯН' : 'ML';
     providerIndicator.style.color = activeProv === 'yandex' ? '#ef4444' : '#38bdf8';
   }
   if (btnToggleProvider) {
     btnToggleProvider.title = activeProv === 'yandex'
-      ? 'Карта: Яндекс (живой слой пробок). Нажмите для 3D Vector'
-      : 'Карта: 3D Vector. Нажмите для Яндекс.Пробок';
+      ? 'Карта: Яндекс (пробки). Нажмите для переключения на MapLibre'
+      : 'Карта: MapLibre. Нажмите для переключения на Яндекс';
 
     btnToggleProvider.addEventListener('click', () => {
       const currentUrlProv = new URLSearchParams(window.location.search).get('provider');
@@ -819,6 +819,25 @@ function initToolbarHandlers() {
       btnCompass.classList.toggle('active', isHeadingUp);
     }
   });
+
+  // 2D / 3D Mode Toggle (MapsEV Isometric Cube Switcher)
+  const btnToggle2D3D = document.getElementById('btn-toggle-2d3d');
+  const btn3DModeLabel = document.getElementById('btn-3d-mode-label');
+  const saved3D = localStorage.getItem('tesla_map_3d_mode');
+  const isInitial3D = saved3D === '3d';
+  if (btnToggle2D3D) {
+    btnToggle2D3D.classList.toggle('is-3d', isInitial3D);
+    if (btn3DModeLabel) btn3DModeLabel.textContent = isInitial3D ? '3D' : '2D';
+    btnToggle2D3D.title = isInitial3D ? 'Переключить в 2D плоский вид' : 'Переключить в 3D перспективный вид';
+    btnToggle2D3D.addEventListener('click', () => {
+      if (mapEngine && typeof mapEngine.toggle2D3D === 'function') {
+        const is3D = mapEngine.toggle2D3D();
+        btnToggle2D3D.classList.toggle('is-3d', is3D);
+        if (btn3DModeLabel) btn3DModeLabel.textContent = is3D ? '3D' : '2D';
+        btnToggle2D3D.title = is3D ? 'Переключить в 2D плоский вид' : 'Переключить в 3D перспективный вид';
+      }
+    });
+  }
 
   // EV Charging Stations Drawer & Battery Pill Handlers (Mapsev Reference)
   initChargingStationsDrawer();

@@ -24,7 +24,7 @@ const CONFIG = {
   defaultProvider: 'maplibre', // 'maplibre' | 'yandex' | 'osm'
   maplibreStyle: 'https://tiles.openfreemap.org/styles/liberty',
   navigationZoom: 16.5,
-  navigationPitch: 55 // 3D Driving Perspective Tilt
+  navigationPitch: 45 // 3D Driving Perspective Tilt (MapsEV optimal tilt)
 };
 
 // Dictionaries for RU, HY, EN

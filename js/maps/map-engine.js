@@ -21,7 +21,8 @@ class TeslaMapEngine {
     this.routePolyline = null;
     this.followCar = true;
     this.isHeadingUp = true; // True = map turns with car, False = North-up
-    this.is3D = true; // 3D Perspective Driving View with 3D buildings
+    const saved3D = typeof localStorage !== 'undefined' ? localStorage.getItem('tesla_map_3d_mode') : null;
+    this.is3D = saved3D !== null ? saved3D === '3d' : false; // Default to clean 2D (like Yandex) unless 3D is selected
     this.voiceEnabled = true;
 
     this.currentPosition = { lat: this.center.lat, lng: this.center.lng, heading: 0, speed: 0 };
@@ -164,7 +165,7 @@ class TeslaMapEngine {
         zoom: this.navZoom,
         minZoom: 3,
         maxZoom: 19.5,
-        pitch: CONFIG.navigationPitch || 48, // 3D Perspective Driving View (MapsEV & Yandex 3D)
+        pitch: (this.is3D && this.isHeadingUp) ? (CONFIG.navigationPitch || 45) : 0, // 2D flat or 3D Perspective Driving View
         bearing: 0,
         attributionControl: false,
         fadeDuration: 0
@@ -215,16 +216,8 @@ class TeslaMapEngine {
       });
 
       this.map.on('load', () => {
-        // Enable and style 3D Extruded Buildings (MapsEV / Yandex 3D Architecture)
-        try {
-          if (this.map.getLayer('building-3d')) {
-            this.map.setLayoutProperty('building-3d', 'visibility', 'visible');
-            this.map.setPaintProperty('building-3d', 'fill-extrusion-opacity', 0.88);
-            this.map.setPaintProperty('building-3d', 'fill-extrusion-color', '#ebe6dc');
-          }
-        } catch (e) {
-          console.warn('Building 3d setup error:', e);
-        }
+        // Apply 2D / 3D Building Styling (Clean Yandex 2D footprints & Delicate MapsEV 3D)
+        this.update3DMode(this.is3D);
 
         // Apply Authentic Mapsev & Yandex Navigator Road Palette (Refs: refs/map/)
         this.applyMapsevRoadColors();
@@ -589,7 +582,7 @@ class TeslaMapEngine {
         center: [this.currentPosition.lng, this.currentPosition.lat],
         zoom: this.navZoom,
         bearing: this.isHeadingUp ? targetHeading : 0,
-        pitch: this.isNavigating ? 35 : 0,
+        pitch: (this.is3D && this.isHeadingUp) ? (CONFIG.navigationPitch || 45) : 0,
         padding: pad
       });
     } else if (this.provider === 'yandex' && this.map) {
@@ -623,7 +616,7 @@ class TeslaMapEngine {
           center: [this.currentPosition.lng, this.currentPosition.lat],
           zoom: this.navZoom,
           bearing: this.isHeadingUp ? this.currentHeading : 0,
-          pitch: this.isHeadingUp ? 35 : 0,
+          pitch: (this.is3D && this.isHeadingUp) ? (CONFIG.navigationPitch || 45) : 0,
           padding: pad
         });
       } else {
@@ -657,7 +650,7 @@ class TeslaMapEngine {
           center: [this.currentPosition.lng, this.currentPosition.lat],
           zoom: this.navZoom,
           bearing: this.isHeadingUp ? this.currentHeading : 0,
-          pitch: this.isHeadingUp ? 35 : 0,
+          pitch: (this.is3D && this.isHeadingUp) ? (CONFIG.navigationPitch || 45) : 0,
           padding: pad
         });
       } else {
@@ -715,7 +708,7 @@ class TeslaMapEngine {
         this.map.easeTo({
           center: [this.currentPosition.lng, this.currentPosition.lat],
           bearing: targetHeading,
-          pitch: this.isNavigating ? 35 : 0,
+          pitch: (this.is3D && this.isHeadingUp) ? (CONFIG.navigationPitch || 45) : 0,
           padding: { top: 220, bottom: 0, left: 0, right: 0 },
           duration: 500
         });
@@ -734,6 +727,99 @@ class TeslaMapEngine {
       if (markerEl) markerEl.style.transform = `rotate(${this.currentHeading.toFixed(1)}deg)`;
     }
     return this.isHeadingUp;
+  }
+
+  // Update 2D / 3D Mode, building aesthetics, and camera pitch
+  update3DMode(is3D) {
+    this.is3D = !!is3D;
+    try {
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem('tesla_map_3d_mode', this.is3D ? '3d' : '2d');
+      }
+    } catch (e) {}
+
+    // Update floating toggle button state
+    const btn = document.getElementById('btn-toggle-2d3d');
+    const label = document.getElementById('btn-3d-mode-label');
+    if (btn) {
+      btn.classList.toggle('is-3d', this.is3D);
+      btn.title = this.is3D ? 'Переключить в 2D плоский вид (как в Яндекс)' : 'Переключить в 3D перспективный вид';
+    }
+    if (label) {
+      label.textContent = this.is3D ? '3D' : '2D';
+    }
+
+    if (this.provider === 'maplibre' && this.map) {
+      try {
+        // 1. Ensure clean 2D building footprints exist across all zoom levels (13 to 24)
+        if (!this.map.getLayer('building-clean-2d') && this.map.getSource('openmaptiles')) {
+          const beforeLayer = this.map.getLayer('building-3d') ? 'building-3d' : undefined;
+          this.map.addLayer({
+            id: 'building-clean-2d',
+            type: 'fill',
+            source: 'openmaptiles',
+            'source-layer': 'building',
+            minzoom: 13,
+            maxzoom: 24,
+            paint: {
+              'fill-color': '#f5f2eb',
+              'fill-opacity': 0.95,
+              'fill-outline-color': '#dfd9cd'
+            }
+          }, beforeLayer);
+        }
+
+        // 2. Control 2D and 3D layer visibility & styling
+        if (this.map.getLayer('building-clean-2d')) {
+          this.map.setLayoutProperty('building-clean-2d', 'visibility', 'visible');
+          this.map.setPaintProperty('building-clean-2d', 'fill-color', '#f5f2eb');
+          this.map.setPaintProperty('building-clean-2d', 'fill-outline-color', '#dfd9cd');
+        }
+
+        if (this.map.getLayer('building-3d')) {
+          this.map.setLayoutProperty('building-3d', 'visibility', this.is3D ? 'visible' : 'none');
+          if (this.is3D) {
+            this.map.setPaintProperty('building-3d', 'fill-extrusion-opacity', 0.72);
+            this.map.setPaintProperty('building-3d', 'fill-extrusion-color', '#ede8df');
+            this.map.setPaintProperty('building-3d', 'fill-extrusion-height', [
+              '*',
+              ['coalesce', ['get', 'render_height'], ['get', 'height'], 8],
+              0.45
+            ]);
+            this.map.setPaintProperty('building-3d', 'fill-extrusion-base', [
+              '*',
+              ['coalesce', ['get', 'render_min_height'], ['get', 'min_height'], 0],
+              0.45
+            ]);
+          }
+        }
+
+        // 3. Smooth camera pitch transition (0 for 2D, 45 for 3D Heading-Up)
+        const targetPitch = (this.is3D && this.isHeadingUp) ? (CONFIG.navigationPitch || 45) : 0;
+        this.map.easeTo({
+          pitch: targetPitch,
+          duration: 350
+        });
+      } catch (err) {
+        console.warn('update3DMode styling error:', err);
+      }
+    }
+  }
+
+  // Toggle 2D / 3D mode
+  toggle2D3D() {
+    if (this.provider === 'yandex') {
+      try {
+        localStorage.setItem('tesla_map_3d_mode', '3d');
+        localStorage.setItem('tesla_map_provider', 'maplibre');
+      } catch (e) {}
+      const url = new URL(window.location.href);
+      url.searchParams.set('provider', 'maplibre');
+      window.location.href = url.toString();
+      return true;
+    }
+    this.update3DMode(!this.is3D);
+    return this.is3D;
   }
 
   // Toggle Voice Sound On/Off
@@ -943,7 +1029,7 @@ class TeslaMapEngine {
             center: [displayLng, displayLat],
             zoom: this.navZoom,
             bearing: this.currentHeading,
-            pitch: CONFIG.navigationPitch || 48,
+            pitch: (this.is3D && this.isHeadingUp) ? (CONFIG.navigationPitch || 45) : 0,
             padding: navPadding
           });
         }
@@ -1774,7 +1860,7 @@ class TeslaMapEngine {
       this.map.easeTo({
         center: [this.currentPosition.lng, this.currentPosition.lat],
         bearing: this.currentHeading,
-        pitch: 35,
+        pitch: (this.is3D && this.isHeadingUp) ? (CONFIG.navigationPitch || 45) : 0,
         padding: { top: 220, bottom: 0, left: 0, right: 0 },
         zoom: this.navZoom,
         duration: 500

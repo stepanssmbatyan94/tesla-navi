@@ -225,6 +225,69 @@ html, body {
   margin: 0 auto;
 }
 
+/* 2D / 3D Mode Toggle Button (MapsEV Style Isometric Cube) */
+.map-3d-toggle-btn {
+  width: 44px;
+  height: 48px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.95);
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.22), 0 1px 3px rgba(0, 0, 0, 0.1);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  cursor: pointer;
+  color: #334155;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  padding: 0;
+  outline: none;
+  user-select: none;
+}
+
+.map-3d-toggle-btn:hover {
+  background: #ffffff;
+  transform: scale(1.06);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.28);
+}
+
+.map-3d-toggle-btn:active {
+  transform: scale(0.92);
+}
+
+.map-3d-toggle-btn.is-3d {
+  background: #0284c7;
+  border-color: #0369a1;
+  color: #ffffff;
+  box-shadow: 0 4px 18px rgba(2, 132, 199, 0.45);
+}
+
+.map-3d-toggle-btn.is-3d:hover {
+  background: #0369a1;
+}
+
+.map-3d-toggle-btn .cube-3d-icon {
+  width: 20px;
+  height: 20px;
+  stroke: currentColor;
+  transition: transform 0.25s ease;
+}
+
+.map-3d-toggle-btn.is-3d .cube-3d-icon {
+  transform: rotate(12deg) scale(1.08);
+}
+
+.map-3d-toggle-btn .mode-3d-text {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
 /* Circular Recenter Navigation Arrow Button (Yandex Style) */
 .floating-recenter-btn {
   width: 48px;
