@@ -2823,4 +2823,58 @@ html, body {
 .dev-log-entry.gps { color: #a78bfa; }
 .dev-log-entry.voice { color: #34d399; }
 
+/* YouTube Autocomplete Suggestions Dropdown */
+.yt-suggestions-box {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  background: #ffffff;
+  border-radius: 16px;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.12), 0 2px 6px rgba(0, 0, 0, 0.04);
+  z-index: 100;
+  max-height: 240px;
+  overflow-y: auto;
+  margin-top: 6px;
+}
+
+.yt-suggestions-box.hidden {
+  display: none;
+}
+
+.yt-suggestion-item {
+  padding: 10px 14px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
+  font-size: 14px;
+  color: #1e293b;
+  border-bottom: 1px solid #f8fafc;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.yt-suggestion-item:last-child {
+  border-bottom: none;
+}
+
+.yt-suggestion-item:hover {
+  background: #f1f5f9;
+  color: #2563eb;
+}
+
+.yt-suggest-icon {
+  color: #94a3b8;
+  flex: none;
+}
+
+/* Yandex Maps 2.1 Aesthetic enhancement matching Mapsev light mode */
+.ymaps-2-1-79-map canvas,
+.ymaps-2-1-79-map ymaps[class*="tile"],
+.ymaps-2-1-79-map img {
+  filter: contrast(1.05) saturate(0.92);
+}
+
+
 

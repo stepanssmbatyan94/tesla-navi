@@ -901,6 +901,34 @@ function getArmenianAudio(text, voiceChoice = 'gor') {
     return;
   }
 
+  // API 4.5: /api/yt-suggestions (Real-time YouTube search autocomplete suggestions)
+  if (pathname === '/api/yt-suggestions') {
+    const q = (parsedUrl.searchParams.get('q') || '').trim();
+    if (!q) {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ success: true, suggestions: [] }));
+      return;
+    }
+
+    try {
+      const suggestUrl = `https://suggestqueries.google.com/complete/search?client=firefox&ds=yt&hl=ru&gl=AM&q=${encodeURIComponent(q)}`;
+      const suggestRes = await fetch(suggestUrl, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+        }
+      });
+      const data = await suggestRes.json();
+      const suggestions = (data && Array.isArray(data[1])) ? data[1] : [];
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ success: true, suggestions }));
+    } catch (err) {
+      console.warn('YouTube suggestions fetch warning:', err.message);
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ success: false, suggestions: [] }));
+    }
+    return;
+  }
+
   // Handle routes
   if (pathname === '/phone' || pathname.startsWith('/phone/')) {
     pathname = '/phone.html';

@@ -2348,6 +2348,7 @@ function initWeatherAndMusic() {
     currentYtQuery = q;
     currentYtContinuationToken = null;
     isYtLoadingMore = false;
+    document.getElementById('yt-suggestions-box')?.classList.add('hidden');
 
     try {
       const res = await fetch(`/api/yt-search?q=${encodeURIComponent(q)}`);
@@ -2373,15 +2374,75 @@ function initWeatherAndMusic() {
     }
   }
 
+  // YouTube Autocomplete Suggestions System
+  const ytSuggestionsBox = document.getElementById('yt-suggestions-box');
+  let ytSuggestDebounceTimer = null;
+
+  async function fetchYtSuggestions(query) {
+    if (!query || query.length < 2 || !ytSuggestionsBox) {
+      if (ytSuggestionsBox) ytSuggestionsBox.classList.add('hidden');
+      return;
+    }
+
+    try {
+      const res = await fetch(`/api/yt-suggestions?q=${encodeURIComponent(query)}`);
+      const data = await res.json();
+      if (data.suggestions && data.suggestions.length > 0) {
+        renderYtSuggestions(data.suggestions);
+      } else {
+        ytSuggestionsBox.classList.add('hidden');
+      }
+    } catch (err) {
+      console.warn('Suggestions fetch error:', err);
+      ytSuggestionsBox.classList.add('hidden');
+    }
+  }
+
+  function renderYtSuggestions(suggestions) {
+    if (!ytSuggestionsBox) return;
+    ytSuggestionsBox.innerHTML = '';
+    suggestions.slice(0, 8).forEach(s => {
+      const item = document.createElement('div');
+      item.className = 'yt-suggestion-item';
+      item.innerHTML = `
+        <svg class="yt-suggest-icon" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <span>${s}</span>
+      `;
+      item.addEventListener('click', () => {
+        if (ytSearchInput) ytSearchInput.value = s;
+        ytSuggestionsBox.classList.add('hidden');
+        handleYtSearch(s);
+      });
+      ytSuggestionsBox.appendChild(item);
+    });
+    ytSuggestionsBox.classList.remove('hidden');
+  }
+
+  document.addEventListener('click', (e) => {
+    if (ytSuggestionsBox && !e.target.closest('.yt-search-pill-container')) {
+      ytSuggestionsBox.classList.add('hidden');
+    }
+  });
+
   if (btnYtSearchGo) btnYtSearchGo.addEventListener('click', () => handleYtSearch());
   if (ytSearchInput) {
     ytSearchInput.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') handleYtSearch();
+      if (e.key === 'Enter') {
+        ytSuggestionsBox?.classList.add('hidden');
+        handleYtSearch();
+      } else if (e.key === 'Escape') {
+        ytSuggestionsBox?.classList.add('hidden');
+      }
     });
     ytSearchInput.addEventListener('input', () => {
+      const val = ytSearchInput.value.trim();
       if (btnYtSearchClear) {
-        btnYtSearchClear.classList.toggle('hidden', !ytSearchInput.value);
+        btnYtSearchClear.classList.toggle('hidden', !val);
       }
+      clearTimeout(ytSuggestDebounceTimer);
+      ytSuggestDebounceTimer = setTimeout(() => {
+        fetchYtSuggestions(val);
+      }, 200);
     });
   }
   if (btnYtSearchClear) {
@@ -2389,25 +2450,24 @@ function initWeatherAndMusic() {
       if (ytSearchInput) {
         ytSearchInput.value = '';
         btnYtSearchClear.classList.add('hidden');
+        ytSuggestionsBox?.classList.add('hidden');
         ytSearchInput.focus();
       }
     });
   }
 
-  // Category filter tabs: Playlists, Liked, Trending, Search
+  // Category filter tabs: Search, Trending, Music, Podcasts (removed Playlists and Liked per user instruction)
   document.querySelectorAll('.yt-filter-tab').forEach(tab => {
     tab.addEventListener('click', () => {
       document.querySelectorAll('.yt-filter-tab').forEach(t => t.classList.remove('active'));
       tab.classList.add('active');
       const tabName = tab.dataset.tab;
       if (tabName === 'trending') {
-        handleYtSearch('top hits 2024 trending music');
-      } else if (tabName === 'liked' || tabName === 'playlists') {
-        if (youtubeQueue.length > 0) {
-          renderRecommendations(youtubeQueue.slice(0, 8));
-        } else {
-          handleYtSearch('popular music');
-        }
+        handleYtSearch('top trending songs 2024');
+      } else if (tabName === 'music') {
+        handleYtSearch('popular hits music');
+      } else if (tabName === 'podcasts') {
+        handleYtSearch('interesting podcasts');
       } else if (tabName === 'search') {
         if (ytSearchInput && ytSearchInput.value.trim()) {
           handleYtSearch();

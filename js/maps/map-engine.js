@@ -241,19 +241,32 @@ class TeslaMapEngine {
         el.innerHTML = `
           <div class="tesla-car-pulse"></div>
           <div class="tesla-car-arrow" style="transform: rotate(0deg); transition: none;">
-            <svg viewBox="0 0 54 54" width="50" height="50">
+            <svg viewBox="0 0 54 54" width="52" height="52">
               <defs>
                 <filter id="car-shadow" x="-30%" y="-30%" width="160%" height="160%">
-                  <feDropShadow dx="0" dy="4" stdDeviation="4" flood-color="#000" flood-opacity="0.65"/>
+                  <feDropShadow dx="0" dy="3" stdDeviation="3.5" flood-color="#000000" flood-opacity="0.55"/>
                 </filter>
-                <linearGradient id="arrow-gold" x1="0%" y1="0%" x2="100%" y2="100%">
-                  <stop offset="0%" stop-color="#fde047" />
-                  <stop offset="60%" stop-color="#eab308" />
-                  <stop offset="100%" stop-color="#ca8a04" />
+                <linearGradient id="arrow-facet-left" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stop-color="#fffbeb" />
+                  <stop offset="45%" stop-color="#fef08a" />
+                  <stop offset="100%" stop-color="#facc15" />
+                </linearGradient>
+                <linearGradient id="arrow-facet-right" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stop-color="#eab308" />
+                  <stop offset="60%" stop-color="#ca8a04" />
+                  <stop offset="100%" stop-color="#a16207" />
                 </linearGradient>
               </defs>
-              <polygon points="27,4 49,46 27,35 5,46" fill="url(#arrow-gold)" stroke="#ffffff" stroke-width="3" stroke-linejoin="round" filter="url(#car-shadow)"/>
-              <circle cx="27" cy="26" r="3.5" fill="#ffffff" />
+              <g filter="url(#car-shadow)">
+                <!-- Crisp white outer contour -->
+                <polygon points="27,4 47,46 27,35 7,46" fill="#ffffff" stroke="#ffffff" stroke-width="2.5" stroke-linejoin="round"/>
+                <!-- Left illuminated 3D facet -->
+                <polygon points="27,6 27,34 9,44" fill="url(#arrow-facet-left)"/>
+                <!-- Right shaded 3D facet -->
+                <polygon points="27,6 45,44 27,34" fill="url(#arrow-facet-right)"/>
+                <!-- Central ridge highlight line -->
+                <line x1="27" y1="6" x2="27" y2="34" stroke="#ffffff" stroke-width="1.2" stroke-opacity="0.85"/>
+              </g>
             </svg>
           </div>
         `;
@@ -469,19 +482,28 @@ class TeslaMapEngine {
           `<div id="yandex-car-marker" class="tesla-3d-car-marker" style="transform: translate(-50%, -50%);">
             <div class="tesla-car-pulse"></div>
             <div class="tesla-car-arrow" style="transform: rotate(0deg); transition: none;">
-              <svg viewBox="0 0 54 54" width="50" height="50">
+              <svg viewBox="0 0 54 54" width="52" height="52">
                 <defs>
                   <filter id="yandex-car-shadow" x="-30%" y="-30%" width="160%" height="160%">
-                    <feDropShadow dx="0" dy="4" stdDeviation="4" flood-color="#000" flood-opacity="0.65"/>
+                    <feDropShadow dx="0" dy="3" stdDeviation="3.5" flood-color="#000000" flood-opacity="0.55"/>
                   </filter>
-                  <linearGradient id="yandex-arrow-gold" x1="0%" y1="0%" x2="100%" y2="100%">
-                    <stop offset="0%" stop-color="#fde047" />
-                    <stop offset="60%" stop-color="#eab308" />
-                    <stop offset="100%" stop-color="#ca8a04" />
+                  <linearGradient id="yandex-facet-left" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" stop-color="#fffbeb" />
+                    <stop offset="45%" stop-color="#fef08a" />
+                    <stop offset="100%" stop-color="#facc15" />
+                  </linearGradient>
+                  <linearGradient id="yandex-facet-right" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" stop-color="#eab308" />
+                    <stop offset="60%" stop-color="#ca8a04" />
+                    <stop offset="100%" stop-color="#a16207" />
                   </linearGradient>
                 </defs>
-                <polygon points="27,4 49,46 27,35 5,46" fill="url(#yandex-arrow-gold)" stroke="#ffffff" stroke-width="3" stroke-linejoin="round" filter="url(#yandex-car-shadow)"/>
-                <circle cx="27" cy="26" r="3.5" fill="#ffffff" />
+                <g filter="url(#yandex-car-shadow)">
+                  <polygon points="27,4 47,46 27,35 7,46" fill="#ffffff" stroke="#ffffff" stroke-width="2.5" stroke-linejoin="round"/>
+                  <polygon points="27,6 27,34 9,44" fill="url(#yandex-facet-left)"/>
+                  <polygon points="27,6 45,44 27,34" fill="url(#yandex-facet-right)"/>
+                  <line x1="27" y1="6" x2="27" y2="34" stroke="#ffffff" stroke-width="1.2" stroke-opacity="0.85"/>
+                </g>
               </svg>
             </div>
           </div>`
@@ -526,8 +548,12 @@ class TeslaMapEngine {
             <div class="tesla-car-pulse"></div>
             <div class="tesla-car-arrow" style="transform: rotate(0deg);">
               <svg viewBox="0 0 54 54" width="52" height="52">
-                <polygon points="27,4 49,46 27,35 5,46" fill="#ef4444" stroke="#ffffff" stroke-width="3.5" stroke-linejoin="round"/>
-                <circle cx="27" cy="26" r="3.5" fill="#ffffff" />
+                <g>
+                  <polygon points="27,4 47,46 27,35 7,46" fill="#ffffff" stroke="#ffffff" stroke-width="2.5" stroke-linejoin="round"/>
+                  <polygon points="27,6 27,34 9,44" fill="#facc15"/>
+                  <polygon points="27,6 45,44 27,34" fill="#ca8a04"/>
+                  <line x1="27" y1="6" x2="27" y2="34" stroke="#ffffff" stroke-width="1.2" stroke-opacity="0.85"/>
+                </g>
               </svg>
             </div>
           </div>`,
@@ -982,11 +1008,10 @@ class TeslaMapEngine {
       if (this.followCar) {
         if (!this.isUserPinching) {
           const now = performance.now();
-          // High-frequency 30fps lockstep update (35ms throttle) with duration: 0
-          // Keeps map and car marker in lockstep sync, eliminating jerky 3.5m step jumps
-          if (!this.lastYandexCenterTime || (now - this.lastYandexCenterTime >= 35)) {
+          // Throttled smooth camera pan: prevents DOM thrashing and lag on Yandex 2.1
+          if (!this.lastYandexCenterTime || (now - this.lastYandexCenterTime >= 160)) {
             this.lastYandexCenterTime = now;
-            this.map.setCenter([displayLat, displayLng], this.navZoom, { duration: 0, checkZoomRange: false });
+            this.map.panTo([displayLat, displayLng], { duration: 160, checkZoomRange: false, delay: 0 });
           }
         }
       }
@@ -1067,6 +1092,11 @@ class TeslaMapEngine {
             geometry: { type: 'LineString', coordinates: traveledCoords }
           });
         }
+      } else if (this.provider === 'yandex' && this.map && this.yandexTraveledPolyline && (this.lastProgressIndex > prevProgressIdx || !this.lastTraveledUpdate || (now - this.lastTraveledUpdate > 120))) {
+        this.lastTraveledUpdate = now;
+        const traveledCoords = this.routeCoordinates.slice(0, currentSeg + 1).map(c => [c[1], c[0]]);
+        traveledCoords.push([currentLat, currentLng]);
+        this.yandexTraveledPolyline.geometry.setCoordinates(traveledCoords);
       }
 
       // 3. Instant O(1) Remaining Route Distance
@@ -1656,8 +1686,18 @@ class TeslaMapEngine {
   }
 
   renderYandexRoute(latLngs, destination, trafficSegments = null) {
-    if (this.routePolyline) this.map.geoObjects.remove(this.routePolyline);
-    if (this.destMarker) this.map.geoObjects.remove(this.destMarker);
+    if (this.routePolyline) {
+      this.map.geoObjects.remove(this.routePolyline);
+      this.routePolyline = null;
+    }
+    if (this.yandexTraveledPolyline) {
+      this.map.geoObjects.remove(this.yandexTraveledPolyline);
+      this.yandexTraveledPolyline = null;
+    }
+    if (this.destMarker) {
+      this.map.geoObjects.remove(this.destMarker);
+      this.destMarker = null;
+    }
 
     this.routePolyline = new window.ymaps.GeoObjectCollection();
     this.routePolyline.add(new window.ymaps.Polyline(latLngs, {}, {
@@ -1679,6 +1719,14 @@ class TeslaMapEngine {
     });
 
     this.map.geoObjects.add(this.routePolyline);
+
+    // Traveled route polyline: rendered on top, starts empty, dims driven road with #94a3b8
+    this.yandexTraveledPolyline = new window.ymaps.Polyline([], {}, {
+      strokeColor: '#94a3b8',
+      strokeWidth: 8.5,
+      strokeOpacity: 0.85
+    });
+    this.map.geoObjects.add(this.yandexTraveledPolyline);
 
     this.destMarker = new window.ymaps.Placemark([destination.lat, destination.lng], {
       hintContent: destination.name || 'Пункт назначения'
@@ -1815,8 +1863,10 @@ class TeslaMapEngine {
       });
     } else if (this.provider === 'yandex' && this.map) {
       if (this.routePolyline) this.map.geoObjects.remove(this.routePolyline);
+      if (this.yandexTraveledPolyline) this.map.geoObjects.remove(this.yandexTraveledPolyline);
       if (this.destMarker) this.map.geoObjects.remove(this.destMarker);
       this.routePolyline = null;
+      this.yandexTraveledPolyline = null;
       this.destMarker = null;
     } else if (this.map) {
       if (this.routePolyline) this.map.removeLayer(this.routePolyline);
