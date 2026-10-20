@@ -24,16 +24,16 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
   <!-- Tesla Cockpit CSS -->
-  <link rel="stylesheet" href="css/tesla-display.css?v=11">
+  <link rel="stylesheet" href="css/tesla-display.css?v=12">
 </head>
 <body>
 
   <!-- Fullscreen Map Viewport -->
   <div id="map-container"></div>
 
-  <!-- 1. Floating Left Action Toolbar (Mapsev Architecture) -->
+  <!-- 1. Floating Left Action Toolbar (Clean 3-Button Dock + More Menu) -->
   <nav class="floating-toolbar" aria-label="Toolbar">
-    <!-- Search Button -->
+    <!-- 1. Search Button -->
     <button id="btn-open-search" class="tool-btn" title="Поиск (Search)">
       <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.5">
         <circle cx="11" cy="11" r="8"></circle>
@@ -41,71 +41,30 @@
       </svg>
     </button>
 
-    <!-- YouTube Music Button -->
-    <button id="btn-open-music" class="tool-btn" title="Музыка YouTube">
+    <!-- 2. YouTube Music & Video Button -->
+    <button id="btn-open-music" class="tool-btn" title="YouTube">
       <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor">
         <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 14.5v-9l6 4.5-6 4.5z"/>
       </svg>
     </button>
 
-    <!-- EV Chargers Button -->
-    <button id="btn-toggle-chargers" class="tool-btn" title="Зарядки EV">
-      <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.5">
-        <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
-      </svg>
-    </button>
-
-    <!-- My Places Button (Home, Work, Favorites - Mapsev Screenshot 1 Style) -->
-    <button id="btn-open-my-places" class="tool-btn" title="Мои места (Дом, Работа, Избранное)">
+    <!-- 3. My Places / Bookmarks Button -->
+    <button id="btn-open-my-places" class="tool-btn" title="Мои места (Дом, Работа, Закладки)">
       <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round">
         <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path>
       </svg>
     </button>
 
-    <!-- Weather Button -->
-    <button id="btn-open-weather" class="tool-btn" title="Погода в Ереване">
-      <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.5">
-        <path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/>
+    <!-- 4. More Functions Menu Button ("•••") -->
+    <button id="btn-more-tools" class="tool-btn" title="Ещё функции (Зарядки, Погода, Телефон, Настройки)">
+      <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor">
+        <circle cx="12" cy="12" r="2"></circle>
+        <circle cx="12" cy="5" r="2"></circle>
+        <circle cx="12" cy="19" r="2"></circle>
       </svg>
     </button>
 
-    <!-- Phone Pairing & Telemetry Button -->
-    <button id="btn-open-pairing" class="tool-btn" title="Телефон / GPS">
-      <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.5">
-        <rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect>
-        <line x1="12" y1="18" x2="12.01" y2="18"></line>
-      </svg>
-      <span id="tool-phone-dot" class="tool-badge-dot"></span>
-    </button>
-
-    <!-- Language Toggle Button: RU | HY | EN -->
-    <button id="btn-lang-toggle" class="tool-btn" title="Сменить язык (RU / HY / EN)">
-      <span id="lang-indicator" class="tool-lang-badge">RU</span>
-    </button>
-
-    <!-- Voice Toggle Button: Svetlana 👩 / Dmitry 👨 -->
-    <button id="btn-voice-toggle" class="tool-btn" title="Голос навигатора (Светлана 👩 / Дмитрий 👨)">
-      <span id="voice-indicator" class="tool-lang-badge" style="font-size: 14px;">👩</span>
-    </button>
-
-    <!-- Map Engine Toggle: MapLibre Vector vs Yandex Live Traffic (Яндекс) -->
-    <button id="btn-toggle-provider" class="tool-btn" title="Переключить карту: MapLibre / Яндекс.Пробки">
-      <span id="provider-indicator" class="tool-lang-badge" style="font-size: 11px; font-weight: 800; color: #38bdf8;">ML</span>
-    </button>
-
-    <!-- Compass / 3D Heading-Up Toggle Button -->
-    <button id="btn-compass" class="tool-btn active" title="Компас (Поворот карты по ходу движения)">
-      <div id="compass-needle" class="compass-arrow-wrap">
-        <svg viewBox="0 0 24 24" width="22" height="22" fill="none">
-          <polygon points="12,2 17,12 12,9" fill="#ef4444"/>
-          <polygon points="12,2 7,12 12,9" fill="#dc2626"/>
-          <polygon points="12,22 17,12 12,15" fill="#ffffff"/>
-          <polygon points="12,22 7,12 12,15" fill="#e2e8f0"/>
-        </svg>
-      </div>
-    </button>
-
-    <!-- Attached Battery Pill (Mapsev Screenshot 1 Style - anchored to centered dock) -->
+    <!-- Attached Battery Pill (Anchored to centered dock) -->
     <div id="dock-battery-badge" class="dock-battery-pill" title="Заряд батареи Tesla">
       <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="#16a34a" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
         <rect x="2" y="7" width="16" height="10" rx="2" ry="2"></rect>
@@ -115,6 +74,71 @@
       <span id="dock-battery-val">80%</span>
     </div>
   </nav>
+
+  <!-- More Tools Flyout Popover (Opens from the bottom "•••" button) -->
+  <div id="more-tools-popover" class="more-tools-popover hidden">
+    <div class="more-tools-popover-header">
+      <span>Функции</span>
+      <button id="btn-close-more-tools" class="card-close-btn" style="width: 24px; height: 24px; font-size: 13px;">✕</button>
+    </div>
+    <div class="more-tools-grid">
+      <!-- EV Chargers Button -->
+      <button id="btn-toggle-chargers" class="more-tool-card" title="Зарядки EV">
+        <div class="more-tool-icon">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#0284c7" stroke-width="2.5">
+            <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+          </svg>
+        </div>
+        <span class="more-tool-label">Зарядки</span>
+      </button>
+
+      <!-- Weather Button -->
+      <button id="btn-open-weather" class="more-tool-card" title="Погода в Ереване">
+        <div class="more-tool-icon">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#0ea5e9" stroke-width="2.5">
+            <path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/>
+          </svg>
+        </div>
+        <span class="more-tool-label">Погода</span>
+      </button>
+
+      <!-- Phone Pairing & Telemetry Button -->
+      <button id="btn-open-pairing" class="more-tool-card" title="Телефон / GPS">
+        <div class="more-tool-icon" style="position: relative;">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#10b981" stroke-width="2.5">
+            <rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect>
+            <line x1="12" y1="18" x2="12.01" y2="18"></line>
+          </svg>
+          <span id="tool-phone-dot" class="tool-badge-dot"></span>
+        </div>
+        <span class="more-tool-label">Телефон</span>
+      </button>
+
+      <!-- Language Toggle Button: RU | HY | EN -->
+      <button id="btn-lang-toggle" class="more-tool-card" title="Сменить язык (RU / HY / EN)">
+        <div class="more-tool-icon">
+          <span id="lang-indicator" class="tool-lang-badge">RU</span>
+        </div>
+        <span class="more-tool-label">Язык</span>
+      </button>
+
+      <!-- Voice Toggle Button: Svetlana / Dmitry / Gor -->
+      <button id="btn-voice-toggle" class="more-tool-card" title="Голос навигатора">
+        <div class="more-tool-icon">
+          <span id="voice-indicator" class="tool-lang-badge" style="font-size: 16px;">👩</span>
+        </div>
+        <span class="more-tool-label">Голос</span>
+      </button>
+
+      <!-- Map Engine Toggle: MapLibre Vector vs Yandex Live Traffic (Яндекс) -->
+      <button id="btn-toggle-provider" class="more-tool-card" title="Переключить карту: MapLibre / Яндекс.Пробки">
+        <div class="more-tool-icon">
+          <span id="provider-indicator" class="tool-lang-badge" style="font-size: 12px; font-weight: 800; color: #ef4444;">ЯН</span>
+        </div>
+        <span class="more-tool-label">Движок</span>
+      </button>
+    </div>
+  </div>
 
   <!-- 2. Sliding Search Drawer (Left Drawer, Sleek & Fully Closable) -->
   <aside id="search-drawer" class="search-drawer hidden">
@@ -524,6 +548,18 @@
         <path d="M4 12L20 4L12 20L10.5 13.5L4 12Z" fill="#1e293b" stroke="#1e293b" stroke-width="2" stroke-linejoin="round"/>
       </svg>
     </button>
+
+    <!-- Compass / Heading-Up Toggle Button (Moved to Right Bottom Corner) -->
+    <button id="btn-compass" class="map-compass-btn active" title="Компас (Поворот карты по ходу движения)">
+      <div id="compass-needle" class="compass-arrow-wrap">
+        <svg viewBox="0 0 24 24" width="24" height="24" fill="none">
+          <polygon points="12,2 17,12 12,9" fill="#ef4444"/>
+          <polygon points="12,2 7,12 12,9" fill="#dc2626"/>
+          <polygon points="12,22 17,12 12,15" fill="#ffffff"/>
+          <polygon points="12,22 7,12 12,15" fill="#e2e8f0"/>
+        </svg>
+      </div>
+    </button>
   </div>
 
   <!-- 6. Compact Modals -->
@@ -715,12 +751,16 @@
       <div id="yt-suggestions-box" class="yt-suggestions-box hidden"></div>
     </div>
 
-    <!-- Category Filter Tabs (Search, Trending, Music, Podcasts) -->
+    <!-- Category Filter Tabs matching YouTube Home Feed (Screenshots 2 & 3) -->
     <div class="yt-category-tabs-row">
-      <button class="yt-filter-tab active" data-tab="search">Поиск</button>
-      <button class="yt-filter-tab" data-tab="trending">Тренды</button>
+      <button class="yt-filter-tab active" data-tab="all">Все</button>
       <button class="yt-filter-tab" data-tab="music">Музыка</button>
-      <button class="yt-filter-tab" data-tab="podcasts">Подкасты</button>
+      <button class="yt-filter-tab" data-tab="jams">Джемы</button>
+      <button class="yt-filter-tab" data-tab="armcomedy">ArmComedy</button>
+      <button class="yt-filter-tab" data-tab="auto">Авто & Игры</button>
+      <button class="yt-filter-tab" data-tab="football">Футбол</button>
+      <button class="yt-filter-tab" data-tab="news">Новости</button>
+      <button class="yt-filter-tab" data-tab="history">История</button>
     </div>
 
     <!-- Dynamic Recommendations / Search Results List (Screenshots 3, 4, 5) -->
@@ -883,9 +923,9 @@
   </div>
 
   <!-- Scripts -->
-  <script src="js/config.js?v=11"></script>
-  <script src="js/realtime.js?v=11"></script>
-  <script src="js/maps/map-engine.js?v=11"></script>
-  <script src="js/tesla-cockpit.js?v=11"></script>
+  <script src="js/config.js?v=12"></script>
+  <script src="js/realtime.js?v=12"></script>
+  <script src="js/maps/map-engine.js?v=12"></script>
+  <script src="js/tesla-cockpit.js?v=12"></script>
 </body>
 </html>

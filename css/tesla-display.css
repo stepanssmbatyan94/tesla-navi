@@ -152,6 +152,93 @@ html, body {
   pointer-events: auto;
 }
 
+/* More Tools Flyout Popover Menu */
+.more-tools-popover {
+  position: absolute;
+  left: 78px;
+  top: 50%;
+  transform: translateY(-20%);
+  z-index: 55;
+  background: rgba(255, 255, 255, 0.96);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 20px;
+  padding: 12px;
+  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.18), 0 2px 8px rgba(0, 0, 0, 0.08);
+  transition: opacity 0.2s cubic-bezier(0.16, 1, 0.3, 1), transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.more-tools-popover.hidden {
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-20%) scale(0.92);
+  display: none !important;
+}
+
+.more-tools-popover-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 4px 8px 4px;
+  margin-bottom: 6px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+  font-size: 13px;
+  font-weight: 700;
+  color: #1e293b;
+}
+
+.more-tools-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 92px);
+  gap: 8px;
+}
+
+.more-tool-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 10px 6px;
+  border-radius: 14px;
+  border: 1px solid rgba(0, 0, 0, 0.05);
+  background: #f8fafc;
+  color: #1e293b;
+  cursor: pointer;
+  transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+  outline: none;
+}
+
+.more-tool-card:hover {
+  background: #f1f5f9;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+.more-tool-card:active {
+  transform: scale(0.94);
+}
+
+.more-tool-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
+}
+
+.more-tool-label {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: #475569;
+  letter-spacing: 0.2px;
+  text-align: center;
+}
+
 .compass-arrow-wrap {
   width: 24px;
   height: 24px;
@@ -328,6 +415,44 @@ html, body {
   opacity: 0;
   transform: scale(0.5) translateY(12px);
   pointer-events: none;
+}
+
+/* Circular Compass Button (Anchored to Right-Bottom Corner / Right Map Controls) */
+.map-compass-btn {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.95);
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.22), 0 1px 3px rgba(0, 0, 0, 0.1);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  padding: 0;
+  outline: none;
+  user-select: none;
+}
+
+.map-compass-btn:hover {
+  background: #ffffff;
+  transform: scale(1.08);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.32);
+}
+
+.map-compass-btn:active {
+  transform: scale(0.92);
+}
+
+.map-compass-btn .compass-arrow-wrap {
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  transition: transform 0.2s cubic-bezier(0.2, 0.9, 0.4, 1);
 }
 
 /* 3. Sliding Search Drawer (Left Drawer, Sleek & Fully Closable - Mapsev Light) */
@@ -1934,11 +2059,11 @@ html, body {
 .yt-filter-tab {
   background: #f1f5f9;
   border: none;
-  border-radius: 12px;
+  border-radius: 10px;
   padding: 6px 14px;
   font-size: 12.5px;
   font-weight: 600;
-  color: #475569;
+  color: #334155;
   cursor: pointer;
   white-space: nowrap;
   transition: all 0.15s ease;
@@ -1948,48 +2073,87 @@ html, body {
   color: #0f172a;
 }
 .yt-filter-tab.active {
-  background: #ef4444;
+  background: #0f172a;
   color: #ffffff;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.2);
 }
 
 /* Recommendations / Search Results Scroll List (Screenshots 3, 4, 5) */
 .yt-results-scroll-list {
-  max-height: 250px;
+  max-height: 260px;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 8px;
   padding-right: 2px;
+}
+
+.yt-section-header {
+  font-size: 11.5px;
+  font-weight: 700;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  padding: 4px 6px 0 6px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.yt-clear-history-btn {
+  background: transparent;
+  border: none;
+  color: #94a3b8;
+  font-size: 11px;
+  cursor: pointer;
+  padding: 0;
+}
+.yt-clear-history-btn:hover {
+  color: #ef4444;
 }
 
 .yt-result-item {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
   padding: 6px 8px;
   border-radius: 12px;
   cursor: pointer;
-  transition: background 0.15s ease;
+  transition: background 0.15s ease, transform 0.1s ease;
 }
 .yt-result-item:hover {
   background: #f8fafc;
+  transform: translateX(2px);
 }
 .yt-result-item.playing {
   background: #fef2f2;
 }
 
 .yt-thumb-wrap {
-  width: 76px;
-  height: 44px;
+  position: relative;
+  width: 88px;
+  height: 50px;
   border-radius: 8px;
   overflow: hidden;
-  background: #000000;
+  background: #0f172a;
   flex-shrink: 0;
 }
 .yt-thumb-img {
   width: 100%;
   height: 100%;
   object-fit: cover;
+}
+.yt-duration-badge {
+  position: absolute;
+  bottom: 3px;
+  right: 4px;
+  background: rgba(0, 0, 0, 0.82);
+  color: #ffffff;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 1px 4px;
+  border-radius: 4px;
+  letter-spacing: 0.2px;
 }
 
 .yt-info-wrap {

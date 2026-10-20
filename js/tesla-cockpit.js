@@ -823,6 +823,44 @@ function initToolbarHandlers() {
     btn.addEventListener('click', () => pairingModal.classList.add('hidden'));
   });
 
+  // More Tools Flyout Popover ("•••" Button)
+  const btnMoreTools = document.getElementById('btn-more-tools');
+  const moreToolsPopover = document.getElementById('more-tools-popover');
+  const btnCloseMoreTools = document.getElementById('btn-close-more-tools');
+
+  if (btnMoreTools && moreToolsPopover) {
+    btnMoreTools.addEventListener('click', (e) => {
+      e.stopPropagation();
+      moreToolsPopover.classList.toggle('hidden');
+      btnMoreTools.classList.toggle('active', !moreToolsPopover.classList.contains('hidden'));
+    });
+
+    if (btnCloseMoreTools) {
+      btnCloseMoreTools.addEventListener('click', (e) => {
+        e.stopPropagation();
+        moreToolsPopover.classList.add('hidden');
+        btnMoreTools.classList.remove('active');
+      });
+    }
+
+    document.addEventListener('click', (e) => {
+      if (!moreToolsPopover.classList.contains('hidden') && !e.target.closest('#more-tools-popover') && !e.target.closest('#btn-more-tools')) {
+        moreToolsPopover.classList.add('hidden');
+        btnMoreTools.classList.remove('active');
+      }
+    });
+
+    // Auto-close popover when opening modals or actions
+    ['btn-toggle-chargers', 'btn-open-weather', 'btn-open-pairing', 'btn-lang-toggle', 'btn-voice-toggle', 'btn-toggle-provider'].forEach(id => {
+      document.getElementById(id)?.addEventListener('click', () => {
+        if (id === 'btn-open-weather' || id === 'btn-open-pairing') {
+          moreToolsPopover.classList.add('hidden');
+          btnMoreTools.classList.remove('active');
+        }
+      });
+    });
+  }
+
   // Map Engine Switcher: MapLibre Vector vs Yandex Live Traffic (Яндекс)
   const btnToggleProvider = document.getElementById('btn-toggle-provider');
   const providerIndicator = document.getElementById('provider-indicator');
@@ -2348,6 +2386,9 @@ function initWeatherAndMusic() {
     if (ytNowTitle) ytNowTitle.textContent = title || 'YouTube Track';
     if (ytNowArtist) ytNowArtist.textContent = channel || '';
 
+    // Record into persistent history
+    addToYouTubeHistory({ id: videoId, title, channel, duration });
+
     syncMusicState(true, title || 'YouTube Music');
     if (btnMusic) btnMusic.classList.add('active');
 
@@ -2415,46 +2456,296 @@ function initWeatherAndMusic() {
   if (btnMiniInfoExpand) btnMiniInfoExpand.addEventListener('click', expandToFullPlayer);
   if (btnMiniClose) btnMiniClose.addEventListener('click', stopAndCloseAllMusic);
 
+  // Authentic Curated Recommendations from User Real YouTube Home Feed (Screenshots 2 & 3)
+  const HOME_RECOMMENDATIONS = [
+    {
+      id: '6CZLCZZNc90',
+      title: 'Джем – Garik - indz el tar (official lyrics video)',
+      channel: 'Garik Papoyan',
+      duration: '3:10',
+      meta: 'Джем • 185 тыс. просмотров'
+    },
+    {
+      id: 'OLqjgBoPV9E',
+      title: 'ArmComedy 1439 - COP 17, Էփշթեյն և Ամուլսար',
+      channel: 'ArmComedy',
+      duration: '30:13',
+      meta: '10 тыс. просмотров • 2 ч назад'
+    },
+    {
+      id: '04HS6MkhOr4',
+      title: 'Պարոդիա - Լիլի Հովեր',
+      channel: 'HD Production',
+      duration: '3:52',
+      meta: '14 тыс. просмотров • 2 ч назад'
+    },
+    {
+      id: 'vPNsZM2y7bw',
+      title: '🚨Նոր ավտոյիս վրա ԱՎՏՈԲՈՒՍԻ մատոռ⚡The Long Drive #104',
+      channel: 'Saint-Hov 🇦🇲',
+      duration: '13:51',
+      meta: '114 тыс. просмотров • 4 мес. назад'
+    },
+    {
+      id: '5bFiccd8lCI',
+      title: 'When Young Lionel Messi Substituted & SHOCKED Pep Guardiola',
+      channel: 'VALENTINO PRODUCTIONS',
+      duration: '12:44',
+      meta: '1.2 млн просмотров • 1 мес. назад'
+    },
+    {
+      id: 'mFRh6wVyMaE',
+      title: 'Brunette - Bac kapuyt achqerd',
+      channel: 'Brunette',
+      duration: '3:36',
+      meta: '2.4 млн просмотров'
+    },
+    {
+      id: 'TPjN6N8TgNI',
+      title: 'Super Sako - Mi Gna ft. Hayko (Official Audio)',
+      channel: 'Super Sako',
+      duration: '3:22',
+      meta: '320 млн просмотров'
+    },
+    {
+      id: 'z3wqyffIosw',
+      title: 'Сделал 1 кг филамента для 3D-принтера из мусорных бутылок ♻️',
+      channel: 'Modelmen Life',
+      duration: '9:12',
+      meta: '145 тыс. просмотров • 10 дн. назад'
+    },
+    {
+      id: 'ayMA_IeEp2Q',
+      title: '#Corner Mundial #1. Աշխարհի առաջնությունը՝ Օգնյեն Չանչարևիչի հետ',
+      channel: 'Corner Football Armenia',
+      duration: '53:43',
+      meta: '38 тыс. просмотров'
+    },
+    {
+      id: 'rOgehCKt-VA',
+      title: 'Ռոմանոս Պետրոսյանի հանձնարարականով Երևանի Քրիստափորի փողոցի փտած ...',
+      channel: 'Shamshyan.com',
+      duration: '8:36',
+      meta: '1.1 тыс. просмотров • 6 ч назад'
+    }
+  ];
+
+  const CATEGORY_FEEDS = {
+    all: HOME_RECOMMENDATIONS,
+    music: [
+      { id: '6CZLCZZNc90', title: 'Джем – Garik - indz el tar', channel: 'Garik Papoyan', duration: '3:10', meta: 'Джем • 185 тыс.' },
+      { id: 'mFRh6wVyMaE', title: 'Brunette - Bac kapuyt achqerd', channel: 'Brunette', duration: '3:36', meta: '2.4 млн просмотров' },
+      { id: 'TPjN6N8TgNI', title: 'Super Sako - Mi Gna ft. Hayko', channel: 'Super Sako', duration: '3:22', meta: '320 млн просмотров' },
+      { id: 'Z1bS3aT_r24', title: 'Garik & Sona - Lusi', channel: 'Garik & Sona', duration: '4:12', meta: '5.1 млн просмотров' },
+      { id: 'kLp_Hh684HQ', title: 'Aram MP3 - Not Alone', channel: 'Aram MP3', duration: '3:02', meta: '12 млн просмотров' }
+    ],
+    jams: [
+      { id: '6CZLCZZNc90', title: 'Джем – Garik - indz el tar (official lyrics video)', channel: 'Garik Papoyan', duration: '3:10', meta: 'Джем • 185 тыс.' },
+      { id: '1QnCj2g8g_g', title: 'Garik Papoyan - Jam Session Live Acoustic', channel: 'Garik Papoyan', duration: '24:15', meta: 'Акустический джем' },
+      { id: '8JkL99qX1rU', title: 'Armenian Street Music & Jam Acoustic', channel: 'Yerevan Jam', duration: '18:40', meta: 'Live Session' }
+    ],
+    armcomedy: [
+      { id: 'OLqjgBoPV9E', title: 'ArmComedy 1439 - COP 17, Էփշթեյն և Ամուլսար', channel: 'ArmComedy', duration: '30:13', meta: '10 тыс. • 2 ч назад' },
+      { id: '04HS6MkhOr4', title: 'Պարոդիա - Լիլի Հովեր', channel: 'HD Production', duration: '3:52', meta: '14 тыс. • 2 ч назад' },
+      { id: 'Kq06w4ZkEeo', title: 'ArmComedy 1438', channel: 'ArmComedy', duration: '28:40', meta: '52 тыс. просмотров' },
+      { id: 'a4Xp_BfX9aI', title: 'Ruben Yesayan - Stand Up Yerevan', channel: 'Ruben Yesayan', duration: '16:22', meta: '85 тыс. просмотров' }
+    ],
+    auto: [
+      { id: 'vPNsZM2y7bw', title: '🚨Նոր ավտոյիս վրա ԱՎՏՈԲՈՒՍԻ մատոռ⚡The Long Drive #104', channel: 'Saint-Hov 🇦🇲', duration: '13:51', meta: '114 тыс. • 4 мес. назад' },
+      { id: 'z3wqyffIosw', title: 'Сделал 1 кг филамента для 3D-принтера из мусорных бутылок ♻️', channel: 'Modelmen Life', duration: '9:12', meta: '145 тыс. • 10 дн. назад' },
+      { id: 'K7nFz2u5RkQ', title: 'Tesla Model 3 / Model Y Hidden Tricks & Tips', channel: 'Tesla Drivers', duration: '14:20', meta: '220 тыс. просмотров' }
+    ],
+    football: [
+      { id: '5bFiccd8lCI', title: 'When Young Lionel Messi Substituted & SHOCKED Pep Guardiola', channel: 'VALENTINO PRODUCTIONS', duration: '12:44', meta: '1.2 млн • 1 мес. назад' },
+      { id: 'ayMA_IeEp2Q', title: '#Corner Mundial #1. Աշխարհի առաջնությունը՝ Օգնյեն Չանչարևիչի հետ', channel: 'Corner Football Armenia', duration: '53:43', meta: '38 тыс. просмотров' }
+    ],
+    news: [
+      { id: 'rOgehCKt-VA', title: 'Երևանի Քրիստափորի փողոցի փտած ...', channel: 'Shamshyan.com', duration: '8:36', meta: '1.1 тыс. • 6 ч назад' },
+      { id: '9QvH0rWwL8M', title: 'PanArmenian News Today Highlights', channel: 'PanArmenian TV', duration: '15:10', meta: 'Новости дня' }
+    ]
+  };
+
+  function getYouTubeHistory() {
+    try {
+      return JSON.parse(localStorage.getItem('tesla_yt_history') || '[]');
+    } catch (e) {
+      return [];
+    }
+  }
+
+  function addToYouTubeHistory(track) {
+    if (!track || !track.id) return;
+    try {
+      let history = getYouTubeHistory();
+      history = history.filter(t => t.id !== track.id);
+      history.unshift({
+        id: track.id,
+        title: track.title,
+        channel: track.channel || 'YouTube',
+        duration: track.duration || '3:30',
+        meta: 'Ранее прослушано',
+        playedAt: Date.now()
+      });
+      if (history.length > 40) history = history.slice(0, 40);
+      localStorage.setItem('tesla_yt_history', JSON.stringify(history));
+    } catch (e) {}
+  }
+
+  function clearYouTubeHistory() {
+    try {
+      localStorage.removeItem('tesla_yt_history');
+      loadYouTubeCategory('history');
+    } catch (e) {}
+  }
+
+  function createResultItemElement(track, idx) {
+    const item = document.createElement('div');
+    const isPlaying = (currentTrackInfo && currentTrackInfo.id === track.id) || (currentTrackIndex === idx);
+    item.className = `yt-result-item ${isPlaying ? 'playing' : ''}`;
+    item.dataset.id = track.id;
+    item.dataset.index = idx;
+
+    const thumbUrl = track.thumbnail || `https://i.ytimg.com/vi/${track.id}/hqdefault.jpg`;
+    const metaText = [track.channel, track.meta || track.duration].filter(Boolean).join(' · ');
+
+    item.innerHTML = `
+      <div class="yt-thumb-wrap">
+        <img class="yt-thumb-img" src="${thumbUrl}" alt="" loading="lazy" />
+        <span class="yt-duration-badge">${track.duration || '3:30'}</span>
+      </div>
+      <div class="yt-info-wrap">
+        <div class="yt-item-title">${track.title}</div>
+        <div class="yt-item-meta">${metaText}</div>
+      </div>
+    `;
+
+    item.addEventListener('click', () => {
+      currentTrackIndex = idx;
+      currentTrackInfo = track;
+      playTrackById(track.id, track.title, track.channel, track.duration);
+    });
+
+    return item;
+  }
+
   // Render recommendations with Infinite Scroll support
   function renderRecommendations(tracks) {
     if (!ytResultsList) return;
     ytResultsList.innerHTML = '';
     if (!tracks || tracks.length === 0) {
-      ytResultsList.innerHTML = '<div style="text-align: center; color: #94a3b8; padding: 20px 10px; font-size: 13px;">Ничего не найдено</div>';
+      ytResultsList.innerHTML = '<div style="text-align: center; color: #94a3b8; padding: 24px 10px; font-size: 13px;">Ничего не найдено</div>';
+      return;
+    }
+    appendRecommendations(tracks, 0);
+  }
+
+  function renderHomeWithHistory(history, recommendations) {
+    if (!ytResultsList) return;
+    ytResultsList.innerHTML = '';
+
+    // If user has recently played history, render "Недавно прослушано" at the top!
+    if (history && history.length > 0) {
+      const histSec = document.createElement('div');
+      histSec.className = 'yt-section-header';
+      histSec.innerHTML = `
+        <span>Недавно прослушано</span>
+        <button class="yt-clear-history-btn" id="btn-clear-yt-hist">Очистить</button>
+      `;
+      ytResultsList.appendChild(histSec);
+
+      history.slice(0, 4).forEach((track, idx) => {
+        const item = createResultItemElement(track, idx);
+        ytResultsList.appendChild(item);
+      });
+
+      const recSec = document.createElement('div');
+      recSec.className = 'yt-section-header';
+      recSec.style.marginTop = '8px';
+      recSec.innerHTML = `<span>Рекомендовано для вас</span>`;
+      ytResultsList.appendChild(recSec);
+    }
+
+    recommendations.forEach((track, idx) => {
+      const offset = history && history.length > 0 ? Math.min(4, history.length) : 0;
+      const item = createResultItemElement(track, offset + idx);
+      ytResultsList.appendChild(item);
+    });
+
+    document.getElementById('btn-clear-yt-hist')?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      clearYouTubeHistory();
+    });
+  }
+
+  function renderHistoryView(history) {
+    if (!ytResultsList) return;
+    ytResultsList.innerHTML = '';
+    if (!history || history.length === 0) {
+      ytResultsList.innerHTML = `
+        <div style="text-align: center; color: #94a3b8; padding: 36px 16px; font-size: 13px; line-height: 1.5;">
+          <div style="font-size: 28px; margin-bottom: 6px;">🎧</div>
+          История пуста.<br>Включайте музыку и видео в поиске или рекомендациях, и они сохранятся здесь.
+        </div>
+      `;
       return;
     }
 
-    appendRecommendations(tracks, 0);
+    const histSec = document.createElement('div');
+    histSec.className = 'yt-section-header';
+    histSec.innerHTML = `
+      <span>История воспроизведения (${history.length})</span>
+      <button class="yt-clear-history-btn" id="btn-clear-all-hist">Очистить всё</button>
+    `;
+    ytResultsList.appendChild(histSec);
+
+    history.forEach((track, idx) => {
+      const item = createResultItemElement(track, idx);
+      ytResultsList.appendChild(item);
+    });
+
+    document.getElementById('btn-clear-all-hist')?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      clearYouTubeHistory();
+    });
+  }
+
+  function loadYouTubeCategory(cat) {
+    currentActiveTab = cat;
+    document.querySelectorAll('.yt-filter-tab').forEach(t => {
+      t.classList.toggle('active', t.dataset.tab === cat);
+    });
+
+    if (cat === 'history') {
+      const history = getYouTubeHistory();
+      youtubeQueue = history;
+      currentYtContinuationToken = null;
+      renderHistoryView(history);
+      return;
+    }
+
+    if (cat === 'all') {
+      const history = getYouTubeHistory();
+      youtubeQueue = [...HOME_RECOMMENDATIONS];
+      currentYtContinuationToken = null;
+      renderHomeWithHistory(history, HOME_RECOMMENDATIONS);
+      return;
+    }
+
+    const feed = CATEGORY_FEEDS[cat];
+    if (feed && feed.length > 0) {
+      youtubeQueue = [...feed];
+      currentYtContinuationToken = null;
+      renderRecommendations(feed);
+    } else {
+      handleYtSearch(cat);
+    }
   }
 
   function appendRecommendations(tracks, startIndex) {
     if (!ytResultsList) return;
     tracks.forEach((track, offset) => {
       const idx = startIndex + offset;
-      const item = document.createElement('div');
-      item.className = `yt-result-item ${idx === currentTrackIndex ? 'playing' : ''}`;
-      item.dataset.id = track.id;
-      item.dataset.index = idx;
-
-      const thumbUrl = track.thumbnail || `https://i.ytimg.com/vi/${track.id}/hqdefault.jpg`;
-      const metaText = [track.channel, track.duration].filter(Boolean).join(' · ');
-
-      item.innerHTML = `
-        <div class="yt-thumb-wrap">
-          <img class="yt-thumb-img" src="${thumbUrl}" alt="" loading="lazy" />
-        </div>
-        <div class="yt-info-wrap">
-          <div class="yt-item-title">${track.title}</div>
-          <div class="yt-item-meta">${metaText}</div>
-        </div>
-      `;
-
-      item.addEventListener('click', () => {
-        currentTrackIndex = idx;
-        currentTrackInfo = track;
-        playTrackById(track.id, track.title, track.channel, track.duration);
-      });
-
+      const item = createResultItemElement(track, idx);
       ytResultsList.appendChild(item);
     });
   }
@@ -2630,27 +2921,16 @@ function initWeatherAndMusic() {
     });
   }
 
-  // Category filter tabs: Search, Trending, Music, Podcasts (removed Playlists and Liked per user instruction)
+  // Category filter tabs: Все, Музыка, Джемы, ArmComedy, Авто & Игры, Футбол, Новости, История
   document.querySelectorAll('.yt-filter-tab').forEach(tab => {
     tab.addEventListener('click', () => {
-      document.querySelectorAll('.yt-filter-tab').forEach(t => t.classList.remove('active'));
-      tab.classList.add('active');
-      const tabName = tab.dataset.tab;
-      if (tabName === 'trending') {
-        handleYtSearch('top trending songs 2024');
-      } else if (tabName === 'music') {
-        handleYtSearch('popular hits music');
-      } else if (tabName === 'podcasts') {
-        handleYtSearch('interesting podcasts');
-      } else if (tabName === 'search') {
-        if (ytSearchInput && ytSearchInput.value.trim()) {
-          handleYtSearch();
-        } else {
-          ytSearchInput?.focus();
-        }
-      }
+      const tabName = tab.dataset.tab || 'all';
+      loadYouTubeCategory(tabName);
     });
   });
+
+  // Pre-load default YouTube recommendations so feed is ready instantly
+  loadYouTubeCategory('all');
 
   // Timeline scrubber click to seek
   if (ytTimelineTrack) {
