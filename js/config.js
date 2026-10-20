@@ -21,7 +21,7 @@ const CONFIG = {
   },
 
   // Map settings
-  defaultProvider: 'maplibre', // 'maplibre' | 'yandex' | 'osm'
+  defaultProvider: 'yandex', // 'yandex' (default for real driving) | 'maplibre'
   maplibreStyle: 'https://tiles.openfreemap.org/styles/liberty',
   navigationZoom: 16.5,
   navigationPitch: 45 // 3D Driving Perspective Tilt (MapsEV optimal tilt)

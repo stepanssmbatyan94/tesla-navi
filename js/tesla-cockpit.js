@@ -481,10 +481,10 @@ async function updateLiveTrafficBadge() {
 // 4. Map Engine Initialization
 async function initMap() {
   const urlParams = new URLSearchParams(window.location.search);
-  let activeProvider = urlParams.get('provider') || localStorage.getItem('tesla_map_provider') || 'maplibre';
+  let activeProvider = urlParams.get('provider') || localStorage.getItem('tesla_map_provider') || (CONFIG && CONFIG.defaultProvider) || 'yandex';
   if (activeProvider === 'osm') {
-    activeProvider = 'maplibre';
-    localStorage.setItem('tesla_map_provider', 'maplibre');
+    activeProvider = 'yandex';
+    localStorage.setItem('tesla_map_provider', 'yandex');
   }
 
   mapEngine = new TeslaMapEngine('map-container', {
@@ -826,7 +826,7 @@ function initToolbarHandlers() {
   // Map Engine Switcher: MapLibre Vector vs Yandex Live Traffic (Яндекс)
   const btnToggleProvider = document.getElementById('btn-toggle-provider');
   const providerIndicator = document.getElementById('provider-indicator');
-  const activeProv = new URLSearchParams(window.location.search).get('provider') || localStorage.getItem('tesla_map_provider') || 'maplibre';
+  const activeProv = new URLSearchParams(window.location.search).get('provider') || localStorage.getItem('tesla_map_provider') || (CONFIG && CONFIG.defaultProvider) || 'yandex';
   if (providerIndicator) {
     providerIndicator.textContent = activeProv === 'yandex' ? 'ЯН' : 'ML';
     providerIndicator.style.color = activeProv === 'yandex' ? '#ef4444' : '#38bdf8';
@@ -838,7 +838,7 @@ function initToolbarHandlers() {
 
     btnToggleProvider.addEventListener('click', () => {
       const currentUrlProv = new URLSearchParams(window.location.search).get('provider');
-      const cur = currentUrlProv || localStorage.getItem('tesla_map_provider') || 'maplibre';
+      const cur = currentUrlProv || localStorage.getItem('tesla_map_provider') || (CONFIG && CONFIG.defaultProvider) || 'yandex';
       const nextProv = (cur === 'yandex') ? 'maplibre' : 'yandex';
       localStorage.setItem('tesla_map_provider', nextProv);
       const url = new URL(window.location.href);

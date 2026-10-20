@@ -927,12 +927,12 @@ class TeslaMapEngine {
             this.map.setPaintProperty('building-3d', 'fill-extrusion-color', '#ede8df');
             this.map.setPaintProperty('building-3d', 'fill-extrusion-height', [
               '*',
-              ['coalesce', ['get', 'render_height'], ['get', 'height'], 8],
+              ['to-number', ['coalesce', ['get', 'render_height'], ['get', 'height'], 8], 8],
               0.45
             ]);
             this.map.setPaintProperty('building-3d', 'fill-extrusion-base', [
               '*',
-              ['coalesce', ['get', 'render_min_height'], ['get', 'min_height'], 0],
+              ['to-number', ['coalesce', ['get', 'render_min_height'], ['get', 'min_height'], 0], 0],
               0.45
             ]);
           }
