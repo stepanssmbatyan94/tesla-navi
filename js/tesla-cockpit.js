@@ -444,8 +444,11 @@ async function updateLiveTrafficBadge() {
 
 // 4. Map Engine Initialization
 async function initMap() {
-  const urlParams = new URLSearchParams(window.location.search);
-  const activeProvider = urlParams.get('provider') || localStorage.getItem('tesla_map_provider') || 'maplibre';
+  let activeProvider = urlParams.get('provider') || localStorage.getItem('tesla_map_provider') || 'maplibre';
+  if (activeProvider === 'osm') {
+    activeProvider = 'maplibre';
+    localStorage.setItem('tesla_map_provider', 'maplibre');
+  }
 
   mapEngine = new TeslaMapEngine('map-container', {
     provider: activeProvider,
@@ -797,7 +800,9 @@ function initToolbarHandlers() {
       : 'Карта: 3D Vector. Нажмите для Яндекс.Пробок';
 
     btnToggleProvider.addEventListener('click', () => {
-      const nextProv = (localStorage.getItem('tesla_map_provider') || 'maplibre') === 'yandex' ? 'maplibre' : 'yandex';
+      const currentUrlProv = new URLSearchParams(window.location.search).get('provider');
+      const cur = currentUrlProv || localStorage.getItem('tesla_map_provider') || 'maplibre';
+      const nextProv = (cur === 'yandex') ? 'maplibre' : 'yandex';
       localStorage.setItem('tesla_map_provider', nextProv);
       const url = new URL(window.location.href);
       url.searchParams.set('provider', nextProv);

@@ -60,7 +60,12 @@ class TeslaMapEngine {
     container.innerHTML = '';
 
     if (this.provider === 'maplibre' && window.maplibregl) {
-      await this.initMapLibre();
+      try {
+        await this.initMapLibre();
+      } catch (err) {
+        console.warn('MapLibre initialization warning:', err);
+        await this.initLeaflet();
+      }
     } else if (this.provider === 'yandex' && window.ymaps) {
       await this.initYandex();
     } else {
@@ -536,9 +541,8 @@ class TeslaMapEngine {
         attributionControl: false
       });
 
-      window.L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
-        maxZoom: 19,
-        subdomains: 'abcd'
+      window.L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19
       }).addTo(this.map);
 
       const carIcon = window.L.divIcon({
