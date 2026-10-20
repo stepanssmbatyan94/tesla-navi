@@ -8,23 +8,25 @@ let currentLang = 'ru';
 let activeChargersMarkers = [];
 let chargersVisible = false;
 
-// YouTube Music Playlist (Verified working YouTube IDs)
-const PLAYLIST = [
-  { title: 'BRUNETTE - ANHETANAM', id: '-o07wiIMd3g' },
-  { title: 'K/ES - yellowheart. feat Misho', id: 'xNW2-ruUlVI' },
-  { title: 'Arkadi Dumikyan - Hreshtakneri qaxaq', id: 'Za4JpfNyHkY' },
-  { title: 'Artur Arakelyan - Kyanqis Imast', id: 'RWoOXqWeBvw' }
-];
-let currentTrackIndex = 0;
+// YouTube Queue & Player State (Dynamic, no hardcoded tracks)
+let youtubeQueue = [];
+let currentTrackIndex = -1;
 let isMusicPlaying = false;
+let currentTrackInfo = null;
 
-// Yerevan EV Supercharging Stations (CPS, Flash, PlugShare)
+// Yerevan EV Supercharging Stations Hubs (CPS, Flash, PlugShare, Dalma)
 const EV_CHARGERS = [
-  { name: 'Tesla Supercharger Yerevan (Flash)', lat: 40.192000, lng: 44.475000, power: '150 kW' },
-  { name: 'EV Motors Fast Charger (Kievyan St)', lat: 40.198500, lng: 44.493000, power: '120 kW' },
-  { name: 'CPS Electric Charging Hub (Halabyan)', lat: 40.187000, lng: 44.471000, power: '60 kW' },
-  { name: 'SAS Foodland EV Charger (Baghramyan)', lat: 40.191200, lng: 44.501500, power: '50 kW' },
-  { name: 'Dalma Garden Mall Supercharger', lat: 40.180200, lng: 44.482000, power: '120 kW' }
+  { name: 'Dalma Garden Mall Supercharger', lat: 40.180200, lng: 44.482000, power: '150 kW', stalls: '4/6 свободно', address: 'Tsitsernakaberd Hwy, Yerevan' },
+  { name: 'Tesla Supercharger Yerevan (Flash)', lat: 40.192000, lng: 44.475000, power: '150 kW', stalls: '3/4 свободно', address: 'Halabyan St, Yerevan' },
+  { name: 'EV Motors Fast Hub (Kievyan St)', lat: 40.198500, lng: 44.493000, power: '120 kW', stalls: '2/2 свободно', address: 'Kievyan St 8, Yerevan' },
+  { name: 'CPS Electric Charging Hub (Halabyan)', lat: 40.187000, lng: 44.471000, power: '60 kW', stalls: '1/2 свободно', address: 'Halabyan St 38, Yerevan' },
+  { name: 'MegaMall Fast Charger Hub', lat: 40.196300, lng: 44.561000, power: '120 kW', stalls: '4/4 свободно', address: 'Gai Ave 16, Nor Nork' },
+  { name: 'Rio Mall EV Hub (Vahram Papazyan)', lat: 40.201200, lng: 44.508500, power: '60 kW', stalls: '2/2 свободно', address: 'Vahram Papazyan St 8, Yerevan' },
+  { name: 'Yerevan Mall Supercharger Hub', lat: 40.155800, lng: 44.501500, power: '120 kW', stalls: '3/4 свободно', address: 'Arshakunyats Ave 34/3, Yerevan' },
+  { name: 'SAS Foodland Fast Charger (Baghramyan)', lat: 40.191200, lng: 44.501500, power: '50 kW', stalls: '1/2 свободно', address: 'Baghramyan Ave 85, Yerevan' },
+  { name: 'Zvartnots Airport EV Supercharger', lat: 40.147500, lng: 44.398000, power: '120 kW', stalls: '4/6 свободно', address: 'Zvartnots International Airport' },
+  { name: 'Northern Avenue Hub (Center)', lat: 40.182200, lng: 44.514000, power: '50 kW', stalls: '2/2 свободно', address: 'Northern Ave, Yerevan' },
+  { name: 'Cascade Plaza EV Hub', lat: 40.191500, lng: 44.515200, power: '60 kW', stalls: '1/2 свободно', address: 'Antarayin St 160, Yerevan' }
 ];
 
 document.addEventListener('DOMContentLoaded', async () => {
@@ -810,13 +812,8 @@ function initToolbarHandlers() {
     }
   });
 
-  // EV Chargers Toggle
-  const btnChargers = document.getElementById('btn-toggle-chargers');
-  btnChargers.addEventListener('click', () => {
-    chargersVisible = !chargersVisible;
-    btnChargers.classList.toggle('active', chargersVisible);
-    toggleEvChargers(chargersVisible);
-  });
+  // EV Charging Stations Drawer & Battery Pill Handlers (Mapsev Reference)
+  initChargingStationsDrawer();
 
   // Bottom Nav Cancel button
   document.getElementById('btn-cancel-nav').addEventListener('click', () => {
@@ -1312,20 +1309,171 @@ function initEditPlaceModalHandlers() {
   }
 }
 
-// 6. Search & Autocomplete Handlers
+// 6. Search & Autocomplete Handlers with Persistent Search History
+const SEARCH_HISTORY_KEY = 'tesla_search_history';
+
+function getSearchHistory() {
+  try {
+    const raw = localStorage.getItem(SEARCH_HISTORY_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+    }
+  } catch (e) {
+    console.warn('Failed to parse search history:', e);
+  }
+  return [
+    { name: 'Kirk Kerkorian Street, 29/14', address: 'Yerevan, Armenia', lat: 40.189551, lng: 44.468663 },
+    { name: 'Kirk Kerkorian Street', address: 'Yerevan, Armenia', lat: 40.188200, lng: 44.471500 },
+    { name: 'Hakob Hakobyan Street', address: 'Arabkir, Yerevan', lat: 40.198213, lng: 44.492887 }
+  ];
+}
+
+function saveSearchHistory(history) {
+  try {
+    localStorage.setItem(SEARCH_HISTORY_KEY, JSON.stringify(history));
+  } catch (e) {
+    console.warn('Failed to save search history:', e);
+  }
+}
+
+function addToSearchHistory(item) {
+  if (!item || !item.name || !item.lat || !item.lng) return;
+  let history = getSearchHistory();
+  // Filter out duplicates by coordinates or name
+  history = history.filter(h => {
+    const isSameCoords = Math.abs(h.lat - item.lat) < 0.0001 && Math.abs(h.lng - item.lng) < 0.0001;
+    const isSameName = h.name.trim().toLowerCase() === item.name.trim().toLowerCase();
+    return !isSameCoords && !isSameName;
+  });
+  history.unshift({
+    name: item.name,
+    address: item.address || 'Yerevan, Armenia',
+    lat: item.lat,
+    lng: item.lng,
+    timestamp: Date.now()
+  });
+  if (history.length > 25) history = history.slice(0, 25);
+  saveSearchHistory(history);
+  renderSearchHistory();
+}
+
+function removeFromSearchHistory(index) {
+  let history = getSearchHistory();
+  history.splice(index, 1);
+  saveSearchHistory(history);
+  renderSearchHistory();
+}
+
+function clearAllSearchHistory() {
+  saveSearchHistory([]);
+  renderSearchHistory();
+}
+
+function renderSearchHistory() {
+  const resultsList = document.getElementById('search-results-list');
+  const sectionTitle = document.getElementById('drawer-section-title');
+  const searchDrawer = document.getElementById('search-drawer');
+  if (!resultsList) return;
+
+  if (sectionTitle) {
+    sectionTitle.textContent = I18N[window.CURRENT_LANG || 'ru']?.history || 'История';
+  }
+
+  resultsList.innerHTML = '';
+  const history = getSearchHistory();
+
+  if (history.length === 0) {
+    resultsList.innerHTML = `
+      <div style="text-align: center; color: #94a3b8; padding: 28px 14px; font-size: 13px;">
+        История поиска пуста
+      </div>
+    `;
+    return;
+  }
+
+  const cur = mapEngine ? mapEngine.currentPosition : { lat: 40.1776, lng: 44.5125 };
+
+  history.forEach((h, idx) => {
+    const distMeters = mapEngine ? mapEngine.calculateDistance(cur.lat, cur.lng, h.lat, h.lng) : 1000;
+    const distStr = distMeters >= 1000 ? `${(distMeters / 1000).toFixed(1)} км` : `${Math.round(distMeters)} м`;
+    const isStarred = isLocationInFavorites(h.lat, h.lng, h.name);
+
+    const item = document.createElement('div');
+    item.className = 'drawer-list-item';
+    item.innerHTML = `
+      <div class="item-left">
+        <div class="item-icon">📍</div>
+        <div>
+          <div class="item-title">${h.name}</div>
+          <div class="item-subtitle">${h.address || 'Yerevan, Armenia'}</div>
+        </div>
+      </div>
+      <div style="display: flex; align-items: center; gap: 6px;">
+        <div class="item-dist">${distStr}</div>
+        <button class="item-star-btn ${isStarred ? 'starred' : ''}" title="${isStarred ? 'Удалить из избранного' : 'Добавить в избранное'}">
+          ${isStarred ? '⭐' : '☆'}
+        </button>
+        <button class="btn-hist-action" title="Удалить из истории" style="font-size: 12px; padding: 2px 6px;">✕</button>
+      </div>
+    `;
+
+    const starBtn = item.querySelector('.item-star-btn');
+    starBtn?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      toggleFavoritePlace({ name: h.name, address: h.address, lat: h.lat, lng: h.lng });
+      const starredNow = isLocationInFavorites(h.lat, h.lng, h.name);
+      starBtn.classList.toggle('starred', starredNow);
+      starBtn.textContent = starredNow ? '⭐' : '☆';
+    });
+
+    const deleteBtn = item.querySelector('.btn-hist-action');
+    deleteBtn?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      removeFromSearchHistory(idx);
+    });
+
+    item.addEventListener('click', (e) => {
+      if (e.target.closest('.item-star-btn') || e.target.closest('.btn-hist-action')) return;
+      searchDrawer?.classList.add('hidden');
+      startNavigationTo(h);
+    });
+
+    resultsList.appendChild(item);
+  });
+}
+
 function initSearchHandlers() {
   const searchInput = document.getElementById('drawer-search-input');
   const resultsList = document.getElementById('search-results-list');
   const searchDrawer = document.getElementById('search-drawer');
+  const btnClearHistory = document.getElementById('btn-clear-search-history');
   let debounceTimer = null;
+
+  if (btnClearHistory) {
+    btnClearHistory.addEventListener('click', (e) => {
+      e.stopPropagation();
+      clearAllSearchHistory();
+    });
+  }
+
+  // Initial render of persistent search history
+  renderSearchHistory();
 
   // Autocomplete typing with Yandex-powered geocoder
   searchInput.addEventListener('input', () => {
     clearTimeout(debounceTimer);
     const query = searchInput.value.trim();
     const sectionTitle = document.getElementById('drawer-section-title');
+
+    if (!query) {
+      if (sectionTitle) sectionTitle.textContent = I18N[window.CURRENT_LANG || 'ru']?.history || 'История';
+      renderSearchHistory();
+      return;
+    }
+
     if (sectionTitle) {
-      sectionTitle.textContent = query ? 'Результаты поиска' : (I18N[window.CURRENT_LANG || 'ru']?.history || 'История');
+      sectionTitle.textContent = 'Результаты поиска';
     }
 
     if (query.length < 2) return;
@@ -1376,13 +1524,13 @@ function initSearchHandlers() {
               const starredNow = isLocationInFavorites(lat, lng, title);
               starBtn.classList.toggle('starred', starredNow);
               starBtn.textContent = starredNow ? '⭐' : '☆';
-              starBtn.title = starredNow ? 'Удалить из избранного' : 'Добавить в избранное';
             });
 
             item.addEventListener('click', (e) => {
               if (e.target.closest('.item-star-btn')) return;
               searchDrawer.classList.add('hidden');
-              startNavigationTo({ name: title, lat, lng });
+              addToSearchHistory({ name: title, address: subtitle, lat, lng });
+              startNavigationTo({ name: title, lat, lng, address: subtitle });
             });
 
             resultsList.appendChild(item);
@@ -1394,59 +1542,24 @@ function initSearchHandlers() {
     }, 200);
   });
 
-  // Click on default history items with star favorite support
-  document.querySelectorAll('#search-results-list .drawer-list-item').forEach(item => {
-    const lat = parseFloat(item.dataset.lat);
-    const lng = parseFloat(item.dataset.lng);
-    const name = item.dataset.name;
-    const isStarred = isLocationInFavorites(lat, lng, name);
-
-    // Add star button to history item
-    const distEl = item.querySelector('.item-dist');
-    if (distEl && !item.querySelector('.item-star-btn')) {
-      const starBtn = document.createElement('button');
-      starBtn.className = `item-star-btn ${isStarred ? 'starred' : ''}`;
-      starBtn.textContent = isStarred ? '⭐' : '☆';
-      starBtn.title = isStarred ? 'Удалить из избранного' : 'Добавить в избранное';
-      starBtn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        toggleFavoritePlace({ name, address: 'Yerevan, Armenia', lat, lng });
-        const starredNow = isLocationInFavorites(lat, lng, name);
-        starBtn.classList.toggle('starred', starredNow);
-        starBtn.textContent = starredNow ? '⭐' : '☆';
-      });
-
-      const wrap = document.createElement('div');
-      wrap.style.display = 'flex';
-      wrap.style.alignItems = 'center';
-      wrap.style.gap = '8px';
-      distEl.parentNode.insertBefore(wrap, distEl);
-      wrap.appendChild(distEl);
-      wrap.appendChild(starBtn);
-    }
-
-    item.addEventListener('click', (e) => {
-      if (e.target.closest('.item-star-btn')) return;
-      if (lat && lng) {
-        searchDrawer.classList.add('hidden');
-        startNavigationTo({ name, lat, lng });
-      }
-    });
-  });
-
   // Category chips
   document.querySelectorAll('.drawer-chip').forEach(chip => {
     chip.addEventListener('click', () => {
       const type = chip.dataset.type;
+      if (type === 'charging') {
+        searchDrawer.classList.add('hidden');
+        openChargingStationsDrawer();
+        return;
+      }
       let target = null;
-      if (type === 'charging') target = { name: 'Tesla Supercharger Yerevan (Flash)', lat: 40.192000, lng: 44.475000 };
-      else if (type === 'parking') target = { name: 'Парковка / Parking Center', lat: 40.186500, lng: 44.473000 };
+      if (type === 'parking') target = { name: 'Парковка / Parking Center', lat: 40.186500, lng: 44.473000 };
       else if (type === 'carwash') target = { name: 'Premium Car Wash Yerevan', lat: 40.184500, lng: 44.478000 };
       else if (type === 'food') target = { name: 'Ресторан / Dining Yerevan', lat: 40.184000, lng: 44.480000 };
       else if (type === 'coffee') target = { name: 'Coffee House Yerevan', lat: 40.185500, lng: 44.485000 };
 
       if (target) {
         searchDrawer.classList.add('hidden');
+        addToSearchHistory(target);
         startNavigationTo(target);
       }
     });
@@ -1456,6 +1569,9 @@ function initSearchHandlers() {
 // Start Navigation to Target
 async function startNavigationTo(destination) {
   selectedDestination = destination;
+  if (destination && destination.name && destination.lat && destination.lng) {
+    addToSearchHistory(destination);
+  }
   if (mapEngine) {
     const route = await mapEngine.buildRouteTo(destination);
     if (route) {
@@ -1704,6 +1820,115 @@ function toggleEvChargers(show) {
   });
 }
 
+// 8.5. EV Charging Stations Full List Drawer (Mapsev & Tesla Supercharger Architecture)
+function initChargingStationsDrawer() {
+  const drawer = document.getElementById('charging-stations-drawer');
+  const btnClose = document.getElementById('btn-close-chargers');
+  const btnToolbar = document.getElementById('btn-toggle-chargers');
+  const dockBatteryBadge = document.getElementById('dock-battery-badge');
+  const btnQuick = document.getElementById('btn-quick-chargers');
+
+  if (dockBatteryBadge) {
+    dockBatteryBadge.addEventListener('click', () => {
+      openChargingStationsDrawer();
+    });
+  }
+
+  if (btnToolbar) {
+    btnToolbar.addEventListener('click', () => {
+      if (drawer && !drawer.classList.contains('hidden')) {
+        closeChargingStationsDrawer();
+      } else {
+        openChargingStationsDrawer();
+      }
+    });
+  }
+
+  if (btnQuick) {
+    btnQuick.addEventListener('click', () => {
+      openChargingStationsDrawer();
+    });
+  }
+
+  if (btnClose) {
+    btnClose.addEventListener('click', () => {
+      closeChargingStationsDrawer();
+    });
+  }
+}
+
+function openChargingStationsDrawer() {
+  const drawer = document.getElementById('charging-stations-drawer');
+  if (!drawer) return;
+
+  // Close other overlapping drawers
+  document.getElementById('search-drawer')?.classList.add('hidden');
+  document.getElementById('my-places-drawer')?.classList.add('hidden');
+  document.getElementById('weather-modal')?.classList.add('hidden');
+  document.getElementById('pairing-modal')?.classList.add('hidden');
+
+  drawer.classList.remove('hidden');
+  document.getElementById('btn-toggle-chargers')?.classList.add('active');
+
+  // Render stations with live distances
+  renderChargingStationsList();
+
+  // Show EV pins on map
+  toggleEvChargers(true);
+}
+
+function closeChargingStationsDrawer() {
+  const drawer = document.getElementById('charging-stations-drawer');
+  if (drawer) drawer.classList.add('hidden');
+  document.getElementById('btn-toggle-chargers')?.classList.remove('active');
+}
+
+function renderChargingStationsList() {
+  const listEl = document.getElementById('charging-stations-list');
+  if (!listEl) return;
+  listEl.innerHTML = '';
+
+  const cur = mapEngine ? mapEngine.currentPosition : { lat: 40.1872, lng: 44.5152 };
+
+  // Calculate distances and sort
+  const chargersWithDist = EV_CHARGERS.map(c => {
+    const distMeters = mapEngine ? mapEngine.calculateDistance(cur.lat, cur.lng, c.lat, c.lng) : 1200;
+    return { ...c, distMeters };
+  });
+
+  chargersWithDist.sort((a, b) => a.distMeters - b.distMeters);
+
+  chargersWithDist.forEach(charger => {
+    const distStr = charger.distMeters >= 1000
+      ? `${(charger.distMeters / 1000).toFixed(1)} км`
+      : `${Math.round(charger.distMeters)} м`;
+
+    const card = document.createElement('div');
+    card.className = 'ev-charger-card';
+    card.innerHTML = `
+      <div class="ev-charger-top">
+        <div class="ev-charger-name">⚡ ${charger.name}</div>
+        <span class="ev-charger-power">${charger.power}</span>
+      </div>
+      <div style="font-size: 12px; color: #64748b; line-height: 1.3;">${charger.address}</div>
+      <div class="ev-charger-meta">
+        <span class="ev-stalls-free">● ${charger.stalls}</span>
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <span style="font-weight: 600; color: #1e293b;">${distStr}</span>
+          <button class="btn-ev-route-go" type="button">Маршрут</button>
+        </div>
+      </div>
+    `;
+
+    card.addEventListener('click', () => {
+      closeChargingStationsDrawer();
+      startNavigationTo({ name: charger.name, lat: charger.lat, lng: charger.lng, address: charger.address });
+    });
+
+    listEl.appendChild(card);
+  });
+}
+
 // 9. Weather (Open-Meteo Real Forecast for Yerevan) & YouTube Music
 function initWeatherAndMusic() {
   // Weather
@@ -1782,12 +2007,11 @@ function initWeatherAndMusic() {
     handle.addEventListener('pointercancel', stopDrag);
   }
 
-  // YouTube Music & Video Player (Full Player & Draggable Floating Mini Player)
+  // YouTube Music & Video Player (Mapsev Architecture - Draggable / Floating)
   const btnMusic = document.getElementById('btn-open-music');
   const ytModal = document.getElementById('youtube-player-modal');
   const ytHeader = document.getElementById('yt-modal-header');
   const btnCloseMusic = document.getElementById('btn-close-music');
-  const btnMinimizeMusic = document.getElementById('btn-minimize-music');
 
   const miniPlayer = document.getElementById('music-mini-player');
   const miniTitle = document.getElementById('mini-player-title');
@@ -1798,25 +2022,120 @@ function initWeatherAndMusic() {
   const btnMiniPrev = document.getElementById('btn-mini-prev');
   const btnMiniNext = document.getElementById('btn-mini-next');
 
+  const ytIdleScreen = document.getElementById('yt-idle-screen');
+  const ytNowTitle = document.getElementById('yt-now-title');
+  const ytNowArtist = document.getElementById('yt-now-artist');
+  const ytIframe = document.getElementById('yt-player-iframe');
+
+  const ytTimelineTrack = document.getElementById('yt-timeline-track');
+  const ytTimelineFill = document.getElementById('yt-timeline-fill');
+  const ytTimeCur = document.getElementById('yt-time-cur');
+  const ytTimeDur = document.getElementById('yt-time-dur');
+
   const btnMusicPlay = document.getElementById('btn-music-play');
   const btnMusicPrev = document.getElementById('btn-music-prev');
   const btnMusicNext = document.getElementById('btn-music-next');
-  const ytIframe = document.getElementById('yt-player-iframe');
-  const ytSearchInput = document.getElementById('yt-search-input');
-  const btnYtSearchGo = document.getElementById('btn-yt-search-go');
-  const suggestionsList = document.getElementById('yt-suggestions-list');
 
-  // Initialize smooth dragging on both Full Player and Mini Player
+  const ytAccountBadge = document.getElementById('yt-account-badge');
+  const ytUserNameText = document.getElementById('yt-user-name-text');
+  const btnYtShuffle = document.getElementById('btn-yt-shuffle');
+  const btnYtFullscreen = document.getElementById('btn-yt-fullscreen');
+
+  const ytSearchInput = document.getElementById('yt-search-input');
+  const btnYtSearchClear = document.getElementById('btn-yt-search-clear');
+  const btnYtSearchGo = document.getElementById('btn-yt-search-go');
+  const ytResultsList = document.getElementById('yt-results-list');
+  const btnYtAccountToggle = document.getElementById('btn-yt-account-toggle');
+
+  // Dragging support
   makeElementDraggable(ytModal, ytHeader);
   makeElementDraggable(miniPlayer, miniPlayer);
 
+  // Playback timer & time parser
+  let ytProgressTimer = null;
+  let ytElapsedSec = 0;
+  let ytTotalDurationSec = 0;
+
+  function parseDuration(str) {
+    if (!str) return 210;
+    const parts = str.split(':').map(p => parseInt(p, 10));
+    if (parts.length === 2) return (parts[0] * 60) + parts[1];
+    if (parts.length === 3) return (parts[0] * 3600) + (parts[1] * 60) + parts[2];
+    return 210;
+  }
+
+  function formatTime(sec) {
+    const s = Math.max(0, Math.floor(sec));
+    const m = Math.floor(s / 60);
+    const rem = s % 60;
+    return `${m}:${rem < 10 ? '0' : ''}${rem}`;
+  }
+
+  function resetTimeline() {
+    clearInterval(ytProgressTimer);
+    ytElapsedSec = 0;
+    if (ytTimelineFill) ytTimelineFill.style.width = '0%';
+    if (ytTimeCur) ytTimeCur.textContent = '0:00';
+  }
+
+  function startTimelineProgress() {
+    clearInterval(ytProgressTimer);
+    ytProgressTimer = setInterval(() => {
+      if (!isMusicPlaying) return;
+      ytElapsedSec++;
+      if (ytTotalDurationSec > 0) {
+        const pct = Math.min(100, (ytElapsedSec / ytTotalDurationSec) * 100);
+        if (ytTimelineFill) ytTimelineFill.style.width = `${pct}%`;
+        if (ytElapsedSec >= ytTotalDurationSec) {
+          playNextTrack();
+        }
+      }
+      if (ytTimeCur) ytTimeCur.textContent = formatTime(ytElapsedSec);
+    }, 1000);
+  }
+
+  // Account Identity (Stepan Smbatyan - Screenshot 5)
+  let ytUser = localStorage.getItem('tesla_yt_user') || 'Stepan Smbatyan';
+
+  function updateAccountUI() {
+    if (ytUserNameText) ytUserNameText.textContent = ytUser || 'Войти в YouTube';
+    if (btnYtAccountToggle) {
+      btnYtAccountToggle.textContent = ytUser
+        ? `Disconnect YouTube · ${ytUser}`
+        : 'Connect YouTube Account';
+    }
+  }
+  updateAccountUI();
+
+  if (btnYtAccountToggle) {
+    btnYtAccountToggle.addEventListener('click', () => {
+      if (ytUser) {
+        if (confirm(`Отключить аккаунт YouTube (${ytUser})?`)) {
+          ytUser = '';
+          localStorage.removeItem('tesla_yt_user');
+          updateAccountUI();
+        }
+      } else {
+        const name = prompt('Введите имя вашего аккаунта YouTube:', 'Stepan Smbatyan');
+        if (name && name.trim()) {
+          ytUser = name.trim();
+          localStorage.setItem('tesla_yt_user', ytUser);
+          updateAccountUI();
+        }
+      }
+    });
+  }
+
+  // Sync music play/pause icons & states
   function syncMusicState(playing, trackTitle) {
     isMusicPlaying = playing;
-    const playSvg = `<svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><polygon points="6 4 20 12 6 20 6 4"/></svg>`;
-    const pauseSvg = `<svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>`;
-    const icon = playing ? pauseSvg : playSvg;
-    if (btnMusicPlay) btnMusicPlay.innerHTML = icon;
-    if (btnMiniPlay) btnMiniPlay.innerHTML = icon;
+    const playSvg = `<svg viewBox="0 0 24 24" width="24" height="24" fill="#ffffff"><polygon points="6 4 20 12 6 20 6 4"/></svg>`;
+    const pauseSvg = `<svg viewBox="0 0 24 24" width="24" height="24" fill="#ffffff"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>`;
+    const miniPlaySvg = `<svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><polygon points="6 4 20 12 6 20 6 4"/></svg>`;
+    const miniPauseSvg = `<svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>`;
+
+    if (btnMusicPlay) btnMusicPlay.innerHTML = playing ? pauseSvg : playSvg;
+    if (btnMiniPlay) btnMiniPlay.innerHTML = playing ? miniPauseSvg : miniPlaySvg;
 
     if (miniPlayer) {
       miniPlayer.classList.toggle('playing', playing);
@@ -1824,15 +2143,41 @@ function initWeatherAndMusic() {
     if (trackTitle && miniTitle) {
       miniTitle.textContent = trackTitle;
     }
+    if (trackTitle && ytNowTitle) {
+      ytNowTitle.textContent = trackTitle;
+    }
+
+    if (playing) {
+      startTimelineProgress();
+    } else {
+      clearInterval(ytProgressTimer);
+    }
   }
 
-  function playTrackById(videoId, title) {
+  function playTrackById(videoId, title, channel, duration) {
+    resetTimeline();
+    ytTotalDurationSec = parseDuration(duration);
+    if (ytTimeDur) ytTimeDur.textContent = duration || formatTime(ytTotalDurationSec);
+
+    if (ytIdleScreen) ytIdleScreen.classList.add('hidden');
     if (ytIframe) {
+      ytIframe.classList.remove('hidden');
       const origin = window.location.origin || '';
       ytIframe.src = `https://www.youtube.com/embed/${videoId}?autoplay=1&enablejsapi=1&origin=${encodeURIComponent(origin)}`;
     }
+
+    if (ytNowTitle) ytNowTitle.textContent = title || 'YouTube Track';
+    if (ytNowArtist) ytNowArtist.textContent = channel || '';
+
     syncMusicState(true, title || 'YouTube Music');
     if (btnMusic) btnMusic.classList.add('active');
+
+    // Update active highlight in recommendations list
+    if (ytResultsList) {
+      ytResultsList.querySelectorAll('.yt-result-item').forEach(el => {
+        el.classList.toggle('playing', el.dataset.id === videoId);
+      });
+    }
   }
 
   function minimizeToMiniPlayer() {
@@ -1876,106 +2221,200 @@ function initWeatherAndMusic() {
     }
   });
 
-  // Minimize button click
-  if (btnMinimizeMusic) {
-    btnMinimizeMusic.addEventListener('click', minimizeToMiniPlayer);
+  if (btnCloseMusic) {
+    btnCloseMusic.addEventListener('click', () => {
+      if (isMusicPlaying) {
+        minimizeToMiniPlayer();
+      } else {
+        stopAndCloseAllMusic();
+      }
+    });
   }
-
-  // Close full player (minimizes to mini-bar if playing so audio keeps going)
-  btnCloseMusic.addEventListener('click', () => {
-    if (isMusicPlaying) {
-      minimizeToMiniPlayer();
-    } else {
-      stopAndCloseAllMusic();
-    }
-  });
 
   // Mini-player buttons
   if (btnMiniExpand) btnMiniExpand.addEventListener('click', expandToFullPlayer);
   if (btnMiniInfoExpand) btnMiniInfoExpand.addEventListener('click', expandToFullPlayer);
   if (btnMiniClose) btnMiniClose.addEventListener('click', stopAndCloseAllMusic);
 
-  async function handleYtSearch() {
-    const q = ytSearchInput.value.trim();
-    if (!q) return;
-
-    // Check if query is direct YouTube video ID or URL
-    const urlMatch = q.match(/(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|watch\?v=|watch\?.+&v=))([\w-]{11})/);
-    if (urlMatch && urlMatch[1]) {
-      const videoId = urlMatch[1];
-      playTrackById(videoId, q);
+  // Render 10-20 recommendations matching Mapsev Screenshots 3, 4, 5
+  function renderRecommendations(tracks) {
+    if (!ytResultsList) return;
+    ytResultsList.innerHTML = '';
+    if (!tracks || tracks.length === 0) {
+      ytResultsList.innerHTML = '<div style="text-align: center; color: #94a3b8; padding: 20px 10px; font-size: 13px;">Ничего не найдено</div>';
       return;
     }
 
-    if (btnYtSearchGo) btnYtSearchGo.textContent = '⏳';
+    tracks.forEach((track, idx) => {
+      const item = document.createElement('div');
+      item.className = `yt-result-item ${idx === currentTrackIndex ? 'playing' : ''}`;
+      item.dataset.id = track.id;
+      item.dataset.index = idx;
+
+      const thumbUrl = track.thumbnail || `https://i.ytimg.com/vi/${track.id}/hqdefault.jpg`;
+      const metaText = [track.channel, track.duration].filter(Boolean).join(' · ');
+
+      item.innerHTML = `
+        <div class="yt-thumb-wrap">
+          <img class="yt-thumb-img" src="${thumbUrl}" alt="" loading="lazy" />
+        </div>
+        <div class="yt-info-wrap">
+          <div class="yt-item-title">${track.title}</div>
+          <div class="yt-item-meta">${metaText}</div>
+        </div>
+      `;
+
+      item.addEventListener('click', () => {
+        currentTrackIndex = idx;
+        currentTrackInfo = track;
+        playTrackById(track.id, track.title, track.channel, track.duration);
+      });
+
+      ytResultsList.appendChild(item);
+    });
+  }
+
+  // Live YouTube Search & Immediate Auto-Play of First Result (User Explicit Requirement)
+  async function handleYtSearch(customQuery) {
+    const q = (customQuery !== undefined ? customQuery : (ytSearchInput ? ytSearchInput.value : '')).trim();
+    if (!q) return;
+
+    if (btnYtSearchClear) {
+      btnYtSearchClear.classList.toggle('hidden', !q);
+    }
+
+    // Direct YouTube link or ID
+    const urlMatch = q.match(/(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|watch\?v=|watch\?.+&v=))([\w-]{11})/);
+    if (urlMatch && urlMatch[1]) {
+      const videoId = urlMatch[1];
+      playTrackById(videoId, q, 'YouTube', '3:30');
+      return;
+    }
+
+    if (btnYtSearchGo) btnYtSearchGo.textContent = '...';
+
     try {
       const res = await fetch(`/api/yt-search?q=${encodeURIComponent(q)}`);
       const data = await res.json();
       if (data.results && data.results.length > 0) {
-        suggestionsList.innerHTML = '';
-        data.results.forEach((track, idx) => {
-          const div = document.createElement('div');
-          div.className = `yt-song-item ${idx === 0 ? 'active' : ''}`;
-          div.dataset.id = track.id;
-          div.dataset.title = track.title;
-
-          const titleSpan = document.createElement('span');
-          titleSpan.textContent = `🎵 ${track.title}`;
-          titleSpan.style.cssText = 'overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 250px;';
-
-          const durSpan = document.createElement('span');
-          durSpan.textContent = track.duration || '';
-
-          div.appendChild(titleSpan);
-          div.appendChild(durSpan);
-
-          div.addEventListener('click', () => {
-            suggestionsList.querySelectorAll('.yt-song-item').forEach(el => el.classList.remove('active'));
-            div.classList.add('active');
-            playTrackById(track.id, track.title);
-          });
-          suggestionsList.appendChild(div);
-        });
-
-        // Update playlist for next/prev navigation
-        PLAYLIST.length = 0;
-        data.results.forEach(t => PLAYLIST.push({ title: t.title, id: t.id }));
+        youtubeQueue = data.results;
         currentTrackIndex = 0;
+        currentTrackInfo = youtubeQueue[0];
 
-        playTrackById(data.results[0].id, data.results[0].title);
+        // 1. Render all 10-20 recommendations below matching Screenshot 3 & 4
+        renderRecommendations(youtubeQueue);
+
+        // 2. Immediately auto-play the 1st song (User requirement)
+        playTrackById(currentTrackInfo.id, currentTrackInfo.title, currentTrackInfo.channel, currentTrackInfo.duration);
+      } else {
+        renderRecommendations([]);
       }
     } catch (err) {
-      console.warn('YouTube search failed:', err);
+      console.warn('YouTube search error:', err);
     } finally {
-      if (btnYtSearchGo) btnYtSearchGo.textContent = '🔍';
+      if (btnYtSearchGo) btnYtSearchGo.textContent = 'Search';
     }
   }
 
-  if (btnYtSearchGo) btnYtSearchGo.addEventListener('click', handleYtSearch);
+  if (btnYtSearchGo) btnYtSearchGo.addEventListener('click', () => handleYtSearch());
   if (ytSearchInput) {
     ytSearchInput.addEventListener('keydown', (e) => {
       if (e.key === 'Enter') handleYtSearch();
     });
+    ytSearchInput.addEventListener('input', () => {
+      if (btnYtSearchClear) {
+        btnYtSearchClear.classList.toggle('hidden', !ytSearchInput.value);
+      }
+    });
   }
-
-  // Suggestions row clicks
-  if (suggestionsList) {
-    suggestionsList.querySelectorAll('.yt-song-item').forEach(item => {
-      item.addEventListener('click', () => {
-        suggestionsList.querySelectorAll('.yt-song-item').forEach(el => el.classList.remove('active'));
-        item.classList.add('active');
-        const id = item.dataset.id;
-        const title = item.dataset.title;
-        playTrackById(id, title);
-      });
+  if (btnYtSearchClear) {
+    btnYtSearchClear.addEventListener('click', () => {
+      if (ytSearchInput) {
+        ytSearchInput.value = '';
+        btnYtSearchClear.classList.add('hidden');
+        ytSearchInput.focus();
+      }
     });
   }
 
-  // Unified Play / Pause handler
+  // Category filter tabs: Playlists, Liked, Trending, Search
+  document.querySelectorAll('.yt-filter-tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      document.querySelectorAll('.yt-filter-tab').forEach(t => t.classList.remove('active'));
+      tab.classList.add('active');
+      const tabName = tab.dataset.tab;
+      if (tabName === 'trending') {
+        handleYtSearch('top hits 2024 trending music');
+      } else if (tabName === 'liked' || tabName === 'playlists') {
+        if (youtubeQueue.length > 0) {
+          renderRecommendations(youtubeQueue.slice(0, 8));
+        } else {
+          handleYtSearch('popular music');
+        }
+      } else if (tabName === 'search') {
+        if (ytSearchInput && ytSearchInput.value.trim()) {
+          handleYtSearch();
+        } else {
+          ytSearchInput?.focus();
+        }
+      }
+    });
+  });
+
+  // Timeline scrubber click to seek
+  if (ytTimelineTrack) {
+    ytTimelineTrack.addEventListener('click', (e) => {
+      if (!isMusicPlaying || ytTotalDurationSec <= 0) return;
+      const rect = ytTimelineTrack.getBoundingClientRect();
+      const clickX = e.clientX - rect.left;
+      const ratio = Math.max(0, Math.min(1, clickX / rect.width));
+      ytElapsedSec = Math.floor(ratio * ytTotalDurationSec);
+      if (ytTimelineFill) ytTimelineFill.style.width = `${ratio * 100}%`;
+      if (ytTimeCur) ytTimeCur.textContent = formatTime(ytElapsedSec);
+      if (ytIframe) {
+        ytIframe.contentWindow.postMessage(JSON.stringify({
+          event: 'command',
+          func: 'seekTo',
+          args: [ytElapsedSec, true]
+        }), '*');
+      }
+    });
+  }
+
+  // Shuffle button
+  if (btnYtShuffle) {
+    btnYtShuffle.addEventListener('click', () => {
+      if (youtubeQueue.length <= 1) return;
+      for (let i = youtubeQueue.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [youtubeQueue[i], youtubeQueue[j]] = [youtubeQueue[j], youtubeQueue[i]];
+      }
+      renderRecommendations(youtubeQueue);
+    });
+  }
+
+  // Fullscreen button
+  if (btnYtFullscreen) {
+    btnYtFullscreen.addEventListener('click', () => {
+      if (ytIframe && ytIframe.requestFullscreen) {
+        ytIframe.requestFullscreen().catch(() => {});
+      }
+    });
+  }
+
+  // Play / Pause unified toggle
   function togglePlayPause() {
     if (!isMusicPlaying) {
-      const track = PLAYLIST[currentTrackIndex];
-      playTrackById(track.id, track.title);
+      if (currentTrackIndex >= 0 && youtubeQueue[currentTrackIndex]) {
+        const track = youtubeQueue[currentTrackIndex];
+        playTrackById(track.id, track.title, track.channel, track.duration);
+      } else if (youtubeQueue.length > 0) {
+        currentTrackIndex = 0;
+        const track = youtubeQueue[0];
+        playTrackById(track.id, track.title, track.channel, track.duration);
+      } else {
+        handleYtSearch('top music hits');
+      }
     } else {
       syncMusicState(false);
       if (ytIframe) {
@@ -1987,17 +2426,21 @@ function initWeatherAndMusic() {
   btnMusicPlay.addEventListener('click', togglePlayPause);
   if (btnMiniPlay) btnMiniPlay.addEventListener('click', togglePlayPause);
 
-  // Unified Next / Prev handlers
+  // Next / Prev unified handlers
   function playNextTrack() {
-    currentTrackIndex = (currentTrackIndex + 1) % PLAYLIST.length;
-    const track = PLAYLIST[currentTrackIndex];
-    playTrackById(track.id, track.title);
+    if (youtubeQueue.length === 0) return;
+    currentTrackIndex = (currentTrackIndex + 1) % youtubeQueue.length;
+    const track = youtubeQueue[currentTrackIndex];
+    currentTrackInfo = track;
+    playTrackById(track.id, track.title, track.channel, track.duration);
   }
 
   function playPrevTrack() {
-    currentTrackIndex = (currentTrackIndex - 1 + PLAYLIST.length) % PLAYLIST.length;
-    const track = PLAYLIST[currentTrackIndex];
-    playTrackById(track.id, track.title);
+    if (youtubeQueue.length === 0) return;
+    currentTrackIndex = (currentTrackIndex - 1 + youtubeQueue.length) % youtubeQueue.length;
+    const track = youtubeQueue[currentTrackIndex];
+    currentTrackInfo = track;
+    playTrackById(track.id, track.title, track.channel, track.duration);
   }
 
   btnMusicNext.addEventListener('click', playNextTrack);
@@ -2289,7 +2732,7 @@ function initDevMode() {
       console.log('🎵 [Диагностика] Тестирование YouTube плеера...');
       const ytIframe = document.getElementById('yt-player-iframe');
       if (ytIframe) {
-        const testId = PLAYLIST[0].id;
+        const testId = (youtubeQueue && youtubeQueue[0]) ? youtubeQueue[0].id : 'dQw4w9WgXcQ';
         const origin = window.location.origin || '';
         ytIframe.src = `https://www.youtube.com/embed/${testId}?autoplay=1&enablejsapi=1&origin=${encodeURIComponent(origin)}`;
         console.log(`▶️ Загружен тестовый ролик ${testId} с origin: ${origin}`);

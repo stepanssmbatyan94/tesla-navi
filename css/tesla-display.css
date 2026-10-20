@@ -1442,24 +1442,26 @@ html, body {
   pointer-events: none;
 }
 
-/* 8. YouTube Player Modal (With Search & Video Window - Draggable) */
+/* 8. YouTube Player Modal (Mapsev Architecture - Draggable / Floating) */
 .youtube-player-modal {
   position: absolute;
-  top: 60px;
+  top: 50px;
   left: 78px;
   z-index: 75;
-  width: 400px;
+  width: 410px;
   max-width: calc(100vw - 90px);
+  max-height: calc(100vh - 70px);
   background: #ffffff;
   border: 1px solid rgba(0, 0, 0, 0.08);
-  border-radius: 22px;
-  padding: 16px;
-  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.14), 0 2px 8px rgba(0, 0, 0, 0.04);
+  border-radius: 24px;
+  padding: 14px 16px;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.16), 0 2px 8px rgba(0, 0, 0, 0.04);
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 10px;
   user-select: none;
   touch-action: none;
+  overflow-y: auto;
   transition: opacity 0.25s ease, transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
@@ -1469,120 +1471,539 @@ html, body {
   transform: translateY(20px) scale(0.96);
 }
 
-.yt-drag-header {
-  cursor: grab;
-  padding-bottom: 2px;
-  user-select: none;
+.yt-card-header {
+  display: flex;
+  flex-direction: column;
 }
-.yt-drag-header:active {
+
+.yt-handle {
+  width: 36px;
+  height: 4px;
+  background: #cbd5e1;
+  border-radius: 2px;
+  margin: 0 auto 6px auto;
+  cursor: grab;
+}
+.yt-handle:active {
   cursor: grabbing;
 }
 
-.yt-search-row {
+.yt-title-row {
   display: flex;
   align-items: center;
-  background: #f8fafc;
-  border: 1px solid #e2e8f0;
-  border-radius: 14px;
-  padding: 6px 10px;
-  gap: 8px;
+  justify-content: space-between;
+  padding: 0 2px 4px 2px;
 }
 
-.yt-search-input {
-  flex: 1;
-  background: transparent;
-  border: none;
-  outline: none;
-  color: #111827;
-  font-size: 14px;
+.yt-title-row span {
+  font-size: 16px;
+  font-weight: 700;
+  color: #0f172a;
 }
 
-.yt-video-frame {
+/* Video Screen Box (Screenshot 3: Black Box with 'Nothing playing / Pick something below' when idle) */
+.yt-screen-container {
   width: 100%;
-  height: 200px;
-  border-radius: 14px;
+  height: 185px;
+  border-radius: 16px;
   overflow: hidden;
-  background: #000;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+  background: #000000;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.18);
 }
 
-.yt-video-frame iframe {
+.yt-idle-screen {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 16px;
+  text-align: center;
+  color: #ffffff;
+}
+
+.yt-idle-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: #ffffff;
+}
+
+.yt-idle-sub {
+  font-size: 13px;
+  color: #94a3b8;
+}
+
+.yt-iframe-player {
+  position: absolute;
+  top: 0;
+  left: 0;
   width: 100%;
   height: 100%;
   border: none;
 }
 
-.yt-suggestions-row {
+/* Scrub Bar / Timeline (Screenshot 3) */
+.yt-timeline-container {
   display: flex;
   flex-direction: column;
   gap: 4px;
-  max-height: 120px;
-  overflow-y: auto;
+  padding: 0 2px;
 }
 
-.yt-song-item {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 6px 10px;
-  border-radius: 10px;
-  font-size: 13px;
+.yt-timeline-track {
+  height: 4px;
+  background: #e2e8f0;
+  border-radius: 2px;
   cursor: pointer;
-  color: #4b5563;
-  transition: background 0.15s ease;
+  position: relative;
 }
 
-.yt-song-item:hover, .yt-song-item.active {
-  background: #f1f5f9;
-  color: #111827;
+.yt-timeline-fill {
+  height: 100%;
+  background: #ef4444;
+  border-radius: 2px;
+  position: relative;
+  transition: width 0.1s linear;
 }
 
-/* Large, Touch-Friendly Player Transport Controls */
-.music-controls-row {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 20px;
-  padding: 6px 0 2px 0;
-}
-
-.music-ctrl-btn {
-  width: 50px;
-  height: 50px;
+.yt-timeline-knob {
+  width: 12px;
+  height: 12px;
+  background: #ef4444;
+  border: 2px solid #ffffff;
   border-radius: 50%;
-  border: 1px solid #e2e8f0;
-  background: #f8fafc;
-  color: #1e293b;
-  font-size: 20px;
+  position: absolute;
+  right: -6px;
+  top: -4px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
+}
+
+.yt-timestamps {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  font-weight: 500;
+  color: #64748b;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Transport Controls (Screenshot 3: Center Red Play/Pause Button) */
+.yt-transport-row {
   display: flex;
   align-items: center;
   justify-content: center;
+  gap: 28px;
+  margin: 2px 0;
+}
+
+.yt-skip-btn {
+  background: none;
+  border: none;
+  color: #475569;
   cursor: pointer;
-  transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
-  user-select: none;
-  -webkit-tap-highlight-color: transparent;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px;
+  border-radius: 50%;
+  transition: transform 0.15s ease, color 0.15s ease;
 }
-.music-ctrl-btn:hover {
-  background: #f1f5f9;
-  transform: scale(1.1);
+.yt-skip-btn:hover {
+  color: #0f172a;
+  transform: scale(1.15);
 }
-.music-ctrl-btn:active {
+.yt-skip-btn:active {
   transform: scale(0.92);
 }
 
-.music-ctrl-btn.music-play-circle {
-  width: 60px;
-  height: 60px;
+.yt-red-play-btn {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
   background: #ef4444;
   border: none;
-  font-size: 24px;
-  box-shadow: 0 6px 20px rgba(239, 68, 68, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 6px 20px rgba(239, 68, 68, 0.45);
+  transition: all 0.15s cubic-bezier(0.16, 1, 0.3, 1);
 }
-.music-ctrl-btn.music-play-circle:hover {
+.yt-red-play-btn:hover {
   background: #dc2626;
-  transform: scale(1.12);
-  box-shadow: 0 8px 26px rgba(239, 68, 68, 0.75);
+  transform: scale(1.08);
+  box-shadow: 0 8px 24px rgba(239, 68, 68, 0.6);
 }
+.yt-red-play-btn:active {
+  transform: scale(0.94);
+}
+
+/* User Account & Quick Controls Row (Screenshot 3) */
+.yt-user-controls-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 2px;
+}
+
+.yt-account-identity {
+  font-size: 13px;
+  font-weight: 500;
+  color: #475569;
+}
+
+.yt-aux-buttons {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.yt-aux-btn {
+  background: none;
+  border: none;
+  color: #64748b;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.15s;
+}
+.yt-aux-btn:hover {
+  color: #0f172a;
+}
+
+/* Search Bar with Red Search Button (Screenshot 3) */
+.yt-search-pill-container {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.yt-search-pill-wrap {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: #f1f5f9;
+  border-radius: 20px;
+  padding: 8px 12px;
+}
+
+.yt-search-pill-input {
+  flex: 1;
+  border: none;
+  background: transparent;
+  outline: none;
+  font-size: 13.5px;
+  color: #0f172a;
+}
+
+.yt-search-clear-btn {
+  background: none;
+  border: none;
+  color: #94a3b8;
+  font-size: 13px;
+  cursor: pointer;
+  padding: 0 4px;
+}
+
+.yt-btn-red-search {
+  background: #ef4444;
+  color: #ffffff;
+  font-weight: 600;
+  font-size: 13px;
+  border: none;
+  border-radius: 18px;
+  padding: 9px 18px;
+  cursor: pointer;
+  transition: background 0.15s ease, transform 0.15s ease;
+}
+.yt-btn-red-search:hover {
+  background: #dc2626;
+  transform: scale(1.02);
+}
+.yt-btn-red-search:active {
+  transform: scale(0.96);
+}
+
+/* Category Filter Tabs (Screenshot 3) */
+.yt-category-tabs-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+}
+
+.yt-filter-tab {
+  background: #f1f5f9;
+  border: none;
+  border-radius: 12px;
+  padding: 6px 14px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #475569;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s ease;
+}
+.yt-filter-tab:hover {
+  background: #e2e8f0;
+  color: #0f172a;
+}
+.yt-filter-tab.active {
+  background: #ef4444;
+  color: #ffffff;
+}
+
+/* Recommendations / Search Results Scroll List (Screenshots 3, 4, 5) */
+.yt-results-scroll-list {
+  max-height: 250px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-right: 2px;
+}
+
+.yt-result-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 8px;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+.yt-result-item:hover {
+  background: #f8fafc;
+}
+.yt-result-item.playing {
+  background: #fef2f2;
+}
+
+.yt-thumb-wrap {
+  width: 76px;
+  height: 44px;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #000000;
+  flex-shrink: 0;
+}
+.yt-thumb-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.yt-info-wrap {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.yt-item-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #0f172a;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.3;
+}
+
+.yt-item-meta {
+  font-size: 11.5px;
+  color: #64748b;
+  margin-top: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Bottom Account Disconnect Button (Screenshot 5) */
+.yt-disconnect-footer {
+  margin-top: 4px;
+  padding-top: 4px;
+  border-top: 1px solid #f1f5f9;
+}
+
+.btn-yt-disconnect-pill {
+  width: 100%;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  color: #64748b;
+  font-size: 12.5px;
+  font-weight: 500;
+  padding: 9px 14px;
+  border-radius: 14px;
+  cursor: pointer;
+  text-align: center;
+  transition: all 0.15s ease;
+}
+.btn-yt-disconnect-pill:hover {
+  background: #fee2e2;
+  border-color: #fca5a5;
+  color: #b91c1c;
+}
+
+/* ==========================================================================
+   8.1. EV Charging Drawer & Battery Status (Mapsev Supercharger Architecture)
+   ========================================================================== */
+.ev-battery-status-card {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.ev-battery-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.ev-soc-badge {
+  font-size: 13px;
+  font-weight: 700;
+  color: #16a34a;
+  background: #dcfce7;
+  padding: 2px 8px;
+  border-radius: 10px;
+}
+
+.ev-progress-bar {
+  height: 6px;
+  background: #e2e8f0;
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.ev-progress-fill {
+  height: 100%;
+  background: #16a34a;
+  border-radius: 3px;
+}
+
+.ev-charger-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px 14px;
+  border-radius: 16px;
+  background: #ffffff;
+  border: 1px solid #f1f5f9;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+  transition: all 0.18s ease;
+  cursor: pointer;
+}
+.ev-charger-card:hover {
+  background: #f8fafc;
+  border-color: #cbd5e1;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
+}
+
+.ev-charger-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.ev-charger-name {
+  font-weight: 700;
+  font-size: 14px;
+  color: #0f172a;
+}
+
+.ev-charger-power {
+  font-size: 11.5px;
+  font-weight: 700;
+  color: #2563eb;
+  background: #eff6ff;
+  padding: 2px 7px;
+  border-radius: 6px;
+}
+
+.ev-charger-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 12px;
+  color: #64748b;
+}
+
+.ev-stalls-free {
+  color: #16a34a;
+  font-weight: 600;
+}
+
+.btn-ev-route-go {
+  font-size: 12px;
+  font-weight: 600;
+  color: #2563eb;
+  background: #dbeafe;
+  border: none;
+  padding: 4px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.btn-ev-route-go:hover {
+  background: #bfdbfe;
+}
+
+/* History Clear Button */
+.btn-clear-history-link {
+  font-size: 12px;
+  color: #ef4444;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-weight: 600;
+  padding: 2px 6px;
+  border-radius: 6px;
+  transition: background 0.15s;
+}
+.btn-clear-history-link:hover {
+  background: #fee2e2;
+}
+
+/* History Item Actions */
+.history-item-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.btn-hist-action {
+  background: none;
+  border: none;
+  color: #94a3b8;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.15s;
+}
+.btn-hist-action:hover {
+  color: #ef4444;
+}
+.btn-hist-action.starred {
+  color: #eab308;
+}
+
 
 /* 8.5. Floating Mini Music Player (Tesla OS / CarPlay Style) */
 .music-mini-player {

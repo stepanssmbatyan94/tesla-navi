@@ -804,14 +804,9 @@ function getArmenianAudio(text, voiceChoice = 'gor') {
     return;
   }
 
-  // API 4: /api/yt-search (Live YouTube Search for Tesla Cockpit)
+  // API 4: /api/yt-search (Live YouTube Search & Recommendations for Tesla Cockpit)
   if (pathname === '/api/yt-search') {
-    const q = parsedUrl.searchParams.get('q');
-    if (!q) {
-      res.writeHead(400, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ error: 'Query parameter q is required' }));
-      return;
-    }
+    const q = (parsedUrl.searchParams.get('q') || 'trending music').trim();
     try {
       const ytUrl = 'https://www.youtube.com/results?search_query=' + encodeURIComponent(q);
       const ytRes = await fetch(ytUrl, {
@@ -831,9 +826,13 @@ function getArmenianAudio(text, voiceChoice = 'gor') {
           if (v && v.videoId) {
             const title = v.title?.runs?.[0]?.text || '';
             const duration = v.lengthText?.simpleText || '';
-            const thumbnail = v.thumbnail?.thumbnails?.[0]?.url || '';
-            results.push({ id: v.videoId, title, duration, thumbnail });
-            if (results.length >= 8) break;
+            const channel = v.ownerText?.runs?.[0]?.text || v.shortBylineText?.runs?.[0]?.text || '';
+            const thumbObj = v.thumbnail?.thumbnails?.[v.thumbnail.thumbnails.length - 1] || v.thumbnail?.thumbnails?.[0];
+            const thumbnail = thumbObj ? thumbObj.url : `https://i.ytimg.com/vi/${v.videoId}/hqdefault.jpg`;
+            if (title) {
+              results.push({ id: v.videoId, title, duration, channel, thumbnail });
+            }
+            if (results.length >= 20) break;
           }
         }
       }
