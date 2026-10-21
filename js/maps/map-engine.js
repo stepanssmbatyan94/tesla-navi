@@ -161,15 +161,20 @@ class TeslaMapEngine {
   // 1. MapLibre GL Clean Vector Map (Tuned with MapsEV Tesla MCU profile for 0 crashes & 60 FPS)
   async initMapLibre() {
     return new Promise((resolve) => {
+      const urlTheme = typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('theme') : null;
+      const hour = new Date().getHours();
+      const isNightTime = urlTheme ? urlTheme === 'night' : (hour >= 19 || hour < 7);
+      const activeStyle = isNightTime ? (CONFIG.maplibreNightStyle || '/styles/mapsev-night.json') : (CONFIG.maplibreStyle || '/styles/mapsev-day.json');
+
       this.map = new window.maplibregl.Map({
         container: this.containerId,
-        style: CONFIG.maplibreStyle || '/styles/mapsev-day.json',
+        style: activeStyle,
         center: [this.center.lng, this.center.lat],
         zoom: this.navZoom,
         minZoom: 3,
         maxZoom: 19.5,
         maxPitch: 60,
-        pitch: this.is3D ? (CONFIG.navigationPitch || 22) : 0, // 2D flat or 3D Perspective Driving View (MapsEV)
+        pitch: this.is3D ? (CONFIG.navigationPitch || 24) : 0, // 2D flat or 3D Perspective Driving View (MapsEV)
         bearing: 0,
         attributionControl: false,
         // Authentic MapsEV Tesla MCU performance optimizations (Prevents memory leak & MCU crash)

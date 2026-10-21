@@ -23,9 +23,9 @@ const CONFIG = {
   // Map settings (MapsEV WebGL Vector Engine + Live Yandex Traffic & Routing)
   defaultProvider: 'maplibre', // 'maplibre' (MapsEV 3D Vector Engine) | 'yandex'
   maplibreStyle: '/styles/mapsev-day.json',
-  maplibreNightStyle: 'https://tiles.openfreemap.org/styles/dark',
-  navigationZoom: 16.5,
-  navigationPitch: 22 // 3D Driving Perspective Tilt (MapsEV subtle 2.5D, 0 for top-down)
+  maplibreNightStyle: '/styles/mapsev-night.json',
+  navigationZoom: 17.2,
+  navigationPitch: 24 // 3D Perspective Driving View (MapsEV low-profile 2.5D tilt)
 };
 
 // Dictionaries for RU, HY, EN

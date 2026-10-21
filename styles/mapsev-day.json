@@ -21,7 +21,7 @@
       "id": "background",
       "type": "background",
       "paint": {
-        "background-color": "#f3efee"
+        "background-color": "#f6f4ed"
       }
     },
     {
@@ -52,7 +52,7 @@
       "source": "openmaptiles",
       "source-layer": "park",
       "paint": {
-        "fill-color": "rgba(177, 232, 172, 0.95)",
+        "fill-color": "rgba(189, 228, 182, 0.95)",
         "fill-opacity": 1,
         "fill-outline-color": "rgba(95, 208, 100, 1)"
       }
@@ -63,7 +63,7 @@
       "source": "openmaptiles",
       "source-layer": "park",
       "paint": {
-        "line-color": "rgba(154, 226, 148, 0.8)",
+        "line-color": "rgba(168, 218, 160, 0.8)",
         "line-dasharray": [
           1,
           1.5
@@ -85,7 +85,7 @@
         "residential"
       ],
       "paint": {
-        "fill-color": "rgba(246, 245, 245, 0.5)"
+        "fill-color": "rgba(246, 244, 238, 0.5)"
       }
     },
     {
@@ -103,7 +103,7 @@
       ],
       "paint": {
         "fill-antialias": false,
-        "fill-color": "rgba(154, 226, 148, 0.85)",
+        "fill-color": "rgba(178, 222, 170, 0.85)",
         "fill-opacity": 0.4
       }
     },
@@ -122,7 +122,7 @@
       ],
       "paint": {
         "fill-antialias": false,
-        "fill-color": "rgba(203, 240, 200, 0.7)",
+        "fill-color": "rgba(202, 235, 196, 0.7)",
         "fill-opacity": 0.3
       }
     },
@@ -164,7 +164,7 @@
         "fill-opacity": 0.8,
         "fill-pattern": "wetland_bg_11",
         "fill-translate-anchor": "map",
-        "fill-color": "rgba(200, 238, 196, 0.7)"
+        "fill-color": "rgba(195, 230, 190, 0.7)"
       }
     },
     {
@@ -181,7 +181,7 @@
         "pitch"
       ],
       "paint": {
-        "fill-color": "rgba(207, 242, 193, 1)"
+        "fill-color": "#DEE3CD"
       }
     },
     {
@@ -198,7 +198,7 @@
         "track"
       ],
       "paint": {
-        "fill-color": "rgba(240, 234, 194, 0.8)"
+        "fill-color": "#DEE3CD"
       }
     },
     {
@@ -215,7 +215,7 @@
         "cemetery"
       ],
       "paint": {
-        "fill-color": "rgba(195, 232, 192, 0.8)"
+        "fill-color": "hsl(75,37%,81%)"
       }
     },
     {
@@ -232,7 +232,7 @@
         "hospital"
       ],
       "paint": {
-        "fill-color": "rgba(243, 222, 222, 0.8)"
+        "fill-color": "#fde"
       }
     },
     {
@@ -249,7 +249,7 @@
         "school"
       ],
       "paint": {
-        "fill-color": "rgba(238, 227, 207, 0.8)"
+        "fill-color": "rgb(236,238,204)"
       }
     },
     {
@@ -266,7 +266,7 @@
         "tunnel"
       ],
       "paint": {
-        "line-color": "rgba(151, 218, 252, 1)",
+        "line-color": "rgba(174, 224, 248, 1)",
         "line-dasharray": [
           3,
           3
@@ -329,7 +329,7 @@
         "line-cap": "round"
       },
       "paint": {
-        "line-color": "rgba(151, 218, 252, 1)",
+        "line-color": "rgba(174, 224, 248, 1)",
         "line-width": [
           "interpolate",
           [
@@ -374,7 +374,7 @@
         "line-cap": "round"
       },
       "paint": {
-        "line-color": "rgba(151, 218, 252, 1)",
+        "line-color": "rgba(174, 224, 248, 1)",
         "line-width": [
           "interpolate",
           [
@@ -405,7 +405,7 @@
         "tunnel"
       ],
       "paint": {
-        "fill-color": "rgba(151, 218, 252, 1)"
+        "fill-color": "rgba(174, 224, 248, 1)"
       }
     },
     {
@@ -578,7 +578,7 @@
         "line-join": "round"
       },
       "paint": {
-        "line-color": "rgba(128, 148, 174, 1)",
+        "line-color": "rgba(190, 204, 218, 1)",
         "line-dasharray": [
           0.5,
           0.25
@@ -636,7 +636,7 @@
         "line-join": "round"
       },
       "paint": {
-        "line-color": "rgba(215, 222, 232, 1)",
+        "line-color": "rgba(220, 226, 234, 1)",
         "line-dasharray": [
           0.5,
           0.25
@@ -687,7 +687,7 @@
         "line-join": "round"
       },
       "paint": {
-        "line-color": "rgba(215, 222, 232, 1)",
+        "line-color": "rgba(220, 226, 234, 1)",
         "line-width": [
           "interpolate",
           [
@@ -741,7 +741,7 @@
         "line-join": "round"
       },
       "paint": {
-        "line-color": "rgba(215, 222, 232, 1)",
+        "line-color": "rgba(220, 226, 234, 1)",
         "line-opacity": [
           "interpolate",
           [
@@ -808,7 +808,7 @@
         "line-join": "round"
       },
       "paint": {
-        "line-color": "rgba(157, 168, 195, 1)",
+        "line-color": "rgba(205, 215, 226, 1)",
         "line-width": [
           "interpolate",
           [
@@ -858,7 +858,7 @@
         "line-join": "round"
       },
       "paint": {
-        "line-color": "rgba(128, 148, 174, 1)",
+        "line-color": "rgba(190, 204, 218, 1)",
         "line-width": [
           "interpolate",
           [
@@ -915,7 +915,7 @@
         "line-join": "round"
       },
       "paint": {
-        "line-color": "rgba(128, 148, 174, 1)",
+        "line-color": "rgba(190, 204, 218, 1)",
         "line-dasharray": [
           0.5,
           0.25
@@ -982,7 +982,7 @@
         ]
       ],
       "paint": {
-        "line-color": "rgba(240, 238, 235, 1)",
+        "line-color": "rgba(242, 240, 236, 1)",
         "line-dasharray": [
           1,
           0.75
@@ -1039,7 +1039,7 @@
         "line-join": "round"
       },
       "paint": {
-        "line-color": "rgba(160, 175, 195, 1)",
+        "line-color": "rgba(154, 171, 189, 1)",
         "line-width": [
           "interpolate",
           [
@@ -1245,7 +1245,7 @@
         "line-join": "round"
       },
       "paint": {
-        "line-color": "rgba(190, 197, 215, 1)",
+        "line-color": "rgba(182, 195, 212, 1)",
         "line-width": [
           "interpolate",
           [
@@ -1297,7 +1297,7 @@
         "line-join": "round"
       },
       "paint": {
-        "line-color": "rgba(160, 175, 195, 1)",
+        "line-color": "rgba(154, 171, 189, 1)",
         "line-width": [
           "interpolate",
           [
@@ -1352,7 +1352,7 @@
         "line-join": "round"
       },
       "paint": {
-        "line-color": "rgba(160, 175, 195, 1)",
+        "line-color": "rgba(154, 171, 189, 1)",
         "line-width": [
           "interpolate",
           [
@@ -1627,7 +1627,7 @@
         "line-join": "round"
       },
       "paint": {
-        "line-color": "rgba(128, 148, 174, 1)",
+        "line-color": "rgba(190, 204, 218, 1)",
         "line-width": [
           "interpolate",
           [
@@ -1687,7 +1687,7 @@
         "line-join": "round"
       },
       "paint": {
-        "line-color": "rgba(215, 222, 232, 1)",
+        "line-color": "rgba(220, 226, 234, 1)",
         "line-width": [
           "interpolate",
           [
@@ -1757,7 +1757,7 @@
         "line-join": "round"
       },
       "paint": {
-        "line-color": "rgba(215, 222, 232, 1)",
+        "line-color": "rgba(220, 226, 234, 1)",
         "line-width": [
           "interpolate",
           [
@@ -1836,7 +1836,7 @@
         "line-join": "round"
       },
       "paint": {
-        "line-color": "rgba(215, 222, 232, 1)",
+        "line-color": "rgba(220, 226, 234, 1)",
         "line-opacity": [
           "interpolate",
           [
@@ -1917,7 +1917,7 @@
         "line-join": "round"
       },
       "paint": {
-        "line-color": "rgba(157, 168, 195, 1)",
+        "line-color": "rgba(205, 215, 226, 1)",
         "line-width": [
           "interpolate",
           [
@@ -1972,7 +1972,7 @@
         "line-join": "round"
       },
       "paint": {
-        "line-color": "rgba(128, 148, 174, 1)",
+        "line-color": "rgba(190, 204, 218, 1)",
         "line-width": [
           "interpolate",
           [
@@ -2036,7 +2036,7 @@
         "line-join": "round"
       },
       "paint": {
-        "line-color": "rgba(128, 148, 174, 1)",
+        "line-color": "rgba(190, 204, 218, 1)",
         "line-width": [
           "interpolate",
           [
@@ -2108,7 +2108,7 @@
         "line-join": "round"
       },
       "paint": {
-        "line-color": "rgba(240, 238, 235, 1)",
+        "line-color": "rgba(242, 240, 236, 1)",
         "line-dasharray": [
           1,
           0.7
@@ -2172,7 +2172,7 @@
         "line-join": "round"
       },
       "paint": {
-        "line-color": "rgba(160, 175, 195, 1)",
+        "line-color": "rgba(154, 171, 189, 1)",
         "line-width": [
           "interpolate",
           [
@@ -2431,7 +2431,7 @@
         "line-join": "round"
       },
       "paint": {
-        "line-color": "rgba(190, 197, 215, 1)",
+        "line-color": "rgba(182, 195, 212, 1)",
         "line-width": [
           "interpolate",
           [
@@ -2488,7 +2488,7 @@
         "line-join": "round"
       },
       "paint": {
-        "line-color": "rgba(160, 175, 195, 1)",
+        "line-color": "rgba(154, 171, 189, 1)",
         "line-width": [
           "interpolate",
           [
@@ -2550,7 +2550,7 @@
         "line-join": "round"
       },
       "paint": {
-        "line-color": "rgba(160, 175, 195, 1)",
+        "line-color": "rgba(154, 171, 189, 1)",
         "line-width": [
           "interpolate",
           [
@@ -2848,7 +2848,7 @@
         "line-join": "round"
       },
       "paint": {
-        "line-color": "rgba(128, 148, 174, 1)",
+        "line-color": "rgba(190, 204, 218, 1)",
         "line-width": [
           "interpolate",
           [
@@ -2902,7 +2902,7 @@
         "line-join": "round"
       },
       "paint": {
-        "line-color": "rgba(215, 222, 232, 1)",
+        "line-color": "rgba(220, 226, 234, 1)",
         "line-width": [
           "interpolate",
           [
@@ -2949,7 +2949,7 @@
         "line-join": "round"
       },
       "paint": {
-        "line-color": "rgba(215, 222, 232, 1)",
+        "line-color": "rgba(220, 226, 234, 1)",
         "line-width": [
           "interpolate",
           [
@@ -3003,7 +3003,7 @@
         "line-join": "round"
       },
       "paint": {
-        "line-color": "rgba(215, 222, 232, 1)",
+        "line-color": "rgba(220, 226, 234, 1)",
         "line-opacity": [
           "interpolate",
           [
@@ -3079,7 +3079,7 @@
         ]
       ],
       "paint": {
-        "line-color": "rgba(215, 222, 232, 1)",
+        "line-color": "rgba(220, 226, 234, 1)",
         "line-dasharray": [
           1,
           0
@@ -3133,7 +3133,7 @@
         "line-join": "round"
       },
       "paint": {
-        "line-color": "rgba(157, 168, 195, 1)",
+        "line-color": "rgba(205, 215, 226, 1)",
         "line-width": [
           "interpolate",
           [
@@ -3183,7 +3183,7 @@
         "line-join": "round"
       },
       "paint": {
-        "line-color": "rgba(128, 148, 174, 1)",
+        "line-color": "rgba(190, 204, 218, 1)",
         "line-width": [
           "interpolate",
           [
@@ -3240,7 +3240,7 @@
         "line-join": "round"
       },
       "paint": {
-        "line-color": "rgba(128, 148, 174, 1)",
+        "line-color": "rgba(190, 204, 218, 1)",
         "line-width": [
           "interpolate",
           [
@@ -3303,7 +3303,7 @@
         ]
       ],
       "paint": {
-        "line-color": "rgba(240, 238, 235, 1)",
+        "line-color": "rgba(242, 240, 236, 1)",
         "line-dasharray": [
           1,
           0.3
@@ -3360,7 +3360,7 @@
         "line-join": "round"
       },
       "paint": {
-        "line-color": "rgba(160, 175, 195, 1)",
+        "line-color": "rgba(154, 171, 189, 1)",
         "line-width": [
           "interpolate",
           [
@@ -3566,7 +3566,7 @@
         "line-join": "round"
       },
       "paint": {
-        "line-color": "rgba(190, 197, 215, 1)",
+        "line-color": "rgba(182, 195, 212, 1)",
         "line-width": [
           "interpolate",
           [
@@ -3618,7 +3618,7 @@
         "line-join": "round"
       },
       "paint": {
-        "line-color": "rgba(160, 175, 195, 1)",
+        "line-color": "rgba(154, 171, 189, 1)",
         "line-width": [
           "interpolate",
           [
@@ -3673,7 +3673,7 @@
         "line-join": "round"
       },
       "paint": {
-        "line-color": "rgba(160, 175, 195, 1)",
+        "line-color": "rgba(154, 171, 189, 1)",
         "line-width": [
           "interpolate",
           [
@@ -3909,51 +3909,56 @@
           0,
           16,
           [
-            "*",
+            "min",
             [
-              "to-number",
+              "*",
               [
-                "coalesce",
+                "to-number",
                 [
-                  "get",
-                  "render_height"
-                ],
-                [
-                  "get",
-                  "height"
+                  "coalesce",
+                  [
+                    "get",
+                    "render_height"
+                  ],
+                  [
+                    "get",
+                    "height"
+                  ],
+                  6
                 ],
                 6
               ],
-              6
+              0.22
             ],
-            0.25
+            8
           ],
           18,
           [
-            "*",
+            "min",
             [
-              "to-number",
+              "*",
               [
-                "coalesce",
+                "to-number",
                 [
-                  "get",
-                  "render_height"
-                ],
-                [
-                  "get",
-                  "height"
+                  "coalesce",
+                  [
+                    "get",
+                    "render_height"
+                  ],
+                  [
+                    "get",
+                    "height"
+                  ],
+                  8
                 ],
                 8
               ],
-              8
+              0.28
             ],
-            0.35
+            12
           ]
         ],
         "fill-extrusion-opacity": 0.95
-      },
-      "layout": {
-        "visibility": "visible"
       }
     },
     {
@@ -4209,26 +4214,6 @@
       "paint": {
         "text-color": "#74aee9",
         "text-halo-color": "rgba(255,255,255,0.7)",
-        "text-halo-width": 1.5
-      }
-    },
-    {
-      "id": "housenumber",
-      "type": "symbol",
-      "source": "openmaptiles",
-      "source-layer": "housenumber",
-      "minzoom": 15.5,
-      "layout": {
-        "text-field": "{housenumber}",
-        "text-font": [
-          "Noto Sans Regular"
-        ],
-        "text-size": 10,
-        "visibility": "visible"
-      },
-      "paint": {
-        "text-color": "rgba(100, 100, 100, 1)",
-        "text-halo-color": "rgba(255, 255, 255, 0.9)",
         "text-halo-width": 1.5
       }
     },
@@ -6065,7 +6050,7 @@
       }
     }
   ],
-  "name": "MapsEV Clean 3D Vector (Tesla Day)",
+  "name": "MapsEV Day (Tesla Authentic)",
   "light": {
     "anchor": "viewport",
     "position": [
