@@ -22,7 +22,7 @@ class TeslaMapEngine {
     this.followCar = true;
     this.isHeadingUp = true; // True = map turns with car, False = North-up
     const saved3D = typeof localStorage !== 'undefined' ? localStorage.getItem('tesla_map_3d_mode') : null;
-    this.is3D = saved3D !== null ? saved3D === '3d' : true; // Default to 3D perspective driving view (MapsEV style)
+    this.is3D = saved3D !== null ? saved3D === '3d' : false; // Default to 2D top-down (MapsEV style), toggleable to subtle 3D
     this.voiceEnabled = true;
 
     this.currentPosition = { lat: this.center.lat, lng: this.center.lng, heading: 0, speed: 0 };
@@ -169,7 +169,7 @@ class TeslaMapEngine {
         minZoom: 3,
         maxZoom: 19.5,
         maxPitch: 60,
-        pitch: this.is3D ? (CONFIG.navigationPitch || 45) : 0, // 2D flat or 3D Perspective Driving View (MapsEV)
+        pitch: this.is3D ? (CONFIG.navigationPitch || 22) : 0, // 2D flat or 3D Perspective Driving View (MapsEV)
         bearing: 0,
         attributionControl: false,
         // Authentic MapsEV Tesla MCU performance optimizations (Prevents memory leak & MCU crash)
@@ -735,7 +735,7 @@ class TeslaMapEngine {
         center: [this.currentPosition.lng, this.currentPosition.lat],
         zoom: this.navZoom,
         bearing: this.isHeadingUp ? targetHeading : 0,
-        pitch: (this.is3D && this.isHeadingUp) ? (CONFIG.navigationPitch || 45) : 0,
+        pitch: (this.is3D && this.isHeadingUp) ? (CONFIG.navigationPitch || 22) : 0,
         padding: pad
       });
     } else if (this.provider === 'yandex' && this.map) {
@@ -780,7 +780,7 @@ class TeslaMapEngine {
           center: [this.currentPosition.lng, this.currentPosition.lat],
           zoom: this.navZoom,
           bearing: this.isHeadingUp ? this.currentHeading : 0,
-          pitch: (this.is3D && this.isHeadingUp) ? (CONFIG.navigationPitch || 45) : 0,
+          pitch: (this.is3D && this.isHeadingUp) ? (CONFIG.navigationPitch || 22) : 0,
           padding: pad
         });
       } else {
@@ -814,7 +814,7 @@ class TeslaMapEngine {
           center: [this.currentPosition.lng, this.currentPosition.lat],
           zoom: this.navZoom,
           bearing: this.isHeadingUp ? this.currentHeading : 0,
-          pitch: (this.is3D && this.isHeadingUp) ? (CONFIG.navigationPitch || 45) : 0,
+          pitch: (this.is3D && this.isHeadingUp) ? (CONFIG.navigationPitch || 22) : 0,
           padding: pad
         });
       } else {
@@ -872,7 +872,7 @@ class TeslaMapEngine {
         this.map.easeTo({
           center: [this.currentPosition.lng, this.currentPosition.lat],
           bearing: targetHeading,
-          pitch: (this.is3D && this.isHeadingUp) ? (CONFIG.navigationPitch || 45) : 0,
+          pitch: (this.is3D && this.isHeadingUp) ? (CONFIG.navigationPitch || 22) : 0,
           padding: { top: 220, bottom: 0, left: 0, right: 0 },
           duration: 500
         });
@@ -928,8 +928,8 @@ class TeslaMapEngine {
           this.map.setLayoutProperty('building', 'visibility', this.is3D ? 'none' : 'visible');
         }
 
-        // 2. Smooth camera pitch transition (0 for 2D, 45 for 3D Perspective Driving View)
-        const targetPitch = this.is3D ? (CONFIG.navigationPitch || 45) : 0;
+        // 2. Smooth camera pitch transition (0 for 2D, 22 for MapsEV 3D Perspective Driving View)
+        const targetPitch = this.is3D ? (CONFIG.navigationPitch || 22) : 0;
         this.map.easeTo({
           pitch: targetPitch,
           duration: 350
@@ -1215,7 +1215,7 @@ class TeslaMapEngine {
             center: [displayLng, displayLat],
             zoom: this.navZoom,
             bearing: this.currentHeading,
-            pitch: (this.is3D && this.isHeadingUp) ? (CONFIG.navigationPitch || 45) : 0,
+            pitch: (this.is3D && this.isHeadingUp) ? (CONFIG.navigationPitch || 22) : 0,
             padding: navPadding
           });
         }
@@ -2154,7 +2154,7 @@ class TeslaMapEngine {
       this.map.easeTo({
         center: [this.currentPosition.lng, this.currentPosition.lat],
         bearing: this.currentHeading,
-        pitch: (this.is3D && this.isHeadingUp) ? (CONFIG.navigationPitch || 45) : 0,
+        pitch: (this.is3D && this.isHeadingUp) ? (CONFIG.navigationPitch || 22) : 0,
         padding: { top: 220, bottom: 0, left: 0, right: 0 },
         zoom: this.navZoom,
         duration: 500

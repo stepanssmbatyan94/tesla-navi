@@ -25,7 +25,7 @@ const CONFIG = {
   maplibreStyle: '/styles/mapsev-day.json',
   maplibreNightStyle: 'https://tiles.openfreemap.org/styles/dark',
   navigationZoom: 16.5,
-  navigationPitch: 45 // 3D Driving Perspective Tilt (MapsEV optimal tilt)
+  navigationPitch: 22 // 3D Driving Perspective Tilt (MapsEV subtle 2.5D, 0 for top-down)
 };
 
 // Dictionaries for RU, HY, EN

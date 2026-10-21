@@ -3885,8 +3885,8 @@
       "maxzoom": 14,
       "paint": {
         "fill-color": "rgba(244, 234, 225, 1)",
-        "fill-outline-color": "rgba(220, 215, 205, 1)",
-        "fill-opacity": 0.95
+        "fill-outline-color": "rgba(215, 208, 198, 1)",
+        "fill-opacity": 1
       }
     },
     {
@@ -3896,22 +3896,7 @@
       "source-layer": "building",
       "minzoom": 14,
       "paint": {
-        "fill-extrusion-base": [
-          "to-number",
-          [
-            "coalesce",
-            [
-              "get",
-              "render_min_height"
-            ],
-            [
-              "get",
-              "min_height"
-            ],
-            0
-          ],
-          0
-        ],
+        "fill-extrusion-base": 0,
         "fill-extrusion-color": "rgba(244, 234, 225, 1)",
         "fill-extrusion-height": [
           "interpolate",
@@ -3921,26 +3906,30 @@
           [
             "zoom"
           ],
-          13,
+          14,
           0,
-          14.5,
+          16,
           [
-            "to-number",
+            "*",
             [
-              "coalesce",
+              "to-number",
               [
-                "get",
-                "render_height"
-              ],
-              [
-                "get",
-                "height"
+                "coalesce",
+                [
+                  "get",
+                  "render_height"
+                ],
+                [
+                  "get",
+                  "height"
+                ],
+                6
               ],
               6
             ],
-            6
+            0.25
           ],
-          17,
+          18,
           [
             "*",
             [
@@ -3959,10 +3948,10 @@
               ],
               8
             ],
-            1
+            0.35
           ]
         ],
-        "fill-extrusion-opacity": 0.92
+        "fill-extrusion-opacity": 0.95
       }
     },
     {
@@ -6074,5 +6063,15 @@
       }
     }
   ],
-  "name": "MapsEV Clean 3D Vector (Tesla Day)"
+  "name": "MapsEV Clean 3D Vector (Tesla Day)",
+  "light": {
+    "anchor": "viewport",
+    "position": [
+      1.15,
+      210,
+      30
+    ],
+    "color": "#ffffff",
+    "intensity": 0.12
+  }
 }
