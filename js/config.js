@@ -22,7 +22,7 @@ const CONFIG = {
 
   // Map settings (MapsEV WebGL Vector Engine + Live Yandex Traffic & Routing)
   defaultProvider: 'maplibre', // 'maplibre' (MapsEV 3D Vector Engine) | 'yandex'
-  maplibreStyle: 'https://tiles.openfreemap.org/styles/positron',
+  maplibreStyle: '/styles/mapsev-day.json',
   maplibreNightStyle: 'https://tiles.openfreemap.org/styles/dark',
   navigationZoom: 16.5,
   navigationPitch: 45 // 3D Driving Perspective Tilt (MapsEV optimal tilt)

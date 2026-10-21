@@ -163,7 +163,7 @@ class TeslaMapEngine {
     return new Promise((resolve) => {
       this.map = new window.maplibregl.Map({
         container: this.containerId,
-        style: CONFIG.maplibreStyle || 'https://tiles.openfreemap.org/styles/positron',
+        style: CONFIG.maplibreStyle || '/styles/mapsev-day.json',
         center: [this.center.lng, this.center.lat],
         zoom: this.navZoom,
         minZoom: 3,
@@ -242,11 +242,8 @@ class TeslaMapEngine {
       });
 
       this.map.on('load', () => {
-        // Apply 2D / 3D Building Styling (Clean Yandex 2D footprints & Delicate MapsEV 3D)
+        // Apply 2D / 3D Building Styling (Clean 2D footprints & Delicate MapsEV 3D)
         this.update3DMode(this.is3D);
-
-        // Apply Authentic Mapsev & Yandex Navigator Road Palette (Refs: refs/map/)
-        this.applyMapsevRoadColors();
 
         // Render Traffic Lights and Speed Cameras
         this.renderTrafficPoints();
@@ -261,28 +258,28 @@ class TeslaMapEngine {
             <svg viewBox="0 0 54 54" width="52" height="52">
               <defs>
                 <filter id="car-shadow" x="-30%" y="-30%" width="160%" height="160%">
-                  <feDropShadow dx="0" dy="3" stdDeviation="3.5" flood-color="#000000" flood-opacity="0.55"/>
+                  <feDropShadow dx="0" dy="3" stdDeviation="3.5" flood-color="#000000" flood-opacity="0.45"/>
                 </filter>
                 <linearGradient id="arrow-facet-left" x1="0%" y1="0%" x2="100%" y2="100%">
-                  <stop offset="0%" stop-color="#fffbeb" />
-                  <stop offset="45%" stop-color="#fef08a" />
-                  <stop offset="100%" stop-color="#facc15" />
+                  <stop offset="0%" stop-color="#ff7675" />
+                  <stop offset="50%" stop-color="#ee5253" />
+                  <stop offset="100%" stop-color="#ea2027" />
                 </linearGradient>
                 <linearGradient id="arrow-facet-right" x1="0%" y1="0%" x2="100%" y2="100%">
-                  <stop offset="0%" stop-color="#eab308" />
-                  <stop offset="60%" stop-color="#ca8a04" />
-                  <stop offset="100%" stop-color="#a16207" />
+                  <stop offset="0%" stop-color="#d63031" />
+                  <stop offset="60%" stop-color="#b71540" />
+                  <stop offset="100%" stop-color="#800e28" />
                 </linearGradient>
               </defs>
               <g filter="url(#car-shadow)">
                 <!-- Crisp white outer contour -->
                 <polygon points="27,4 47,46 27,35 7,46" fill="#ffffff" stroke="#ffffff" stroke-width="2.5" stroke-linejoin="round"/>
-                <!-- Left illuminated 3D facet -->
+                <!-- Left illuminated 3D facet (MapsEV Red/Coral) -->
                 <polygon points="27,6 27,34 9,44" fill="url(#arrow-facet-left)"/>
                 <!-- Right shaded 3D facet -->
                 <polygon points="27,6 45,44 27,34" fill="url(#arrow-facet-right)"/>
                 <!-- Central ridge highlight line -->
-                <line x1="27" y1="6" x2="27" y2="34" stroke="#ffffff" stroke-width="1.2" stroke-opacity="0.85"/>
+                <line x1="27" y1="6" x2="27" y2="34" stroke="#ffffff" stroke-width="1.2" stroke-opacity="0.9"/>
               </g>
             </svg>
           </div>
@@ -923,54 +920,7 @@ class TeslaMapEngine {
           return;
         }
 
-        // 1. Ensure 3D building extrusion layer exists (MapsEV 3D Architecture)
-        if (!this.map.getLayer('building-3d') && this.map.getSource('openmaptiles')) {
-          let firstSymbolId;
-          try {
-            const layers = this.map.getStyle().layers;
-            for (let i = 0; i < layers.length; i++) {
-              if (layers[i].type === 'symbol') {
-                firstSymbolId = layers[i].id;
-                break;
-              }
-            }
-          } catch (e) {}
-
-          this.map.addLayer({
-            id: 'building-3d',
-            source: 'openmaptiles',
-            'source-layer': 'building',
-            type: 'fill-extrusion',
-            minzoom: 13,
-            paint: {
-              'fill-extrusion-color': [
-                'interpolate',
-                ['linear'],
-                ['to-number', ['coalesce', ['get', 'render_height'], ['get', 'height'], 6], 6],
-                0, '#e5eaf0',
-                20, '#d1dae3',
-                50, '#b3c1d1',
-                100, '#8c9fb5'
-              ],
-              'fill-extrusion-height': [
-                'interpolate',
-                ['linear'],
-                ['zoom'],
-                13, 0,
-                14.5, ['to-number', ['coalesce', ['get', 'render_height'], ['get', 'height'], 6], 6],
-                17, ['*', ['to-number', ['coalesce', ['get', 'render_height'], ['get', 'height'], 8], 8], 1.0]
-              ],
-              'fill-extrusion-base': [
-                'to-number',
-                ['coalesce', ['get', 'render_min_height'], ['get', 'min_height'], 0],
-                0
-              ],
-              'fill-extrusion-opacity': 0.85
-            }
-          }, firstSymbolId);
-        }
-
-        // 2. Control 2D and 3D layer visibility
+        // 1. Control 2D and 3D layer visibility
         if (this.map.getLayer('building-3d')) {
           this.map.setLayoutProperty('building-3d', 'visibility', this.is3D ? 'visible' : 'none');
         }
@@ -978,7 +928,7 @@ class TeslaMapEngine {
           this.map.setLayoutProperty('building', 'visibility', this.is3D ? 'none' : 'visible');
         }
 
-        // 3. Smooth camera pitch transition (0 for 2D, 45 for 3D Perspective Driving View)
+        // 2. Smooth camera pitch transition (0 for 2D, 45 for 3D Perspective Driving View)
         const targetPitch = this.is3D ? (CONFIG.navigationPitch || 45) : 0;
         this.map.easeTo({
           pitch: targetPitch,
