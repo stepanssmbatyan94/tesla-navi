@@ -914,7 +914,7 @@ function initToolbarHandlers() {
   const btnToggle2D3D = document.getElementById('btn-toggle-2d3d');
   const btn3DModeLabel = document.getElementById('btn-3d-mode-label');
   const saved3D = localStorage.getItem('tesla_map_3d_mode');
-  const isInitial3D = saved3D !== null ? saved3D === '3d' : false;
+  const isInitial3D = saved3D !== null ? saved3D === '3d' : true;
   if (btnToggle2D3D) {
     btnToggle2D3D.classList.toggle('is-3d', isInitial3D);
     if (btn3DModeLabel) btn3DModeLabel.textContent = isInitial3D ? '3D' : '2D';

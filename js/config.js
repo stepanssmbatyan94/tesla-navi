@@ -25,7 +25,7 @@ const CONFIG = {
   maplibreStyle: '/styles/mapsev-day.json',
   maplibreNightStyle: '/styles/mapsev-night.json',
   navigationZoom: 16.3,
-  navigationPitch: 20 // 3D Perspective Driving View (MapsEV subtle 2.5D tilt)
+  navigationPitch: 45 // 3D Perspective Driving View (MapsEV authentic 3D building perspective)
 };
 
 // Dictionaries for RU, HY, EN
