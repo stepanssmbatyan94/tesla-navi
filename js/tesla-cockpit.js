@@ -929,6 +929,23 @@ function initToolbarHandlers() {
     });
   }
 
+  // Day / Night / Auto Theme Toggle Handlers (MapsEV Architecture)
+  const btnToggleTheme = document.getElementById('btn-toggle-theme');
+  const btnMenuThemeToggle = document.getElementById('btn-menu-theme-toggle');
+
+  function handleThemeCycle() {
+    if (mapEngine && typeof mapEngine.cycleTheme === 'function') {
+      mapEngine.cycleTheme();
+    }
+  }
+
+  if (btnToggleTheme) {
+    btnToggleTheme.addEventListener('click', handleThemeCycle);
+  }
+  if (btnMenuThemeToggle) {
+    btnMenuThemeToggle.addEventListener('click', handleThemeCycle);
+  }
+
   // EV Charging Stations Drawer & Battery Pill Handlers (Mapsev Reference)
   initChargingStationsDrawer();
 

@@ -155,10 +155,9 @@ class TeslaMapEngine {
   // 1. MapLibre GL Clean Vector Map (Tuned with MapsEV Tesla MCU profile for 0 crashes & 60 FPS)
   async initMapLibre() {
     return new Promise((resolve) => {
-      const urlTheme = typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('theme') : null;
-      const hour = new Date().getHours();
-      const isNightTime = urlTheme ? urlTheme === 'night' : (hour >= 19 || hour < 7);
+      const isNightTime = this.isNightActive();
       const activeStyle = isNightTime ? (CONFIG.maplibreNightStyle || '/styles/mapsev-night.json') : (CONFIG.maplibreStyle || '/styles/mapsev-day.json');
+      this.lastIsNight = isNightTime;
 
       this.map = new window.maplibregl.Map({
         container: this.containerId,
@@ -243,6 +242,20 @@ class TeslaMapEngine {
       this.map.on('load', () => {
         // Apply 2D / 3D Building Styling (Clean 2D footprints & Delicate MapsEV 3D)
         this.update3DMode(this.is3D);
+        this.updateThemeUI();
+
+        // Periodic auto-theme transition checker (every 60s)
+        if (!this._themeCheckInterval && typeof window !== 'undefined') {
+          this._themeCheckInterval = setInterval(() => {
+            if (this.getThemeMode() === 'auto') {
+              const shouldBeNight = this.isNightActive();
+              if (this.lastIsNight !== shouldBeNight) {
+                console.log('[Theme] Auto transition triggered:', shouldBeNight ? 'night' : 'day');
+                this.setTheme('auto');
+              }
+            }
+          }, 60000);
+        }
 
         // Render Traffic Lights and Speed Cameras
         this.renderTrafficPoints();
@@ -956,6 +969,118 @@ class TeslaMapEngine {
     }
     this.update3DMode(!this.is3D);
     return this.is3D;
+  }
+
+  // --- Theme Mode Management: auto / night / day (MapsEV Architecture) ---
+  getThemeMode() {
+    if (typeof window !== 'undefined') {
+      const urlTheme = new URLSearchParams(window.location.search).get('theme');
+      if (urlTheme) {
+        const t = urlTheme.toLowerCase();
+        if (t === 'night' || t === 'dark' || t === 'on') return 'night';
+        if (t === 'day' || t === 'light' || t === 'off') return 'day';
+        if (t === 'auto') return 'auto';
+      }
+      const saved = localStorage.getItem('tesla_map_theme');
+      if (saved && ['auto', 'night', 'day'].includes(saved)) {
+        return saved;
+      }
+    }
+    return 'auto';
+  }
+
+  isNightActive() {
+    const mode = this.getThemeMode();
+    if (mode === 'night') return true;
+    if (mode === 'day') return false;
+    // Auto: 19:00 - 07:00 is night
+    const hour = new Date().getHours();
+    return hour >= 19 || hour < 7;
+  }
+
+  setTheme(mode) {
+    const validModes = ['auto', 'night', 'day'];
+    if (!validModes.includes(mode)) mode = 'auto';
+
+    try {
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem('tesla_map_theme', mode);
+      }
+    } catch (e) {}
+
+    const isNight = this.isNightActive();
+    this.lastIsNight = isNight;
+    const targetStyle = isNight
+      ? (CONFIG.maplibreNightStyle || '/styles/mapsev-night.json')
+      : (CONFIG.maplibreStyle || '/styles/mapsev-day.json');
+
+    if (this.provider === 'maplibre' && this.map) {
+      try {
+        this.map.setStyle(targetStyle);
+        this.map.once('style.load', () => {
+          this.update3DMode(this.is3D);
+          if (this.activeRoute) {
+            this.drawRoute(this.activeRoute);
+          }
+        });
+      } catch (err) {
+        console.warn('[Theme] Error switching style:', err);
+      }
+    }
+
+    this.updateThemeUI();
+    return mode;
+  }
+
+  cycleTheme() {
+    const cur = this.getThemeMode();
+    let next = 'auto';
+    if (cur === 'auto') next = 'night';
+    else if (cur === 'night') next = 'day';
+    else if (cur === 'day') next = 'auto';
+    return this.setTheme(next);
+  }
+
+  updateThemeUI() {
+    const mode = this.getThemeMode();
+    const isNight = this.isNightActive();
+
+    // 1. Right floating button
+    const btnLabel = document.getElementById('btn-theme-mode-label');
+    const iconSymbol = document.getElementById('theme-icon-symbol');
+    const btn = document.getElementById('btn-toggle-theme');
+
+    if (btnLabel && iconSymbol && btn) {
+      if (mode === 'auto') {
+        btnLabel.textContent = 'АВТО';
+        iconSymbol.textContent = isNight ? '🌓' : '⛅';
+        btn.title = `Тема: Авто (сейчас ${isNight ? 'Ночь' : 'День'}). Нажмите для переключения`;
+      } else if (mode === 'night') {
+        btnLabel.textContent = 'НОЧЬ';
+        iconSymbol.textContent = '🌙';
+        btn.title = 'Тема: Ночь (Всегда темная). Нажмите для переключения';
+      } else {
+        btnLabel.textContent = 'ДЕНЬ';
+        iconSymbol.textContent = '☀️';
+        btn.title = 'Тема: День (Всегда светлая). Нажмите для переключения';
+      }
+    }
+
+    // 2. More tools menu card
+    const menuIcon = document.getElementById('menu-theme-icon');
+    const menuLabel = document.getElementById('menu-theme-label');
+    if (menuLabel && menuIcon) {
+      if (mode === 'auto') {
+        menuIcon.textContent = isNight ? '🌓' : '⛅';
+        menuLabel.textContent = `Тема: Авто (${isNight ? 'Ночь' : 'День'})`;
+      } else if (mode === 'night') {
+        menuIcon.textContent = '🌙';
+        menuLabel.textContent = 'Тема: Ночь (Вкл)';
+      } else {
+        menuIcon.textContent = '☀️';
+        menuLabel.textContent = 'Тема: День (Выкл)';
+      }
+    }
   }
 
   // Toggle Voice Sound On/Off
