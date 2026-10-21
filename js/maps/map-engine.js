@@ -22,7 +22,7 @@ class TeslaMapEngine {
     this.followCar = true;
     this.isHeadingUp = true; // True = map turns with car, False = North-up
     const saved3D = typeof localStorage !== 'undefined' ? localStorage.getItem('tesla_map_3d_mode') : null;
-    this.is3D = saved3D !== null ? saved3D === '3d' : true; // Default to authentic MapsEV 3D perspective
+    this.is3D = saved3D !== null ? saved3D === '3d' : false; // Default to authentic MapsEV 2D flat view
     this.voiceEnabled = true;
 
     this.currentPosition = { lat: this.center.lat, lng: this.center.lng, heading: 0, speed: 0 };
@@ -936,6 +936,9 @@ class TeslaMapEngine {
         if (this.map.getLayer('3d-building')) {
           this.map.setLayoutProperty('3d-building', 'visibility', this.is3D ? 'visible' : 'none');
         }
+        if (this.map.getLayer('building')) {
+          this.map.setLayoutProperty('building', 'visibility', this.is3D ? 'none' : 'visible');
+        }
         if (this.map.getLayer('building-3d')) {
           this.map.setLayoutProperty('building-3d', 'visibility', this.is3D ? 'visible' : 'none');
         }
@@ -943,8 +946,8 @@ class TeslaMapEngine {
           this.map.setLayoutProperty('building-ao-ground', 'visibility', this.is3D ? 'visible' : 'none');
         }
 
-        // 2. Smooth camera pitch transition (0 for 2D, 45 for MapsEV 3D Perspective Driving View)
-        const targetPitch = this.is3D ? (CONFIG.navigationPitch || 45) : 0;
+        // 2. Smooth camera pitch transition (0 for 2D, 35 for MapsEV 3D Perspective Driving View)
+        const targetPitch = this.is3D ? (CONFIG.navigationPitch || 35) : 0;
         this.map.easeTo({
           pitch: targetPitch,
           duration: 350

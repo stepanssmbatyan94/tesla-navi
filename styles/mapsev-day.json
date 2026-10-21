@@ -10,41 +10,24 @@
       "url": "https://tiles.openfreemap.org/planet"
     }
   },
-  "sprite": "/styles/sprites/mapsev-night",
+  "sprite": "/styles/sprites/mapsev-day",
   "glyphs": "https://tiles.openfreemap.org/fonts/{fontstack}/{range}.pbf",
   "light": {
     "anchor": "viewport",
     "position": [
-      1.15,
-      210,
-      30
+      1.5,
+      90,
+      80
     ],
     "color": "#ffffff",
-    "intensity": 0.45
+    "intensity": 0.65
   },
   "layers": [
     {
       "id": "land",
       "type": "background",
       "paint": {
-        "background-color": "#f7f5f0"
-      }
-    },
-    {
-      "id": "land-fill",
-      "type": "fill",
-      "source": "openmaptiles",
-      "source-layer": "structure",
-      "filter": [
-        "==",
-        [
-          "get",
-          "class"
-        ],
-        "land"
-      ],
-      "paint": {
-        "fill-color": "rgba(28, 41, 64, 1)"
+        "background-color": "#faf8f5"
       }
     },
     {
@@ -54,7 +37,7 @@
       "source-layer": "landcover",
       "maxzoom": 11,
       "paint": {
-        "fill-color": "#d8ecd5",
+        "fill-color": "#d6eed8",
         "fill-opacity": [
           "interpolate",
           [
@@ -118,7 +101,7 @@
       "source-layer": "landuse_overlay",
       "minzoom": 5,
       "paint": {
-        "fill-color": "#d8ecd5",
+        "fill-color": "#d6eed8",
         "fill-opacity": [
           "interpolate",
           [
@@ -212,7 +195,7 @@
         ]
       ],
       "paint": {
-        "fill-color": "rgba(29, 41, 66, 1)",
+        "fill-color": "#ede9e1",
         "fill-antialias": false
       }
     },
@@ -300,41 +283,35 @@
             "get",
             "class"
           ],
-          "wood",
-          "rgba(52, 86, 67, 0.8)",
-          "scrub",
-          "rgba(65, 90, 85, 0.6)",
           [
-            "agriculture",
-            "grass"
+            "park",
+            "pitch",
+            "grass",
+            "wood",
+            "scrub",
+            "agriculture"
           ],
-          "rgba(69, 91, 91, 0.6)",
-          "park",
-          "rgba(60, 88, 78, 1)",
-          "airport",
-          "rgba(51, 62, 92, 1)",
-          "cemetery",
-          "rgba(59, 79, 77, 1)",
-          "glacier",
-          "rgba(79, 92, 113, 1)",
-          "hospital",
-          "rgba(69, 61, 73, 0.8)",
-          "pitch",
-          "rgba(64, 91, 84, 1)",
-          "sand",
-          "rgba(78, 83, 67, 1)",
-          "school",
-          "rgba(59, 63, 71, 1)",
-          "commercial_area",
-          "rgba(68, 65, 78, 0.8)",
-          "residential",
-          "rgba(84, 93, 111, 1)",
+          "#d6eed8",
           [
-            "facility",
-            "industrial"
+            "school",
+            "kindergarten",
+            "college",
+            "university",
+            "hospital"
           ],
-          "rgba(67, 75, 94, 0.5)",
-          "rgba(77, 82, 95, 1)"
+          "#f5efe6",
+          [
+            "residential",
+            "commercial_area",
+            "commercial"
+          ],
+          "#faf8f5",
+          [
+            "industrial",
+            "facility"
+          ],
+          "#f5efe6",
+          "#faf8f5"
         ],
         "fill-opacity": [
           "interpolate",
@@ -477,42 +454,7 @@
           15,
           1
         ],
-        "fill-color": "#d8ecd5",
-        "fill-antialias": false
-      }
-    },
-    {
-      "id": "hillshade",
-      "type": "fill",
-      "source": "openmaptiles",
-      "source-layer": "hillshade",
-      "maxzoom": 16,
-      "paint": {
-        "fill-color": [
-          "match",
-          [
-            "get",
-            "class"
-          ],
-          "shadow",
-          "rgba(7, 8, 12, 0.1)",
-          "rgba(57, 65, 89, 0)"
-        ],
-        "fill-opacity": [
-          "interpolate",
-          [
-            "linear"
-          ],
-          [
-            "zoom"
-          ],
-          10,
-          1,
-          12,
-          0.8,
-          16,
-          0
-        ],
+        "fill-color": "#d6eed8",
         "fill-antialias": false
       }
     },
@@ -542,19 +484,7 @@
         ]
       ],
       "paint": {
-        "line-color": [
-          "match",
-          [
-            "get",
-            "type"
-          ],
-          [
-            "playground",
-            "skateboard"
-          ],
-          "rgba(54, 64, 82, 1)",
-          "rgba(39, 67, 56, 1)"
-        ]
+        "line-color": "#c2ded0"
       }
     },
     {
@@ -834,67 +764,6 @@
       }
     },
     {
-      "id": "building-underground",
-      "type": "fill",
-      "source": "openmaptiles",
-      "source-layer": "building",
-      "minzoom": 15,
-      "filter": [
-        "all",
-        [
-          "==",
-          [
-            "get",
-            "underground"
-          ],
-          "true"
-        ],
-        [
-          "==",
-          [
-            "geometry-type"
-          ],
-          "Polygon"
-        ]
-      ],
-      "paint": {
-        "fill-color": [
-          "case",
-          [
-            "to-boolean",
-            [
-              "feature-state",
-              "select"
-            ]
-          ],
-          "rgba(10, 25, 63, 1)",
-          [
-            "to-boolean",
-            [
-              "feature-state",
-              "highlight"
-            ]
-          ],
-          "rgba(28, 40, 62, 1)",
-          "rgba(26, 37, 66, 1)"
-        ],
-        "fill-opacity": [
-          "interpolate",
-          [
-            "linear"
-          ],
-          [
-            "zoom"
-          ],
-          15,
-          0,
-          16,
-          0.5
-        ],
-        "fill-antialias": false
-      }
-    },
-    {
       "id": "tunnel-path-case",
       "type": "line",
       "source": "openmaptiles",
@@ -973,7 +842,7 @@
           22,
           2
         ],
-        "line-color": "rgba(52, 58, 75, 1)",
+        "line-color": "#cbd5e1",
         "line-gap-width": [
           "interpolate",
           [
@@ -1071,7 +940,7 @@
           22,
           2
         ],
-        "line-color": "rgba(52, 58, 75, 1)",
+        "line-color": "#cbd5e1",
         "line-gap-width": [
           "interpolate",
           [
@@ -1165,7 +1034,7 @@
           22,
           80
         ],
-        "line-color": "rgba(59, 69, 90, 1)"
+        "line-color": "#cbd5e1"
       }
     },
     {
@@ -1590,7 +1459,7 @@
           22,
           80
         ],
-        "line-color": "rgba(60, 71, 92, 1)",
+        "line-color": "#ffffff",
         "line-dasharray": [
           10,
           0
@@ -1677,7 +1546,7 @@
           22,
           80
         ],
-        "line-color": "rgba(60, 71, 92, 1)"
+        "line-color": "#ffffff"
       }
     },
     {
@@ -1750,7 +1619,7 @@
           22,
           80
         ],
-        "line-color": "rgba(60, 71, 92, 1)",
+        "line-color": "#ffffff",
         "line-dasharray": [
           "step",
           [
@@ -1862,7 +1731,7 @@
           22,
           80
         ],
-        "line-color": "rgba(60, 71, 92, 1)"
+        "line-color": "#ffffff"
       }
     },
     {
@@ -2632,7 +2501,7 @@
             20
           ]
         ],
-        "line-color": "rgba(30, 68, 46, 1)",
+        "line-color": "#ffffff",
         "line-opacity": [
           "interpolate",
           [
@@ -2976,7 +2845,7 @@
           22,
           2
         ],
-        "line-color": "rgba(52, 58, 75, 1)",
+        "line-color": "#cbd5e1",
         "line-gap-width": [
           "interpolate",
           [
@@ -3071,7 +2940,7 @@
           22,
           80
         ],
-        "line-color": "rgba(52, 58, 75, 1)"
+        "line-color": "#cbd5e1"
       }
     },
     {
@@ -3183,7 +3052,7 @@
           22,
           2
         ],
-        "line-color": "rgba(52, 58, 75, 1)",
+        "line-color": "#cbd5e1",
         "line-gap-width": [
           "interpolate",
           [
@@ -3309,19 +3178,7 @@
           22,
           80
         ],
-        "line-color": [
-          "interpolate",
-          [
-            "linear"
-          ],
-          [
-            "zoom"
-          ],
-          15,
-          "rgba(84, 93, 112, 1)",
-          16,
-          "rgba(80, 89, 108, 1)"
-        ],
+        "line-color": "#ffffff",
         "line-dasharray": [
           10,
           0
@@ -3453,19 +3310,7 @@
           22,
           80
         ],
-        "line-color": [
-          "interpolate",
-          [
-            "linear"
-          ],
-          [
-            "zoom"
-          ],
-          15,
-          "rgba(84, 93, 112, 1)",
-          16,
-          "rgba(80, 89, 108, 1)"
-        ]
+        "line-color": "#ffffff"
       }
     },
     {
@@ -3544,19 +3389,7 @@
           22,
           80
         ],
-        "line-color": [
-          "interpolate",
-          [
-            "linear"
-          ],
-          [
-            "zoom"
-          ],
-          15,
-          "rgba(84, 93, 112, 1)",
-          16,
-          "rgba(80, 89, 108, 1)"
-        ],
+        "line-color": "#ffffff",
         "line-dasharray": [
           "step",
           [
@@ -3697,19 +3530,7 @@
           22,
           80
         ],
-        "line-color": [
-          "interpolate",
-          [
-            "linear"
-          ],
-          [
-            "zoom"
-          ],
-          15,
-          "rgba(84, 93, 112, 1)",
-          16,
-          "rgba(80, 89, 108, 1)"
-        ]
+        "line-color": "#ffffff"
       }
     },
     {
@@ -3738,122 +3559,6 @@
       ],
       "paint": {
         "line-color": "rgba(47, 67, 64, 1)"
-      }
-    },
-    {
-      "id": "gate-fence-hedge-shade",
-      "type": "line",
-      "source": "openmaptiles",
-      "source-layer": "structure",
-      "minzoom": 17,
-      "filter": [
-        "match",
-        [
-          "get",
-          "class"
-        ],
-        [
-          "gate",
-          "fence",
-          "hedge"
-        ],
-        true,
-        false
-      ],
-      "paint": {
-        "line-width": [
-          "interpolate",
-          [
-            "linear"
-          ],
-          [
-            "zoom"
-          ],
-          16,
-          1,
-          20,
-          3
-        ],
-        "line-opacity": [
-          "match",
-          [
-            "get",
-            "class"
-          ],
-          "gate",
-          0.5,
-          1
-        ],
-        "line-translate": [
-          1.5,
-          1.5
-        ],
-        "line-color": [
-          "match",
-          [
-            "get",
-            "class"
-          ],
-          "hedge",
-          "rgba(18, 35, 40, 1)",
-          "rgba(21, 30, 48, 1)"
-        ]
-      }
-    },
-    {
-      "id": "gate-fence-hedge",
-      "type": "line",
-      "source": "openmaptiles",
-      "source-layer": "structure",
-      "minzoom": 16,
-      "filter": [
-        "match",
-        [
-          "get",
-          "class"
-        ],
-        [
-          "gate",
-          "fence",
-          "hedge"
-        ],
-        true,
-        false
-      ],
-      "paint": {
-        "line-color": [
-          "match",
-          [
-            "get",
-            "class"
-          ],
-          "hedge",
-          "rgba(18, 35, 40, 1)",
-          "rgba(25, 36, 58, 1)"
-        ],
-        "line-width": [
-          "interpolate",
-          [
-            "linear"
-          ],
-          [
-            "zoom"
-          ],
-          16,
-          1,
-          20,
-          3
-        ],
-        "line-opacity": [
-          "match",
-          [
-            "get",
-            "class"
-          ],
-          "gate",
-          0.5,
-          1
-        ]
       }
     },
     {
@@ -4036,8 +3741,13 @@
             "trunk_link",
             "primary"
           ],
-          "rgba(70, 85, 110, 1)",
-          "rgba(203, 213, 225, 1)"
+          "#586577",
+          [
+            "secondary",
+            "tertiary"
+          ],
+          "#94a3b8",
+          "#b5c4d6"
         ],
         "line-gap-width": [
           "interpolate",
@@ -4337,24 +4047,7 @@
           14,
           1
         ],
-        "line-color": [
-          "match",
-          [
-            "get",
-            "class"
-          ],
-          [
-            "motorway",
-            "motorway_link"
-          ],
-          "rgba(15, 25, 47, 1)",
-          [
-            "trunk",
-            "trunk_link"
-          ],
-          "rgba(15, 23, 46, 1)",
-          "rgba(18, 29, 53, 1)"
-        ],
+        "line-color": "#b5c4d6",
         "line-width": [
           "interpolate",
           [
@@ -5194,21 +4887,18 @@
           ],
           [
             "motorway",
-            "motorway_link"
-          ],
-          "rgba(85, 104, 133, 1)",
-          [
+            "motorway_link",
             "trunk",
             "trunk_link",
             "primary"
           ],
-          "rgba(95, 114, 143, 1)",
+          "#707e94",
           [
             "secondary",
             "tertiary"
           ],
-          "rgba(255, 255, 255, 1)",
-          "rgba(255, 255, 255, 1)"
+          "#cbd5e1",
+          "#ffffff"
         ],
         "line-opacity": [
           "interpolate",
@@ -5357,7 +5047,7 @@
             20
           ]
         ],
-        "line-color": "rgba(66, 136, 78, 1)",
+        "line-color": "#ffffff",
         "line-translate": [
           0,
           0
@@ -6073,7 +5763,7 @@
           22,
           2
         ],
-        "line-color": "rgba(52, 58, 75, 1)",
+        "line-color": "#cbd5e1",
         "line-gap-width": [
           "interpolate",
           [
@@ -6162,7 +5852,7 @@
           18,
           7
         ],
-        "line-color": "rgba(52, 58, 75, 1)"
+        "line-color": "#cbd5e1"
       }
     },
     {
@@ -6235,7 +5925,7 @@
           22,
           2
         ],
-        "line-color": "rgba(52, 58, 75, 1)",
+        "line-color": "#cbd5e1",
         "line-gap-width": [
           "interpolate",
           [
@@ -6347,19 +6037,7 @@
           22,
           80
         ],
-        "line-color": [
-          "interpolate",
-          [
-            "linear"
-          ],
-          [
-            "zoom"
-          ],
-          15,
-          "rgba(84, 93, 112, 1)",
-          16,
-          "rgba(80, 89, 108, 1)"
-        ],
+        "line-color": "#ffffff",
         "line-dasharray": [
           10,
           0
@@ -6453,19 +6131,7 @@
           22,
           80
         ],
-        "line-color": [
-          "interpolate",
-          [
-            "linear"
-          ],
-          [
-            "zoom"
-          ],
-          15,
-          "rgba(84, 93, 112, 1)",
-          16,
-          "rgba(80, 89, 108, 1)"
-        ]
+        "line-color": "#ffffff"
       }
     },
     {
@@ -6538,19 +6204,7 @@
           22,
           80
         ],
-        "line-color": [
-          "interpolate",
-          [
-            "linear"
-          ],
-          [
-            "zoom"
-          ],
-          15,
-          "rgba(84, 93, 112, 1)",
-          16,
-          "rgba(80, 89, 108, 1)"
-        ],
+        "line-color": "#ffffff",
         "line-dasharray": [
           "step",
           [
@@ -6661,19 +6315,7 @@
           22,
           80
         ],
-        "line-color": [
-          "interpolate",
-          [
-            "linear"
-          ],
-          [
-            "zoom"
-          ],
-          15,
-          "rgba(84, 93, 112, 1)",
-          16,
-          "rgba(80, 89, 108, 1)"
-        ]
+        "line-color": "#ffffff"
       }
     },
     {
@@ -9485,7 +9127,7 @@
         "visibility": "visible"
       },
       "paint": {
-        "line-color": "rgba(66, 136, 78, 1)",
+        "line-color": "#ffffff",
         "line-width": [
           "interpolate",
           [
@@ -10350,133 +9992,26 @@
       }
     },
     {
-      "id": "building-flood-ground",
-      "type": "heatmap",
+      "id": "building",
+      "type": "fill",
       "source": "openmaptiles",
       "source-layer": "building",
-      "minzoom": 15,
-      "filter": [
-        ">=",
-        [
-          "number",
-          [
-            "coalesce",
-            [
-              "get",
-              "height"
-            ],
-            0
-          ]
-        ],
-        30
-      ],
+      "minzoom": 13,
       "paint": {
-        "heatmap-radius": [
-          "interpolate",
-          [
-            "exponential",
-            2
-          ],
-          [
-            "zoom"
-          ],
-          14,
-          8.88095734478589,
-          20,
-          568.3812700662969
-        ],
-        "heatmap-weight": 1,
-        "heatmap-intensity": 1,
-        "heatmap-color": [
-          "interpolate",
-          [
-            "linear"
-          ],
-          [
-            "heatmap-density"
-          ],
-          0,
-          "rgba(245,207,168,0)",
-          0.08,
-          "rgba(245,207,168,0.18)",
-          0.25,
-          "rgba(245,207,168,0.30)",
-          1,
-          "rgba(245,207,168,0.30)"
-        ]
-      }
-    },
-    {
-      "id": "building-ao-ground",
-      "type": "line",
-      "source": "openmaptiles",
-      "source-layer": "building",
-      "minzoom": 14,
-      "paint": {
-        "line-color": "#a8a29e",
-        "line-opacity": [
-          "interpolate",
-          [
-            "linear"
-          ],
-          [
-            "zoom"
-          ],
-          14,
-          0.08,
-          17,
-          0.22,
-          19,
-          0.35
-        ],
-        "line-width": [
-          "interpolate",
-          [
-            "exponential",
-            1.8
-          ],
-          [
-            "zoom"
-          ],
-          14,
-          4,
-          17,
-          10,
-          20,
-          30
-        ],
-        "line-blur": [
-          "interpolate",
-          [
-            "exponential",
-            1.8
-          ],
-          [
-            "zoom"
-          ],
-          14,
-          4,
-          17,
-          10,
-          20,
-          30
-        ]
+        "fill-color": "#f5efe6",
+        "fill-outline-color": "#ded6c8",
+        "fill-opacity": 1
       },
-      "filter": [
-        "!=",
-        [
-          "get",
-          "underground"
-        ],
-        "true"
-      ]
+      "layout": {
+        "visibility": "visible"
+      }
     },
     {
       "id": "3d-building",
       "type": "fill-extrusion",
       "source": "openmaptiles",
       "source-layer": "building",
-      "minzoom": 13.5,
+      "minzoom": 14,
       "filter": [
         "!=",
         [
@@ -10486,10 +10021,10 @@
         "true"
       ],
       "layout": {
-        "visibility": "visible"
+        "visibility": "none"
       },
       "paint": {
-        "fill-extrusion-color": "rgba(240, 235, 228, 1)",
+        "fill-extrusion-color": "#f5efe6",
         "fill-extrusion-height": [
           "interpolate",
           [
@@ -10498,52 +10033,60 @@
           [
             "zoom"
           ],
-          13.5,
+          14,
           0,
-          15,
+          16,
           [
-            "coalesce",
-            [
-              "get",
-              "render_height"
-            ],
+            "min",
             [
               "*",
               [
-                "coalesce",
+                "to-number",
                 [
-                  "get",
-                  "levels"
+                  "coalesce",
+                  [
+                    "get",
+                    "render_height"
+                  ],
+                  [
+                    "get",
+                    "height"
+                  ],
+                  7
                 ],
-                1
+                7
               ],
-              3.8
+              0.25
             ],
-            15
+            10
           ],
           18,
           [
-            "coalesce",
-            [
-              "get",
-              "render_height"
-            ],
+            "min",
             [
               "*",
               [
-                "coalesce",
+                "to-number",
                 [
-                  "get",
-                  "levels"
+                  "coalesce",
+                  [
+                    "get",
+                    "render_height"
+                  ],
+                  [
+                    "get",
+                    "height"
+                  ],
+                  9
                 ],
-                1
+                9
               ],
-              4.5
+              0.3
             ],
-            20
+            15
           ]
         ],
-        "fill-extrusion-opacity": 0.98,
+        "fill-extrusion-opacity": 0.95,
         "fill-extrusion-base": [
           "coalesce",
           [
@@ -10677,8 +10220,8 @@
       "id": "road-label",
       "type": "symbol",
       "source": "openmaptiles",
-      "source-layer": "transportation",
-      "minzoom": 10,
+      "source-layer": "transportation_name",
+      "minzoom": 11,
       "filter": [
         "all",
         [
@@ -10759,6 +10302,12 @@
         ]
       ],
       "layout": {
+        "symbol-placement": "line",
+        "text-font": [
+          "Noto Sans Bold"
+        ],
+        "text-transform": "uppercase",
+        "text-letter-spacing": 0.12,
         "text-size": [
           "interpolate",
           [
@@ -10767,70 +10316,15 @@
           [
             "zoom"
           ],
+          11,
+          8.5,
+          13,
           10,
-          [
-            "match",
-            [
-              "get",
-              "class"
-            ],
-            [
-              "motorway",
-              "trunk",
-              "primary",
-              "secondary",
-              "tertiary"
-            ],
-            9,
-            [
-              "motorway_link",
-              "trunk_link",
-              "primary_link",
-              "secondary_link",
-              "tertiary_link",
-              "street",
-              "street_limited"
-            ],
-            8,
-            6.5
-          ],
-          18,
-          [
-            "match",
-            [
-              "get",
-              "class"
-            ],
-            [
-              "motorway",
-              "trunk",
-              "primary",
-              "secondary",
-              "tertiary"
-            ],
-            16,
-            [
-              "motorway_link",
-              "trunk_link",
-              "primary_link",
-              "secondary_link",
-              "tertiary_link",
-              "street",
-              "street_limited"
-            ],
-            14,
-            13
-          ]
+          15,
+          11.5,
+          17,
+          13
         ],
-        "text-max-angle": 30,
-        "text-transform": "uppercase",
-        "text-font": [
-          "Noto Sans Regular"
-        ],
-        "symbol-placement": "line",
-        "text-padding": 1,
-        "text-rotation-alignment": "map",
-        "text-pitch-alignment": "viewport",
         "text-field": [
           "coalesce",
           [
@@ -10847,16 +10341,52 @@
           ],
           [
             "get",
+            "name_latin"
+          ],
+          [
+            "get",
             "name"
           ]
         ],
-        "text-letter-spacing": 0.15,
+        "text-rotation-alignment": "map",
+        "text-pitch-alignment": "viewport",
+        "text-padding": 2,
         "visibility": "visible"
       },
       "paint": {
-        "text-color": "rgba(51, 65, 85, 1)",
-        "text-halo-color": "rgba(255, 255, 255, 0.98)",
-        "text-halo-width": 1.5
+        "text-color": [
+          "match",
+          [
+            "get",
+            "class"
+          ],
+          [
+            "motorway",
+            "motorway_link",
+            "trunk",
+            "trunk_link",
+            "primary"
+          ],
+          "#ffffff",
+          "#54657d"
+        ],
+        "text-halo-color": [
+          "match",
+          [
+            "get",
+            "class"
+          ],
+          [
+            "motorway",
+            "motorway_link",
+            "trunk",
+            "trunk_link",
+            "primary"
+          ],
+          "rgba(80, 95, 116, 0.95)",
+          "rgba(255, 255, 255, 0.98)"
+        ],
+        "text-halo-width": 1.6
       }
     },
     {
@@ -12358,7 +11888,7 @@
               ],
               20
             ],
-            5
+            6
           ],
           16,
           [
@@ -12371,7 +11901,7 @@
               ],
               20
             ],
-            10
+            11
           ],
           17,
           [
@@ -12396,30 +11926,19 @@
             "class"
           ],
           [
+            "fuel",
+            "gas_station"
+          ],
+          "poi-motorist-fuel",
+          [
             "restaurant",
             "cafe",
             "fast_food",
             "bar",
             "pub",
-            "food",
-            "ice_cream"
+            "food"
           ],
-          [
-            "match",
-            [
-              "get",
-              "subclass"
-            ],
-            "cafe",
-            "poi-food_and_drink-cafe",
-            "fast_food",
-            "poi-food_and_drink-fast-food",
-            "bar",
-            "poi-food_and_drink-bar",
-            "pub",
-            "poi-food_and_drink-bar",
-            "poi-food_and_drink-restaurant"
-          ],
+          "poi-food_and_drink-restaurant",
           [
             "hotel",
             "motel",
@@ -12431,38 +11950,16 @@
             "supermarket",
             "grocery",
             "bakery",
+            "confectionery"
+          ],
+          "poi-food_and_drink_stores-bakery",
+          [
             "shop",
             "mall",
-            "clothes"
+            "clothes",
+            "florist"
           ],
           "poi-store_like-shop",
-          [
-            "museum",
-            "theatre",
-            "cinema",
-            "arts_centre",
-            "gallery",
-            "attraction"
-          ],
-          [
-            "match",
-            [
-              "get",
-              "subclass"
-            ],
-            "theatre",
-            "poi-arts_and_entertainment-theatre",
-            "cinema",
-            "poi-arts_and_entertainment-cinema",
-            "poi-arts_and_entertainment-museum"
-          ],
-          [
-            "fitness",
-            "gym",
-            "sports_centre",
-            "stadium"
-          ],
-          "poi-sport_and_leisure-fitness-centre",
           [
             "park",
             "garden"
@@ -12474,36 +11971,35 @@
             "pharmacy",
             "doctors"
           ],
-          [
-            "match",
-            [
-              "get",
-              "subclass"
-            ],
-            "pharmacy",
-            "poi-medical-pharmacy",
-            "poi-medical-hospital"
-          ],
+          "poi-medical-hospital",
           [
             "bank",
             "atm",
-            "post",
-            "town_hall",
-            "courthouse"
+            "post"
           ],
           "poi-commercial_services-bank",
-          [
-            "railway",
-            "subway"
-          ],
-          "poi-store_like-shop",
           [
             "school",
             "college",
             "university",
             "library"
           ],
-          "poi-education-library",
+          "poi-education-school",
+          [
+            "fitness",
+            "gym",
+            "sports_centre",
+            "stadium"
+          ],
+          "poi-sport_and_leisure-fitness-centre",
+          [
+            "museum",
+            "theatre",
+            "cinema",
+            "arts_centre",
+            "attraction"
+          ],
+          "poi-arts_and_entertainment-theatre",
           "poi-store_like-shop"
         ],
         "icon-size": [
@@ -12517,7 +12013,7 @@
           14,
           0.75,
           16,
-          0.9,
+          0.88,
           18,
           1
         ],
@@ -12557,16 +12053,16 @@
             "zoom"
           ],
           14,
-          11,
+          10.5,
           17,
-          13
+          12.5
         ],
         "text-offset": [
           0,
           1.3
         ],
         "text-anchor": "top",
-        "text-max-width": 9,
+        "text-max-width": 8,
         "text-padding": 3,
         "visibility": "visible"
       },
@@ -12578,56 +12074,67 @@
             "class"
           ],
           [
+            "fuel",
+            "gas_station"
+          ],
+          "#7c3aed",
+          [
             "restaurant",
             "cafe",
             "fast_food",
             "bar",
             "pub",
-            "food",
-            "ice_cream"
+            "food"
           ],
-          "#b45309",
+          "#c26a1b",
           [
             "hotel",
             "motel",
             "hostel",
             "lodging"
           ],
-          "#7e22ce",
-          [
-            "museum",
-            "theatre",
-            "cinema",
-            "arts_centre",
-            "gallery",
-            "attraction"
-          ],
-          "#be185d",
+          "#7c3aed",
           [
             "supermarket",
             "grocery",
             "bakery",
+            "confectionery"
+          ],
+          "#2563eb",
+          [
             "shop",
             "mall",
-            "clothes"
+            "clothes",
+            "florist"
           ],
-          "#1d4ed8",
-          [
-            "fitness",
-            "gym",
-            "sports_centre",
-            "stadium"
-          ],
-          "#0e7490",
+          "#2563eb",
           [
             "park",
             "garden"
           ],
           "#15803d",
+          [
+            "hospital",
+            "clinic",
+            "pharmacy"
+          ],
+          "#dc2626",
+          [
+            "bank",
+            "atm",
+            "post"
+          ],
+          "#7c3aed",
+          [
+            "school",
+            "college",
+            "university"
+          ],
+          "#a16207",
           "#1e293b"
         ],
         "text-halo-color": "rgba(255, 255, 255, 0.98)",
-        "text-halo-width": 1.8
+        "text-halo-width": 2
       }
     },
     {

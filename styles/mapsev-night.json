@@ -10542,6 +10542,21 @@
       ]
     },
     {
+      "id": "building",
+      "type": "fill",
+      "source": "openmaptiles",
+      "source-layer": "building",
+      "minzoom": 13,
+      "layout": {
+        "visibility": "visible"
+      },
+      "paint": {
+        "fill-color": "rgba(26, 37, 60, 1)",
+        "fill-outline-color": "rgba(38, 53, 85, 1)",
+        "fill-opacity": 1
+      }
+    },
+    {
       "id": "3d-building",
       "type": "fill-extrusion",
       "source": "openmaptiles",
@@ -10556,7 +10571,7 @@
         "true"
       ],
       "layout": {
-        "visibility": "visible"
+        "visibility": "none"
       },
       "paint": {
         "fill-extrusion-color": "rgba(33, 46, 68, 1)",
@@ -10747,7 +10762,7 @@
       "id": "road-label",
       "type": "symbol",
       "source": "openmaptiles",
-      "source-layer": "transportation",
+      "source-layer": "transportation_name",
       "minzoom": 10,
       "filter": [
         "all",
@@ -10914,6 +10929,10 @@
           [
             "get",
             "name:latin"
+          ],
+          [
+            "get",
+            "name_latin"
           ],
           [
             "get",
