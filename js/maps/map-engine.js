@@ -22,7 +22,7 @@ class TeslaMapEngine {
     this.followCar = true;
     this.isHeadingUp = true; // True = map turns with car, False = North-up
     const saved3D = typeof localStorage !== 'undefined' ? localStorage.getItem('tesla_map_3d_mode') : null;
-    this.is3D = saved3D !== null ? saved3D === '3d' : false; // Default to clean 2D (like Yandex) unless 3D is selected
+    this.is3D = saved3D !== null ? saved3D === '3d' : true; // Default to 3D perspective driving view (MapsEV style)
     this.voiceEnabled = true;
 
     this.currentPosition = { lat: this.center.lat, lng: this.center.lng, heading: 0, speed: 0 };
@@ -163,13 +163,13 @@ class TeslaMapEngine {
     return new Promise((resolve) => {
       this.map = new window.maplibregl.Map({
         container: this.containerId,
-        style: CONFIG.maplibreStyle || 'https://tiles.openfreemap.org/styles/liberty',
+        style: CONFIG.maplibreStyle || 'https://tiles.openfreemap.org/styles/positron',
         center: [this.center.lng, this.center.lat],
         zoom: this.navZoom,
         minZoom: 3,
         maxZoom: 19.5,
         maxPitch: 60,
-        pitch: (this.is3D && this.isHeadingUp) ? (CONFIG.navigationPitch || 45) : 0, // 2D flat or 3D Perspective Driving View
+        pitch: this.is3D ? (CONFIG.navigationPitch || 45) : 0, // 2D flat or 3D Perspective Driving View (MapsEV)
         bearing: 0,
         attributionControl: false,
         // Authentic MapsEV Tesla MCU performance optimizations (Prevents memory leak & MCU crash)
@@ -910,7 +910,7 @@ class TeslaMapEngine {
     const label = document.getElementById('btn-3d-mode-label');
     if (btn) {
       btn.classList.toggle('is-3d', this.is3D);
-      btn.title = this.is3D ? 'Переключить в 2D плоский вид (как в Яндекс)' : 'Переключить в 3D перспективный вид';
+      btn.title = this.is3D ? 'Переключить в 2D плоский вид' : 'Переключить в 3D перспективный вид (MapsEV)';
     }
     if (label) {
       label.textContent = this.is3D ? '3D' : '2D';
@@ -918,51 +918,68 @@ class TeslaMapEngine {
 
     if (this.provider === 'maplibre' && this.map) {
       try {
-        // 1. Ensure clean 2D building footprints exist across all zoom levels (13 to 24)
-        if (!this.map.getLayer('building-clean-2d') && this.map.getSource('openmaptiles')) {
-          const beforeLayer = this.map.getLayer('building-3d') ? 'building-3d' : undefined;
+        if (!this.map.isStyleLoaded()) {
+          this.map.once('load', () => this.update3DMode(this.is3D));
+          return;
+        }
+
+        // 1. Ensure 3D building extrusion layer exists (MapsEV 3D Architecture)
+        if (!this.map.getLayer('building-3d') && this.map.getSource('openmaptiles')) {
+          let firstSymbolId;
+          try {
+            const layers = this.map.getStyle().layers;
+            for (let i = 0; i < layers.length; i++) {
+              if (layers[i].type === 'symbol') {
+                firstSymbolId = layers[i].id;
+                break;
+              }
+            }
+          } catch (e) {}
+
           this.map.addLayer({
-            id: 'building-clean-2d',
-            type: 'fill',
+            id: 'building-3d',
             source: 'openmaptiles',
             'source-layer': 'building',
+            type: 'fill-extrusion',
             minzoom: 13,
-            maxzoom: 24,
             paint: {
-              'fill-color': '#f5f2eb',
-              'fill-opacity': 0.95,
-              'fill-outline-color': '#dfd9cd'
+              'fill-extrusion-color': [
+                'interpolate',
+                ['linear'],
+                ['to-number', ['coalesce', ['get', 'render_height'], ['get', 'height'], 6], 6],
+                0, '#e5eaf0',
+                20, '#d1dae3',
+                50, '#b3c1d1',
+                100, '#8c9fb5'
+              ],
+              'fill-extrusion-height': [
+                'interpolate',
+                ['linear'],
+                ['zoom'],
+                13, 0,
+                14.5, ['to-number', ['coalesce', ['get', 'render_height'], ['get', 'height'], 6], 6],
+                17, ['*', ['to-number', ['coalesce', ['get', 'render_height'], ['get', 'height'], 8], 8], 1.0]
+              ],
+              'fill-extrusion-base': [
+                'to-number',
+                ['coalesce', ['get', 'render_min_height'], ['get', 'min_height'], 0],
+                0
+              ],
+              'fill-extrusion-opacity': 0.85
             }
-          }, beforeLayer);
+          }, firstSymbolId);
         }
 
-        // 2. Control 2D and 3D layer visibility & styling
-        if (this.map.getLayer('building-clean-2d')) {
-          this.map.setLayoutProperty('building-clean-2d', 'visibility', 'visible');
-          this.map.setPaintProperty('building-clean-2d', 'fill-color', '#f5f2eb');
-          this.map.setPaintProperty('building-clean-2d', 'fill-outline-color', '#dfd9cd');
-        }
-
+        // 2. Control 2D and 3D layer visibility
         if (this.map.getLayer('building-3d')) {
           this.map.setLayoutProperty('building-3d', 'visibility', this.is3D ? 'visible' : 'none');
-          if (this.is3D) {
-            this.map.setPaintProperty('building-3d', 'fill-extrusion-opacity', 0.72);
-            this.map.setPaintProperty('building-3d', 'fill-extrusion-color', '#ede8df');
-            this.map.setPaintProperty('building-3d', 'fill-extrusion-height', [
-              '*',
-              ['to-number', ['coalesce', ['get', 'render_height'], ['get', 'height'], 8], 8],
-              0.45
-            ]);
-            this.map.setPaintProperty('building-3d', 'fill-extrusion-base', [
-              '*',
-              ['to-number', ['coalesce', ['get', 'render_min_height'], ['get', 'min_height'], 0], 0],
-              0.45
-            ]);
-          }
+        }
+        if (this.map.getLayer('building')) {
+          this.map.setLayoutProperty('building', 'visibility', this.is3D ? 'none' : 'visible');
         }
 
-        // 3. Smooth camera pitch transition (0 for 2D, 45 for 3D Heading-Up)
-        const targetPitch = (this.is3D && this.isHeadingUp) ? (CONFIG.navigationPitch || 45) : 0;
+        // 3. Smooth camera pitch transition (0 for 2D, 45 for 3D Perspective Driving View)
+        const targetPitch = this.is3D ? (CONFIG.navigationPitch || 45) : 0;
         this.map.easeTo({
           pitch: targetPitch,
           duration: 350
@@ -978,7 +995,7 @@ class TeslaMapEngine {
     if (this.provider === 'yandex') {
       try {
         localStorage.setItem('tesla_map_3d_mode', '3d');
-        localStorage.setItem('tesla_map_provider', 'maplibre');
+        localStorage.setItem('tesla_map_provider_v2', 'maplibre');
       } catch (e) {}
       const url = new URL(window.location.href);
       url.searchParams.set('provider', 'maplibre');

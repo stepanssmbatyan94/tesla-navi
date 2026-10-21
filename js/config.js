@@ -20,9 +20,10 @@ const CONFIG = {
     ru: { name: 'Россия (CIS)', lat: 55.7558, lng: 37.6173, lang: 'ru' }
   },
 
-  // Map settings
-  defaultProvider: 'yandex', // 'yandex' (default for real driving) | 'maplibre'
-  maplibreStyle: 'https://tiles.openfreemap.org/styles/liberty',
+  // Map settings (MapsEV WebGL Vector Engine + Live Yandex Traffic & Routing)
+  defaultProvider: 'maplibre', // 'maplibre' (MapsEV 3D Vector Engine) | 'yandex'
+  maplibreStyle: 'https://tiles.openfreemap.org/styles/positron',
+  maplibreNightStyle: 'https://tiles.openfreemap.org/styles/dark',
   navigationZoom: 16.5,
   navigationPitch: 45 // 3D Driving Perspective Tilt (MapsEV optimal tilt)
 };

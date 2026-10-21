@@ -481,11 +481,13 @@ async function updateLiveTrafficBadge() {
 // 4. Map Engine Initialization
 async function initMap() {
   const urlParams = new URLSearchParams(window.location.search);
-  let activeProvider = urlParams.get('provider') || localStorage.getItem('tesla_map_provider') || (CONFIG && CONFIG.defaultProvider) || 'yandex';
+  let activeProvider = urlParams.get('provider') || localStorage.getItem('tesla_map_provider_v2') || (CONFIG && CONFIG.defaultProvider) || 'maplibre';
   if (activeProvider === 'osm') {
-    activeProvider = 'yandex';
-    localStorage.setItem('tesla_map_provider', 'yandex');
+    activeProvider = 'maplibre';
   }
+  try {
+    localStorage.setItem('tesla_map_provider_v2', activeProvider);
+  } catch (e) {}
 
   mapEngine = new TeslaMapEngine('map-container', {
     provider: activeProvider,
@@ -873,24 +875,26 @@ function initToolbarHandlers() {
     });
   }
 
-  // Map Engine Switcher: MapLibre Vector vs Yandex Live Traffic (Яндекс)
+  // Map Engine Switcher: MapsEV MapLibre 3D Vector vs Yandex Live Traffic (Яндекс)
   const btnToggleProvider = document.getElementById('btn-toggle-provider');
   const providerIndicator = document.getElementById('provider-indicator');
-  const activeProv = new URLSearchParams(window.location.search).get('provider') || localStorage.getItem('tesla_map_provider') || (CONFIG && CONFIG.defaultProvider) || 'yandex';
+  const activeProv = new URLSearchParams(window.location.search).get('provider') || localStorage.getItem('tesla_map_provider_v2') || (CONFIG && CONFIG.defaultProvider) || 'maplibre';
   if (providerIndicator) {
     providerIndicator.textContent = activeProv === 'yandex' ? 'ЯН' : 'ML';
     providerIndicator.style.color = activeProv === 'yandex' ? '#ef4444' : '#38bdf8';
   }
   if (btnToggleProvider) {
     btnToggleProvider.title = activeProv === 'yandex'
-      ? 'Карта: Яндекс (пробки). Нажмите для переключения на MapLibre'
-      : 'Карта: MapLibre. Нажмите для переключения на Яндекс';
+      ? 'Карта: Яндекс (пробки). Нажмите для переключения на MapsEV MapLibre 3D'
+      : 'Карта: MapsEV MapLibre 3D. Нажмите для переключения на Яндекс';
 
     btnToggleProvider.addEventListener('click', () => {
       const currentUrlProv = new URLSearchParams(window.location.search).get('provider');
-      const cur = currentUrlProv || localStorage.getItem('tesla_map_provider') || (CONFIG && CONFIG.defaultProvider) || 'yandex';
+      const cur = currentUrlProv || localStorage.getItem('tesla_map_provider_v2') || (CONFIG && CONFIG.defaultProvider) || 'maplibre';
       const nextProv = (cur === 'yandex') ? 'maplibre' : 'yandex';
-      localStorage.setItem('tesla_map_provider', nextProv);
+      try {
+        localStorage.setItem('tesla_map_provider_v2', nextProv);
+      } catch (e) {}
       const url = new URL(window.location.href);
       url.searchParams.set('provider', nextProv);
       window.location.href = url.toString();
@@ -910,7 +914,7 @@ function initToolbarHandlers() {
   const btnToggle2D3D = document.getElementById('btn-toggle-2d3d');
   const btn3DModeLabel = document.getElementById('btn-3d-mode-label');
   const saved3D = localStorage.getItem('tesla_map_3d_mode');
-  const isInitial3D = saved3D === '3d';
+  const isInitial3D = saved3D !== null ? saved3D === '3d' : true;
   if (btnToggle2D3D) {
     btnToggle2D3D.classList.toggle('is-3d', isInitial3D);
     if (btn3DModeLabel) btn3DModeLabel.textContent = isInitial3D ? '3D' : '2D';
