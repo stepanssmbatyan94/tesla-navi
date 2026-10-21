@@ -24,8 +24,8 @@ const CONFIG = {
   defaultProvider: 'maplibre', // 'maplibre' (MapsEV 3D Vector Engine) | 'yandex'
   maplibreStyle: '/styles/mapsev-day.json',
   maplibreNightStyle: '/styles/mapsev-night.json',
-  navigationZoom: 17.2,
-  navigationPitch: 24 // 3D Perspective Driving View (MapsEV low-profile 2.5D tilt)
+  navigationZoom: 16.3,
+  navigationPitch: 20 // 3D Perspective Driving View (MapsEV subtle 2.5D tilt)
 };
 
 // Dictionaries for RU, HY, EN

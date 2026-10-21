@@ -41,17 +41,11 @@ class TeslaMapEngine {
     this.totalDistance = 0;
     this.spokenDistanceThresholds = {};
 
-    // Yerevan Key Traffic Lights & Speed Cameras (Sample coordinates around Center/Arabkir/Ajapnyak)
+    // Key Speed Cameras in Yerevan (Alert only, no ugly blocking sprites on map)
     this.trafficPoints = [
-      { type: 'light', lat: 40.1898, lng: 44.4695, name: 'Leningradian / Kerkorian' },
       { type: 'camera', lat: 40.1915, lng: 44.4735, name: 'Speed Cam 60', limit: 60 },
-      { type: 'light', lat: 40.1930, lng: 44.4840, name: 'Kievyan Bridge' },
       { type: 'camera', lat: 40.1955, lng: 44.4880, name: 'Speed Cam 60', limit: 60 },
-      { type: 'light', lat: 40.1982, lng: 44.4928, name: 'Barekamutyun Square' },
-      { type: 'light', lat: 40.1988, lng: 44.4935, name: 'Hakob Hakobyan St' },
-      { type: 'camera', lat: 40.1830, lng: 44.4780, name: 'Monte Melkonyan Cam', limit: 60 },
-      { type: 'light', lat: 40.1875, lng: 44.4750, name: 'Tsitsernakaberd Junction' },
-      { type: 'light', lat: 40.1905, lng: 44.5020, name: 'Baghramyan / Proshyan' }
+      { type: 'camera', lat: 40.1830, lng: 44.4780, name: 'Monte Melkonyan Cam', limit: 60 }
     ];
 
     // Load full verified speed camera database for Yerevan (185 real speed cameras)
