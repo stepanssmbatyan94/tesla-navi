@@ -3274,11 +3274,18 @@ ymaps[class*="copyright"] a[target="_blank"] {
   bottom: 14px;
   left: 50%;
   transform: translateX(-50%);
-  z-index: 100;
+  z-index: 55;
   display: flex;
   align-items: center;
   max-width: calc(100vw - 120px);
   pointer-events: auto;
+  transition: opacity 0.25s ease, transform 0.25s ease;
+}
+
+.quick-dest-bar.hidden {
+  display: none !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
 }
 
 .quick-dest-chips {

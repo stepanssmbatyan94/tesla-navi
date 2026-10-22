@@ -1419,6 +1419,14 @@ class TeslaMapEngine {
     } else {
       this.checkFreeDrivingCameraAlert(displayLat, displayLng, speed);
     }
+
+    if (this.options && this.options.onPositionUpdate && isRealFix) {
+      const now = performance.now();
+      if (!this._lastPosUpdateCb || (now - this._lastPosUpdateCb > 2500)) {
+        this._lastPosUpdateCb = now;
+        this.options.onPositionUpdate({ lat: displayLat, lng: displayLng, speed });
+      }
+    }
   }
 
   calculateDistance(lat1, lon1, lat2, lon2) {

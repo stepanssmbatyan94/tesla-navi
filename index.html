@@ -24,7 +24,7 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
   <!-- Tesla Cockpit CSS -->
-  <link rel="stylesheet" href="css/tesla-display.css?v=17">
+  <link rel="stylesheet" href="css/tesla-display.css?v=18">
 </head>
 <body>
 
@@ -554,13 +554,8 @@
 
   <!-- 5b. Authentic MapsEV Bottom Destination Chips Bar (Screenshot 1) -->
   <div id="quick-dest-bar" class="quick-dest-bar">
-    <div class="quick-dest-chips">
-      <button class="quick-dest-chip" data-dest="home"><span class="chip-ico">🏠</span> 6334 km</button>
-      <button class="quick-dest-chip" data-dest="work"><span class="chip-ico">💼</span> 6334 km</button>
-      <button class="quick-dest-chip" data-dest="resort"><span class="chip-ico">🎓</span> <span class="chip-title">Aghveran Ararat Resort</span> <span class="chip-dist">34 km</span></button>
-      <button class="quick-dest-chip" data-dest="valem"><span class="chip-ico">🏢</span> <span class="chip-title">Valem hamatirutyun</span> <span class="chip-dist">250 m</span></button>
-      <button class="quick-dest-chip" data-dest="home2"><span class="chip-ico">📍</span> <span class="chip-title">Home</span> <span class="chip-dist">100 m</span></button>
-      <button class="quick-dest-chip" data-dest="street"><span class="chip-ico">📍</span> <span class="chip-title">Hakob Hakobyan Street, 1</span> <span class="chip-dist">2.2 km</span></button>
+    <div id="quick-dest-chips" class="quick-dest-chips">
+      <!-- Dynamically populated via renderQuickDestChips() with live GPS distances -->
     </div>
   </div>
 
@@ -968,9 +963,9 @@
   </div>
 
   <!-- Scripts -->
-  <script src="js/config.js?v=17"></script>
-  <script src="js/realtime.js?v=17"></script>
-  <script src="js/maps/map-engine.js?v=17"></script>
-  <script src="js/tesla-cockpit.js?v=17"></script>
+  <script src="js/config.js?v=18"></script>
+  <script src="js/realtime.js?v=18"></script>
+  <script src="js/maps/map-engine.js?v=18"></script>
+  <script src="js/tesla-cockpit.js?v=18"></script>
 </body>
 </html>

@@ -390,11 +390,13 @@ function updatePairingStatus(connected) {
 // Saved Places Manager: Home, Work & Favorites (Mapsev & Yandex Architecture)
 // ==========================================================================
 const DEFAULT_SAVED_PLACES = {
-  home: null,
-  work: null,
+  home: { name: 'Дом', address: 'Hakob Hakobyan Street, 1', lat: 40.1970, lng: 44.4930 },
+  work: { name: 'Работа', address: 'Valem hamatirutyun', lat: 40.1982, lng: 44.4925 },
   favorites: [
-    { id: 'fav_1', name: 'Dalma Garden Mall', address: 'Цицернакабердское шоссе, 3', lat: 40.1802, lng: 44.4842 },
-    { id: 'fav_2', name: 'Yerevan Mall', address: 'проспект Аршакуняц, 34', lat: 40.1534, lng: 44.5026 }
+    { id: 'fav_resort', name: 'Aghveran Ararat Resort', address: 'Aghveran Resort Zone', icon: '🎓', lat: 40.5050, lng: 44.5820 },
+    { id: 'fav_valem', name: 'Valem hamatirutyun', address: 'Hakob Hakobyan St', icon: '🏢', lat: 40.1982, lng: 44.4925 },
+    { id: 'fav_dalma', name: 'Dalma Garden Mall', address: 'Цицернакабердское шоссе, 3', icon: '🛍️', lat: 40.1802, lng: 44.4842 },
+    { id: 'fav_ymall', name: 'Yerevan Mall', address: 'проспект Аршакуняц, 34', icon: '🛍️', lat: 40.1534, lng: 44.5026 }
   ]
 };
 
@@ -406,9 +408,9 @@ function loadSavedPlaces() {
     if (raw) {
       const parsed = JSON.parse(raw);
       return {
-        home: (parsed.home && parsed.home.address) ? parsed.home : null,
-        work: (parsed.work && parsed.work.address) ? parsed.work : null,
-        favorites: Array.isArray(parsed.favorites) ? parsed.favorites : DEFAULT_SAVED_PLACES.favorites
+        home: (parsed.home && parsed.home.address && parsed.home.lat != null) ? parsed.home : DEFAULT_SAVED_PLACES.home,
+        work: (parsed.work && parsed.work.address && parsed.work.lat != null) ? parsed.work : DEFAULT_SAVED_PLACES.work,
+        favorites: (Array.isArray(parsed.favorites) && parsed.favorites.length > 0) ? parsed.favorites : DEFAULT_SAVED_PLACES.favorites
       };
     }
   } catch (e) {
@@ -573,6 +575,9 @@ async function initMap() {
     },
     onArrival: (destination) => {
       showArrivalModal(destination);
+    },
+    onPositionUpdate: (pos) => {
+      updateCommuteEtas();
     },
     onUserPan: () => {
       const recenterBtn = document.getElementById('floating-recenter-btn');
@@ -763,6 +768,10 @@ function initToolbarHandlers() {
   const btnCloseAltDrawer = document.getElementById('btn-close-alt-drawer');
   if (btnCloseAltDrawer) {
     btnCloseAltDrawer.addEventListener('click', () => {
+      document.body.classList.remove('route-options-open');
+      if (!mapEngine || !mapEngine.isNavigating) {
+        document.getElementById('quick-dest-bar')?.classList.remove('hidden');
+      }
       document.getElementById('route-alternatives-drawer').classList.add('hidden');
     });
   }
@@ -772,6 +781,9 @@ function initToolbarHandlers() {
   if (btnStartRouteNav) {
     const handleStartNav = (e) => {
       if (e) e.preventDefault();
+      document.body.classList.remove('route-options-open');
+      document.body.classList.add('navigating');
+      document.getElementById('quick-dest-bar')?.classList.add('hidden');
       document.getElementById('route-alternatives-drawer')?.classList.add('hidden');
       if (currentRouteInfo) {
         showNavigationHud(currentRouteInfo);
@@ -1048,6 +1060,7 @@ function initToolbarHandlers() {
 function updateCommuteEtas() {
   if (!mapEngine) return;
   const current = mapEngine.currentPosition;
+  if (!current) return;
   ['home', 'work'].forEach(key => {
     const loc = userSavedPlaces[key];
     const badge = document.getElementById(`${key}-eta-badge`);
@@ -1066,6 +1079,92 @@ function updateCommuteEtas() {
       badge.textContent = `${durationMin} мин • ${distStr}`;
       badge.className = 'commute-eta-badge';
     }
+  });
+
+  renderQuickDestChips();
+}
+
+// Authentic MapsEV Destination Chips: Home, Work & Favorites with Live GPS Distances & 1-Tap Route
+function renderQuickDestChips() {
+  const container = document.getElementById('quick-dest-chips');
+  if (!container) return;
+
+  const cur = (mapEngine && mapEngine.currentPosition) ? mapEngine.currentPosition : null;
+  const chipsList = [];
+
+  // 1. Home
+  const homePlace = userSavedPlaces.home || DEFAULT_SAVED_PLACES.home;
+  if (homePlace) {
+    chipsList.push({
+      type: 'home',
+      icon: '🏠',
+      title: homePlace.name || 'Дом',
+      place: homePlace
+    });
+  }
+
+  // 2. Work
+  const workPlace = userSavedPlaces.work || DEFAULT_SAVED_PLACES.work;
+  if (workPlace) {
+    chipsList.push({
+      type: 'work',
+      icon: '💼',
+      title: workPlace.name || 'Работа',
+      place: workPlace
+    });
+  }
+
+  // 3. Favorites / Recent Places
+  const favs = (userSavedPlaces.favorites && userSavedPlaces.favorites.length > 0)
+    ? userSavedPlaces.favorites
+    : DEFAULT_SAVED_PLACES.favorites;
+
+  favs.forEach(f => {
+    chipsList.push({
+      type: 'favorite',
+      icon: f.icon || '📍',
+      title: f.name || f.address,
+      place: f
+    });
+  });
+
+  container.innerHTML = '';
+  chipsList.forEach(item => {
+    let distStr = '';
+    if (cur && item.place && item.place.lat != null && item.place.lng != null) {
+      const d = mapEngine.calculateDistance(cur.lat, cur.lng, item.place.lat, item.place.lng);
+      if (d < 50) {
+        distStr = '0 м';
+      } else if (d < 1000) {
+        distStr = `${Math.round(d / 10) * 10} м`;
+      } else {
+        distStr = `${(d / 1000).toFixed(1)} км`;
+      }
+    }
+
+    const btn = document.createElement('button');
+    btn.className = 'quick-dest-chip';
+    btn.setAttribute('type', 'button');
+    btn.dataset.dest = item.type;
+    btn.title = `Построить маршрут: ${item.title}`;
+    btn.innerHTML = `
+      <span class="chip-ico">${item.icon}</span>
+      <span class="chip-title">${item.title}</span>
+      ${distStr ? `<span class="chip-dist">${distStr}</span>` : ''}
+    `;
+
+    btn.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      console.log('📍 Quick destination tapped:', item.title, item.place);
+      if (item.place && item.place.lat && item.place.lng) {
+        startNavigationTo(item.place);
+      } else if (item.type === 'home' || item.type === 'work') {
+        openEditPlaceModal(item.type);
+      }
+    });
+
+    container.appendChild(btn);
   });
 }
 
@@ -1802,6 +1901,8 @@ function handleIncomingDestination(destination) {
 
 // Route Alternatives & Turn Details Drawer (Mapsev IMG_3693)
 function showRouteAlternativesDrawer(route) {
+  document.body.classList.add('route-options-open');
+  document.getElementById('quick-dest-bar')?.classList.add('hidden');
   currentRouteInfo = route;
   const drawer = document.getElementById('route-alternatives-drawer');
   if (!drawer) return;
@@ -1933,6 +2034,9 @@ function renderTrafficProgressBar(segments) {
 }
 
 function showNavigationHud(route) {
+  document.body.classList.remove('route-options-open');
+  document.body.classList.add('navigating');
+  document.getElementById('quick-dest-bar')?.classList.add('hidden');
   document.getElementById('hud-maneuver-card').classList.remove('hidden');
   document.getElementById('bottom-nav-bar').classList.remove('hidden');
   // Keep lane guidance hidden by default unless real lane info is provided
@@ -2208,6 +2312,10 @@ function renderLaneGuidance(m) {
 }
 
 function cancelActiveNavigation() {
+  document.body.classList.remove('navigating');
+  document.body.classList.remove('route-options-open');
+  document.getElementById('quick-dest-bar')?.classList.remove('hidden');
+  renderQuickDestChips();
   document.getElementById('hud-maneuver-card').classList.add('hidden');
   document.getElementById('bottom-nav-bar').classList.add('hidden');
   document.getElementById('lane-guidance-pill').classList.add('hidden');
@@ -2230,6 +2338,10 @@ function cancelActiveNavigation() {
 }
 
 function showArrivalModal(dest) {
+  document.body.classList.remove('navigating');
+  document.body.classList.remove('route-options-open');
+  document.getElementById('quick-dest-bar')?.classList.remove('hidden');
+  renderQuickDestChips();
   document.getElementById('hud-maneuver-card').classList.add('hidden');
   document.getElementById('bottom-nav-bar').classList.add('hidden');
   document.getElementById('lane-guidance-pill').classList.add('hidden');
