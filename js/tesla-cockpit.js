@@ -66,26 +66,24 @@ async function initTeslaCockpit() {
   initLanguage();
   initVoiceSelector();
 
-  // 2. Direct In-Car Tesla Geolocation
+  // 2. Toolbar & Drawer UI Handlers (Must initialize immediately so buttons always respond)
+  initToolbarHandlers();
+  initSearchHandlers();
+  initWeatherAndMusic();
+  initDevMode();
+
+  // 3. Direct In-Car Tesla Geolocation
   initTeslaCarGps();
 
-  // 3. Realtime Phone Pairing (Supabase Broadcast)
+  // 4. Realtime Phone Pairing (Supabase Broadcast)
   initPairing();
 
-  // 4. Map Engine Initialization (MapLibre GL 3D Primary)
-  await initMap();
-
-  // 5. Toolbar & Drawer UI Handlers
-  initToolbarHandlers();
-
-  // 6. Search & Autocomplete Handlers
-  initSearchHandlers();
-
-  // 7. Weather & Music Handlers
-  initWeatherAndMusic();
-
-  // 8. Developer Mode & In-Car Simulator (?mode=dev)
-  initDevMode();
+  // 5. Map Engine Initialization (MapLibre GL 3D Primary)
+  try {
+    await initMap();
+  } catch (mapErr) {
+    console.error('MapEngine initialization error:', mapErr);
+  }
 }
 
 if (document.readyState === 'loading') {
@@ -1114,6 +1112,7 @@ function initToolbarHandlers() {
 }
 
 function updateCommuteEtas() {
+  renderQuickDestChips();
   if (!mapEngine) return;
   const current = mapEngine.currentPosition;
   if (!current) return;

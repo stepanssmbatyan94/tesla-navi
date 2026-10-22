@@ -313,7 +313,17 @@ class TeslaMapEngine {
           }
         });
 
+        clearTimeout(fallbackTimer);
         resolve();
+      });
+
+      const fallbackTimer = setTimeout(() => {
+        console.warn('[MapEngine] MapLibre load event timeout (4s) - resolving gracefully');
+        resolve();
+      }, 4000);
+
+      this.map.on('error', (e) => {
+        console.warn('[MapEngine] MapLibre non-fatal error:', e);
       });
     });
   }
