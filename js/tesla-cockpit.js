@@ -94,53 +94,99 @@ if (document.readyState === 'loading') {
   initTeslaCockpit();
 }
 
-// 1. Language Management (RU, HY, EN)
+// 1. Language Management (RU, HY, EN - Default RU)
 function initLanguage() {
   currentLang = localStorage.getItem('tesla_navi_lang') || 'ru';
+  if (!['ru', 'hy', 'en'].includes(currentLang)) currentLang = 'ru';
   window.CURRENT_LANG = currentLang;
   applyLanguage(currentLang);
 
   const langBtn = document.getElementById('btn-lang-toggle');
-  langBtn.addEventListener('click', () => {
-    if (currentLang === 'ru') currentLang = 'hy';
-    else if (currentLang === 'hy') currentLang = 'en';
-    else currentLang = 'ru';
+  if (langBtn) {
+    langBtn.addEventListener('click', () => {
+      if (currentLang === 'ru') currentLang = 'hy';
+      else if (currentLang === 'hy') currentLang = 'en';
+      else currentLang = 'ru';
 
-    localStorage.setItem('tesla_navi_lang', currentLang);
-    window.CURRENT_LANG = currentLang;
-    applyLanguage(currentLang);
+      localStorage.setItem('tesla_navi_lang', currentLang);
+      window.CURRENT_LANG = currentLang;
+      applyLanguage(currentLang);
 
-    if (mapEngine) {
-      if (currentLang === 'hy') {
+      if (mapEngine) {
         const savedVoice = localStorage.getItem('tesla_navi_voice') || 'female';
         const isMale = (savedVoice === 'male' || savedVoice === 'dmitry' || savedVoice === 'gor' || savedVoice === 'andrew');
-        mapEngine.speakVoice('welcome', isMale ? 'gor' : 'suzie');
-      } else if (currentLang === 'en') {
-        mapEngine.speakVoice('Voice navigation switched to Ava.', 'ava');
-      } else {
-        const v = window.CURRENT_VOICE || 'svetlana';
-        const msg = (v === 'male' || v === 'dmitry') ? 'Голос изменён на Дмитрий.' : 'Голос изменён на Светлана.';
-        mapEngine.speakVoice(msg, (v === 'male' || v === 'dmitry') ? 'dmitry' : 'svetlana');
+        if (currentLang === 'hy') {
+          mapEngine.speakVoice('welcome', isMale ? 'gor' : 'suzie');
+        } else if (currentLang === 'en') {
+          mapEngine.speakVoice(isMale ? 'Voice navigation switched to Andrew.' : 'Voice navigation switched to Ava.', isMale ? 'andrew' : 'ava');
+        } else {
+          const msg = isMale ? 'Голос изменён на Дмитрий.' : 'Голос изменён на Светлана.';
+          mapEngine.speakVoice(msg, isMale ? 'dmitry' : 'svetlana');
+        }
       }
-    }
-  });
+    });
+  }
 }
 
 function applyLanguage(lang) {
-  const dict = I18N[lang] || I18N.ru;
-  document.getElementById('lang-indicator').textContent = lang.toUpperCase();
+  if (!['ru', 'hy', 'en'].includes(lang)) lang = 'ru';
+  currentLang = lang;
+  window.CURRENT_LANG = lang;
+  document.documentElement.lang = lang;
 
+  const dict = (typeof I18N !== 'undefined' && I18N[lang]) ? I18N[lang] : (typeof I18N !== 'undefined' ? I18N.ru : {});
+
+  // 1. Lang indicator badge
+  const langIndicator = document.getElementById('lang-indicator');
+  if (langIndicator) langIndicator.textContent = lang.toUpperCase();
+
+  // 2. Text translations [data-i18n]
   document.querySelectorAll('[data-i18n]').forEach(el => {
     const key = el.dataset.i18n;
     if (dict[key]) el.textContent = dict[key];
   });
 
+  // 3. Tooltip titles [data-i18n-title]
+  document.querySelectorAll('[data-i18n-title]').forEach(el => {
+    const key = el.dataset.i18nTitle;
+    if (dict[key]) el.title = dict[key];
+  });
+
+  // 4. Input placeholders [data-i18n-placeholder]
+  document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
+    const key = el.dataset.i18nPlaceholder;
+    if (dict[key]) el.placeholder = dict[key];
+  });
+
+  // 5. Drawer search input fallback
   const searchInput = document.getElementById('drawer-search-input');
   if (searchInput && dict.searchPlaceholder) {
     searchInput.placeholder = dict.searchPlaceholder;
   }
 
+  // 6. Voice indicator
   updateVoiceIndicator(window.CURRENT_VOICE || 'female');
+
+  // 7. Update active Theme Mode UI in mapEngine if initialized
+  if (mapEngine && typeof mapEngine.updateThemeUI === 'function') {
+    mapEngine.updateThemeUI();
+  }
+
+  // 8. Re-render saved places & commute tiles (Home, Work, Favorites)
+  renderAllSavedPlacesUI();
+
+  // 9. Re-render EV charging stations list if drawer is visible
+  if (!document.getElementById('charging-stations-drawer')?.classList.contains('hidden')) {
+    renderChargingStationsList();
+  }
+
+  // 10. Re-render Route Alternatives & Turn Steps if active
+  if (currentRouteInfo) {
+    showRouteAlternativesDrawer(currentRouteInfo);
+  }
+
+  // 11. Recalculate Live Commute ETAs & Destination Chips
+  updateCommuteEtas();
 }
 
 // 1.5 Voice Management (Female 👩 / Male 👨 across RU, HY, EN)
@@ -190,12 +236,12 @@ function updateVoiceIndicator(voice) {
       ind.style.fontSize = isMale ? '11px' : '10px';
       ind.title = isMale ? 'Ձայն: Գոռ (Արական, նեյրոնային)' : 'Ձայն: Սյուզի (Իգական, նեյրոնային)';
     } else if (lang === 'en') {
-      ind.textContent = isMale ? '👨 EN' : '👩 EN';
-      ind.style.fontSize = '12px';
+      ind.textContent = isMale ? '👨 Andrew' : '👩 Ava';
+      ind.style.fontSize = '10px';
       ind.title = isMale ? 'Voice: Andrew (Male)' : 'Voice: Ava (Female)';
     } else {
-      ind.textContent = isMale ? '👨' : '👩';
-      ind.style.fontSize = '16px';
+      ind.textContent = isMale ? '👨 Дмитрий' : '👩 Светлана';
+      ind.style.fontSize = '10px';
       ind.title = isMale ? 'Голос: Дмитрий (Мужской)' : 'Голос: Светлана (Женский)';
     }
   }
@@ -1071,12 +1117,15 @@ function updateCommuteEtas() {
   if (!mapEngine) return;
   const current = mapEngine.currentPosition;
   if (!current) return;
+  const lang = window.CURRENT_LANG || 'ru';
+  const dict = I18N[lang] || I18N.ru;
+
   ['home', 'work'].forEach(key => {
     const loc = userSavedPlaces[key];
     const badge = document.getElementById(`${key}-eta-badge`);
     if (!loc) {
       if (badge) {
-        badge.textContent = '+ Задать';
+        badge.textContent = dict.setLoc || '+ Задать';
         badge.className = 'commute-add-badge';
       }
       return;
@@ -1084,9 +1133,9 @@ function updateCommuteEtas() {
     const distMeters = mapEngine.calculateDistance(current.lat, current.lng, loc.lat, loc.lng);
     const speedMps = 8.5; // ~30 km/h city average
     const durationMin = Math.max(3, Math.round(distMeters / (speedMps * 60)));
-    const distStr = distMeters >= 1000 ? `${(distMeters / 1000).toFixed(1)} км` : `${Math.round(distMeters)} м`;
+    const distStr = mapEngine.formatNavDistance(distMeters);
     if (badge) {
-      const durStr = mapEngine ? mapEngine.formatNavDuration(durationMin, true) : `${durationMin} мин`;
+      const durStr = mapEngine.formatNavDuration(durationMin, true);
       badge.textContent = `${durStr} • ${distStr}`;
       badge.className = 'commute-eta-badge';
     }
@@ -1101,6 +1150,8 @@ function renderQuickDestChips() {
   if (!container) return;
 
   const cur = (mapEngine && mapEngine.currentPosition) ? mapEngine.currentPosition : null;
+  const lang = window.CURRENT_LANG || 'ru';
+  const dict = I18N[lang] || I18N.ru;
   const chipsList = [];
 
   // 1. Home
@@ -1109,7 +1160,7 @@ function renderQuickDestChips() {
     chipsList.push({
       type: 'home',
       icon: '🏠',
-      title: homePlace.name || 'Дом',
+      title: dict.home || 'Дом',
       place: homePlace
     });
   }
@@ -1120,7 +1171,7 @@ function renderQuickDestChips() {
     chipsList.push({
       type: 'work',
       icon: '💼',
-      title: workPlace.name || 'Работа',
+      title: dict.work || 'Работа',
       place: workPlace
     });
   }
@@ -1144,20 +1195,14 @@ function renderQuickDestChips() {
     let distStr = '';
     if (cur && item.place && item.place.lat != null && item.place.lng != null) {
       const d = mapEngine.calculateDistance(cur.lat, cur.lng, item.place.lat, item.place.lng);
-      if (d < 50) {
-        distStr = '0 м';
-      } else if (d < 1000) {
-        distStr = `${Math.round(d / 10) * 10} м`;
-      } else {
-        distStr = `${(d / 1000).toFixed(1)} км`;
-      }
+      distStr = mapEngine.formatNavDistance(d);
     }
 
     const btn = document.createElement('button');
     btn.className = 'quick-dest-chip';
     btn.setAttribute('type', 'button');
     btn.dataset.dest = item.type;
-    btn.title = `Построить маршрут: ${item.title}`;
+    btn.title = `${dict.btnRoute || 'Маршрут'}: ${item.title}`;
     btn.innerHTML = `
       <span class="chip-ico">${item.icon}</span>
       <span class="chip-title">${item.title}</span>
@@ -1180,6 +1225,9 @@ function renderQuickDestChips() {
 }
 
 function renderAllSavedPlacesUI() {
+  const lang = window.CURRENT_LANG || 'ru';
+  const dict = I18N[lang] || I18N.ru;
+
   // 1. Update Search Drawer Commute Tiles (Strict 2-Column Grid: Home & Work always visible)
   const homeTileEl = document.getElementById('commute-home');
   const workTileEl = document.getElementById('commute-work');
@@ -1191,21 +1239,20 @@ function renderAllSavedPlacesUI() {
   const homeBadge = document.getElementById('home-eta-badge');
   const btnEditHome = document.getElementById('btn-edit-home');
 
+  if (homeTitle) homeTitle.textContent = dict.home || 'Дом';
   if (userSavedPlaces.home) {
-    if (homeTitle) homeTitle.textContent = userSavedPlaces.home.name || 'Дом';
     if (homeSub) {
       homeSub.textContent = userSavedPlaces.home.address;
       homeSub.style.color = '#64748b';
     }
     if (btnEditHome) btnEditHome.classList.remove('hidden');
   } else {
-    if (homeTitle) homeTitle.textContent = 'Дом';
     if (homeSub) {
-      homeSub.textContent = '+ Задать адрес';
+      homeSub.textContent = dict.setAddress || '+ Задать адрес';
       homeSub.style.color = '#94a3b8';
     }
     if (homeBadge) {
-      homeBadge.textContent = '+ Задать';
+      homeBadge.textContent = dict.setLoc || '+ Задать';
       homeBadge.className = 'commute-add-badge';
     }
     if (btnEditHome) btnEditHome.classList.remove('hidden');
@@ -1216,21 +1263,20 @@ function renderAllSavedPlacesUI() {
   const workBadge = document.getElementById('work-eta-badge');
   const btnEditWork = document.getElementById('btn-edit-work');
 
+  if (workTitle) workTitle.textContent = dict.work || 'Работа';
   if (userSavedPlaces.work) {
-    if (workTitle) workTitle.textContent = userSavedPlaces.work.name || 'Работа';
     if (workSub) {
       workSub.textContent = userSavedPlaces.work.address;
       workSub.style.color = '#64748b';
     }
     if (btnEditWork) btnEditWork.classList.remove('hidden');
   } else {
-    if (workTitle) workTitle.textContent = 'Работа';
     if (workSub) {
-      workSub.textContent = '+ Задать адрес';
+      workSub.textContent = dict.setAddress || '+ Задать адрес';
       workSub.style.color = '#94a3b8';
     }
     if (workBadge) {
-      workBadge.textContent = '+ Задать';
+      workBadge.textContent = dict.setLoc || '+ Задать';
       workBadge.className = 'commute-add-badge';
     }
     if (btnEditWork) btnEditWork.classList.remove('hidden');
@@ -1240,16 +1286,19 @@ function renderAllSavedPlacesUI() {
   const favBadge = document.getElementById('fav-count-badge');
   if (favBadge) favBadge.textContent = favCount;
 
-  // 2. Update "My places" Drawer (Screenshot 1)
+  // 2. Update "My places" Drawer
+  const myPlacesHeading = document.getElementById('my-places-heading');
+  if (myPlacesHeading) myPlacesHeading.textContent = dict.myPlaces || 'Мои места';
+
   const myHomeSub = document.getElementById('my-places-home-sub');
   const myHomeActions = document.getElementById('my-places-home-actions');
   if (myHomeSub && myHomeActions) {
     if (userSavedPlaces.home) {
       myHomeSub.textContent = userSavedPlaces.home.address;
       myHomeActions.innerHTML = `
-        <button class="my-place-action-btn route-btn" id="btn-my-home-route" title="Маршрут">🚗</button>
-        <button class="my-place-action-btn" id="btn-my-home-edit" title="Изменить">✏️</button>
-        <button class="my-place-action-btn delete-btn" id="btn-my-home-del" title="Удалить">🗑️</button>
+        <button class="my-place-action-btn route-btn" id="btn-my-home-route" title="${dict.btnRoute || 'Маршрут'}">🚗</button>
+        <button class="my-place-action-btn" id="btn-my-home-edit" title="${dict.edit || 'Изменить'}">✏️</button>
+        <button class="my-place-action-btn delete-btn" id="btn-my-home-del" title="${dict.delete || 'Удалить'}">🗑️</button>
       `;
       document.getElementById('btn-my-home-route')?.addEventListener('click', (e) => {
         e.stopPropagation();
@@ -1266,8 +1315,8 @@ function renderAllSavedPlacesUI() {
         savePlacesToStorage();
       });
     } else {
-      myHomeSub.textContent = 'Не задан';
-      myHomeActions.innerHTML = `<button class="my-place-add-link" id="btn-my-home-add">Add</button>`;
+      myHomeSub.textContent = dict.notSet || 'Не задан';
+      myHomeActions.innerHTML = `<button class="my-place-add-link" id="btn-my-home-add">${dict.add || 'Add'}</button>`;
       document.getElementById('btn-my-home-add')?.addEventListener('click', (e) => {
         e.stopPropagation();
         openEditPlaceModal('home');
@@ -1281,9 +1330,9 @@ function renderAllSavedPlacesUI() {
     if (userSavedPlaces.work) {
       myWorkSub.textContent = userSavedPlaces.work.address;
       myWorkActions.innerHTML = `
-        <button class="my-place-action-btn route-btn" id="btn-my-work-route" title="Маршрут">🚗</button>
-        <button class="my-place-action-btn" id="btn-my-work-edit" title="Изменить">✏️</button>
-        <button class="my-place-action-btn delete-btn" id="btn-my-work-del" title="Удалить">🗑️</button>
+        <button class="my-place-action-btn route-btn" id="btn-my-work-route" title="${dict.btnRoute || 'Маршрут'}">🚗</button>
+        <button class="my-place-action-btn" id="btn-my-work-edit" title="${dict.edit || 'Изменить'}">✏️</button>
+        <button class="my-place-action-btn delete-btn" id="btn-my-work-del" title="${dict.delete || 'Удалить'}">🗑️</button>
       `;
       document.getElementById('btn-my-work-route')?.addEventListener('click', (e) => {
         e.stopPropagation();
@@ -1300,8 +1349,8 @@ function renderAllSavedPlacesUI() {
         savePlacesToStorage();
       });
     } else {
-      myWorkSub.textContent = 'Не задан';
-      myWorkActions.innerHTML = `<button class="my-place-add-link" id="btn-my-work-add">Add</button>`;
+      myWorkSub.textContent = dict.notSet || 'Не задан';
+      myWorkActions.innerHTML = `<button class="my-place-add-link" id="btn-my-work-add">${dict.add || 'Add'}</button>`;
       document.getElementById('btn-my-work-add')?.addEventListener('click', (e) => {
         e.stopPropagation();
         openEditPlaceModal('work');
@@ -1311,7 +1360,7 @@ function renderAllSavedPlacesUI() {
 
   const myFavSub = document.getElementById('my-places-fav-subtitle');
   if (myFavSub) {
-    myFavSub.textContent = `${favCount} places`;
+    myFavSub.textContent = `${favCount} ${dict.placesCount || 'мест'}`;
   }
 
   // 3. Render Favorites Subview List
@@ -1326,13 +1375,15 @@ function renderFavoritesList() {
   if (!container) return;
   container.innerHTML = '';
 
+  const lang = window.CURRENT_LANG || 'ru';
+  const dict = I18N[lang] || I18N.ru;
   const favs = userSavedPlaces.favorites || [];
   if (favs.length === 0) {
     container.innerHTML = `
       <div style="padding: 30px 16px; text-align: center; color: #94a3b8;">
         <div style="font-size: 36px; margin-bottom: 8px;">⭐</div>
-        <div style="font-size: 15px; font-weight: 700; color: #111827;">Нет избранных мест</div>
-        <div style="font-size: 13px; margin-top: 4px;">Нажмите кнопку выше или звездочку в поиске, чтобы добавить место</div>
+        <div style="font-size: 15px; font-weight: 700; color: #111827;">${dict.noFavoritesTitle || 'Нет избранных мест'}</div>
+        <div style="font-size: 13px; margin-top: 4px;">${dict.noFavoritesDesc || 'Нажмите кнопку выше или звездочку в поиске, чтобы добавить место'}</div>
       </div>
     `;
     return;
@@ -1345,7 +1396,7 @@ function renderFavoritesList() {
       ? mapEngine.calculateDistance(cur.lat, cur.lng, fav.lat, fav.lng)
       : null;
     const distStr = distMeters != null
-      ? (distMeters >= 1000 ? `${(distMeters / 1000).toFixed(1)} км` : `${Math.round(distMeters)} м`)
+      ? (mapEngine ? mapEngine.formatNavDistance(distMeters) : `${Math.round(distMeters)} м`)
       : '';
 
     const card = document.createElement('div');
@@ -1359,8 +1410,8 @@ function renderFavoritesList() {
         </div>
       </div>
       <div class="my-place-actions">
-        <button class="my-place-action-btn route-btn" title="Поехать">🚗</button>
-        <button class="my-place-action-btn delete-btn" title="Удалить">✕</button>
+        <button class="my-place-action-btn route-btn" title="${dict.btnRoute || 'Маршрут'}">🚗</button>
+        <button class="my-place-action-btn delete-btn" title="${dict.delete || 'Удалить'}">✕</button>
       </div>
     `;
 
@@ -1966,6 +2017,18 @@ function showRouteAlternativesDrawer(route) {
     }
   }
 
+  // Update card detail tags (Traffic lights & Alternative labels)
+  const dict = (typeof I18N !== 'undefined' && I18N[currentLang]) ? I18N[currentLang] : (I18N ? I18N.ru : {});
+  const card0Tag = document.querySelector('#route-card-0 .card-tag');
+  if (card0Tag) card0Tag.textContent = `8 ${dict.trafficLights || 'светофоров'}`;
+  const card1Tag = document.querySelector('#route-card-1 .card-tag');
+  if (card1Tag) card1Tag.textContent = `${dict.alternative || 'Альтернатива'} 1`;
+  const card2Tag = document.querySelector('#route-card-2 .card-tag');
+  if (card2Tag) card2Tag.textContent = `${dict.alternative || 'Альтернатива'} 2`;
+
+  const goTextEl = document.querySelector('#btn-start-route-nav .go-text');
+  if (goTextEl) goTextEl.textContent = dict.go || 'Поехали';
+
   // Populate Turn-by-Turn list matching IMG_3693
   const listEl = document.getElementById('turn-steps-list');
   listEl.innerHTML = '';
@@ -1976,9 +2039,9 @@ function showRouteAlternativesDrawer(route) {
   locItem.innerHTML = `
     <div class="turn-step-icon" style="color: #ef4444;">●</div>
     <div class="turn-step-info">
-      <div class="turn-step-street">${I18N[currentLang]?.myLocation || 'Мое местоположение'}</div>
+      <div class="turn-step-street">${dict.myLocation || 'Мое местоположение'}</div>
     </div>
-    <div class="turn-step-dist">0 м</div>
+    <div class="turn-step-dist">0 ${dict.m || 'м'}</div>
   `;
   listEl.appendChild(locItem);
 
@@ -1989,13 +2052,14 @@ function showRouteAlternativesDrawer(route) {
       else if (step.modifier && step.modifier.includes('right')) icon = '↱';
       else if (step.modifier && step.modifier.includes('uturn')) icon = '↺';
 
-      const distStr = step.distance >= 1000 ? `${(step.distance / 1000).toFixed(1)} км` : `${Math.round(step.distance)} м`;
+      const distStr = mapEngine ? mapEngine.formatNavDistance(step.distance) : `${Math.round(step.distance)} м`;
+      const localizedInstruction = mapEngine ? mapEngine.formatStepInstruction(step.modifier, step.name) : (step.instruction || step.name);
       const item = document.createElement('div');
       item.className = 'turn-step-item';
       item.innerHTML = `
         <div class="turn-step-icon">${icon}</div>
         <div class="turn-step-info">
-          <div class="turn-step-street">${step.instruction || step.name}</div>
+          <div class="turn-step-street">${localizedInstruction}</div>
         </div>
         <div class="turn-step-dist">${distStr}</div>
       `;
@@ -2470,6 +2534,8 @@ function renderChargingStationsList() {
   listEl.innerHTML = '';
 
   const cur = mapEngine ? mapEngine.currentPosition : { lat: 40.1872, lng: 44.5152 };
+  const lang = window.CURRENT_LANG || 'ru';
+  const dict = (typeof I18N !== 'undefined' && I18N[lang]) ? I18N[lang] : (I18N ? I18N.ru : {});
 
   // Calculate distances and sort
   const chargersWithDist = EV_CHARGERS.map(c => {
@@ -2480,9 +2546,9 @@ function renderChargingStationsList() {
   chargersWithDist.sort((a, b) => a.distMeters - b.distMeters);
 
   chargersWithDist.forEach(charger => {
-    const distStr = charger.distMeters >= 1000
-      ? `${(charger.distMeters / 1000).toFixed(1)} км`
-      : `${Math.round(charger.distMeters)} м`;
+    const distStr = mapEngine
+      ? mapEngine.formatNavDistance(charger.distMeters)
+      : (charger.distMeters >= 1000 ? `${(charger.distMeters / 1000).toFixed(1)} км` : `${Math.round(charger.distMeters)} м`);
 
     const card = document.createElement('div');
     card.className = 'ev-charger-card';
@@ -2496,7 +2562,7 @@ function renderChargingStationsList() {
         <span class="ev-stalls-free">● ${charger.stalls}</span>
         <div style="display: flex; align-items: center; gap: 8px;">
           <span style="font-weight: 600; color: #1e293b;">${distStr}</span>
-          <button class="btn-ev-route-go" type="button">Маршрут</button>
+          <button class="btn-ev-route-go" type="button">${dict.btnRoute || 'Маршрут'}</button>
         </div>
       </div>
     `;

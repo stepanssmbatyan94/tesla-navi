@@ -24,7 +24,7 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
   <!-- Tesla Cockpit CSS -->
-  <link rel="stylesheet" href="css/tesla-display.css?v=21">
+  <link rel="stylesheet" href="css/tesla-display.css?v=22">
 </head>
 <body>
 
@@ -34,7 +34,7 @@
   <!-- 1. Floating Left Action Toolbar (Clean 3-Button Dock + More Menu) -->
   <nav class="floating-toolbar" aria-label="Toolbar">
     <!-- 1. Search Button -->
-    <button id="btn-open-search" class="tool-btn" title="Поиск (Search)">
+    <button id="btn-open-search" class="tool-btn" data-i18n-title="search" title="Поиск (Search)">
       <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.5">
         <circle cx="11" cy="11" r="8"></circle>
         <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
@@ -49,14 +49,14 @@
     </button>
 
     <!-- 3. My Places / Bookmarks Button -->
-    <button id="btn-open-my-places" class="tool-btn" title="Мои места (Дом, Работа, Закладки)">
+    <button id="btn-open-my-places" class="tool-btn" data-i18n-title="myPlaces" title="Мои места (Дом, Работа, Закладки)">
       <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round">
         <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path>
       </svg>
     </button>
 
     <!-- 4. More Functions Menu Button ("•••") -->
-    <button id="btn-more-tools" class="tool-btn" title="Ещё функции (Зарядки, Погода, Телефон, Настройки)">
+    <button id="btn-more-tools" class="tool-btn" data-i18n-title="moreTools" title="Ещё функции (Зарядки, Погода, Телефон, Настройки)">
       <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor">
         <circle cx="12" cy="12" r="2"></circle>
         <circle cx="12" cy="5" r="2"></circle>
@@ -65,7 +65,7 @@
     </button>
 
     <!-- Attached Battery Pill (Anchored to centered dock) -->
-    <div id="dock-battery-badge" class="dock-battery-pill" title="Заряд батареи Tesla">
+    <div id="dock-battery-badge" class="dock-battery-pill" data-i18n-title="battery" title="Заряд батареи Tesla">
       <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="#16a34a" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
         <rect x="2" y="7" width="16" height="10" rx="2" ry="2"></rect>
         <line x1="20" y1="11" x2="20" y2="13"></line>
@@ -78,32 +78,32 @@
   <!-- More Tools Flyout Popover (Opens from the bottom "•••" button) -->
   <div id="more-tools-popover" class="more-tools-popover hidden">
     <div class="more-tools-popover-header">
-      <span>Функции</span>
+      <span data-i18n="tools">Функции</span>
       <button id="btn-close-more-tools" class="card-close-btn" style="width: 24px; height: 24px; font-size: 13px;">✕</button>
     </div>
     <div class="more-tools-grid">
       <!-- EV Chargers Button -->
-      <button id="btn-toggle-chargers" class="more-tool-card" title="Зарядки EV">
+      <button id="btn-toggle-chargers" class="more-tool-card" data-i18n-title="chargingStations" title="Зарядки EV">
         <div class="more-tool-icon">
           <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#0284c7" stroke-width="2.5">
             <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
           </svg>
         </div>
-        <span class="more-tool-label">Зарядки</span>
+        <span class="more-tool-label" data-i18n="charging">Зарядки</span>
       </button>
 
       <!-- Weather Button -->
-      <button id="btn-open-weather" class="more-tool-card" title="Погода в Ереване">
+      <button id="btn-open-weather" class="more-tool-card" data-i18n-title="weather" title="Погода в Ереване">
         <div class="more-tool-icon">
           <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#0ea5e9" stroke-width="2.5">
             <path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/>
           </svg>
         </div>
-        <span class="more-tool-label">Погода</span>
+        <span class="more-tool-label" data-i18n="weather">Погода</span>
       </button>
 
       <!-- Phone Pairing & Telemetry Button -->
-      <button id="btn-open-pairing" class="more-tool-card" title="Телефон / GPS">
+      <button id="btn-open-pairing" class="more-tool-card" data-i18n-title="phone" title="Телефон / GPS">
         <div class="more-tool-icon" style="position: relative;">
           <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#10b981" stroke-width="2.5">
             <rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect>
@@ -111,39 +111,39 @@
           </svg>
           <span id="tool-phone-dot" class="tool-badge-dot"></span>
         </div>
-        <span class="more-tool-label">Телефон</span>
+        <span class="more-tool-label" data-i18n="phone">Телефон</span>
       </button>
 
       <!-- Language Toggle Button: RU | HY | EN -->
-      <button id="btn-lang-toggle" class="more-tool-card" title="Сменить язык (RU / HY / EN)">
+      <button id="btn-lang-toggle" class="more-tool-card" data-i18n-title="lang" title="Сменить язык (RU / HY / EN)">
         <div class="more-tool-icon">
           <span id="lang-indicator" class="tool-lang-badge">RU</span>
         </div>
-        <span class="more-tool-label">Язык</span>
+        <span class="more-tool-label" data-i18n="lang">Язык</span>
       </button>
 
       <!-- Voice Toggle Button: Svetlana / Dmitry / Gor / Suzie -->
-      <button id="btn-voice-toggle" class="more-tool-card" title="Голос навигатора">
+      <button id="btn-voice-toggle" class="more-tool-card" data-i18n-title="voice" title="Голос навигатора">
         <div class="more-tool-icon">
           <span id="voice-indicator" class="tool-lang-badge" style="font-size: 16px;">👩</span>
         </div>
-        <span class="more-tool-label">Голос</span>
+        <span class="more-tool-label" data-i18n="voice">Голос</span>
       </button>
 
       <!-- Map Engine Toggle: MapLibre Vector vs Yandex Live Traffic (Яндекс) -->
-      <button id="btn-toggle-provider" class="more-tool-card" title="Переключить карту: MapLibre / Яндекс.Пробки">
+      <button id="btn-toggle-provider" class="more-tool-card" data-i18n-title="engine" title="Переключить карту: MapLibre / Яндекс.Пробки">
         <div class="more-tool-icon">
           <span id="provider-indicator" class="tool-lang-badge" style="font-size: 12px; font-weight: 800; color: #ef4444;">ЯН</span>
         </div>
-        <span class="more-tool-label">Движок</span>
+        <span class="more-tool-label" data-i18n="engine">Движок</span>
       </button>
 
       <!-- Theme Mode Card: Auto / Night / Day (MapsEV Style) -->
-      <button id="btn-menu-theme-toggle" class="more-tool-card" title="Режим темы: Авто / Ночь / День">
+      <button id="btn-menu-theme-toggle" class="more-tool-card" data-i18n-title="theme" title="Режим темы: Авто / Ночь / День">
         <div class="more-tool-icon">
           <span id="menu-theme-icon" style="font-size: 16px;">🌓</span>
         </div>
-        <span id="menu-theme-label" class="more-tool-label">Тема: Авто</span>
+        <span id="menu-theme-label" class="more-tool-label" data-i18n="themeAuto">Тема: Авто</span>
       </button>
     </div>
   </div>
@@ -156,10 +156,10 @@
           <circle cx="11" cy="11" r="8"></circle>
           <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
         </svg>
-        <input id="drawer-search-input" class="drawer-search-input" type="text" placeholder="Поиск мест и адресов..." autocomplete="off" />
-        <button id="btn-voice-search" class="card-close-btn" style="width: 30px; height: 30px; font-size: 14px;" title="Голосовой поиск">🎤</button>
+        <input id="drawer-search-input" class="drawer-search-input" type="text" data-i18n-placeholder="searchPlaceholder" placeholder="Поиск мест и адресов..." autocomplete="off" />
+        <button id="btn-voice-search" class="card-close-btn" style="width: 30px; height: 30px; font-size: 14px;" data-i18n-title="voiceSearch" title="Голосовой поиск">🎤</button>
       </div>
-      <button id="btn-close-search" class="drawer-close-btn" title="Закрыть">
+      <button id="btn-close-search" class="drawer-close-btn" data-i18n-title="dismiss" title="Закрыть">
         <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
       </button>
     </div>
@@ -171,7 +171,7 @@
           <div class="commute-top-row">
             <div class="commute-icon-title">
               <span>🏠</span>
-              <span id="home-title-text">Дом</span>
+              <span id="home-title-text" data-i18n="home">Дом</span>
             </div>
             <div class="commute-right-actions">
               <span id="home-eta-badge" class="commute-eta-badge">12 мин</span>
@@ -187,7 +187,7 @@
           <div class="commute-top-row">
             <div class="commute-icon-title">
               <span>💼</span>
-              <span id="work-title-text">Работа</span>
+              <span id="work-title-text" data-i18n="work">Работа</span>
             </div>
             <div class="commute-right-actions">
               <span id="work-eta-badge" class="commute-eta-badge">19 мин</span>
@@ -201,10 +201,10 @@
       </div>
 
       <!-- Quick Favorites Bar -->
-      <div id="commute-favorites-bar" class="commute-favorites-bar" title="Посмотреть избранные места">
+      <div id="commute-favorites-bar" class="commute-favorites-bar" data-i18n-title="favorites" title="Посмотреть избранные места">
         <div class="fav-bar-left">
           <span class="fav-star-icon">⭐</span>
-          <span class="fav-bar-title">Избранное</span>
+          <span class="fav-bar-title" data-i18n="favorites">Избранное</span>
           <span id="fav-count-badge" class="fav-count-pill">0</span>
         </div>
         <div class="fav-bar-right">
@@ -240,7 +240,7 @@
       <div>
         <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
           <div id="drawer-section-title" class="drawer-section-title" data-i18n="history">История</div>
-          <button id="btn-clear-search-history" class="btn-clear-history-link" title="Очистить историю поиска">Очистить</button>
+          <button id="btn-clear-search-history" class="btn-clear-history-link" data-i18n="clear" title="Очистить историю поиска">Очистить</button>
         </div>
         <div id="search-results-list" class="drawer-list">
           <!-- Dynamically populated from localStorage tesla_search_history -->
@@ -256,8 +256,8 @@
     <!-- Main View: Home, Work, Favorites entry -->
     <div id="my-places-main-view" class="my-places-view">
       <div class="my-places-header">
-        <div class="my-places-title" id="my-places-heading">My places</div>
-        <button id="btn-close-my-places" class="drawer-close-btn" title="Закрыть">
+        <div class="my-places-title" id="my-places-heading" data-i18n="myPlaces">Мои места</div>
+        <button id="btn-close-my-places" class="drawer-close-btn" data-i18n-title="dismiss" title="Закрыть">
           <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
         </button>
       </div>
@@ -272,7 +272,7 @@
               </svg>
             </div>
             <div class="my-place-info">
-              <div class="my-place-name">Home</div>
+              <div class="my-place-name" data-i18n="home">Дом</div>
               <div id="my-places-home-sub" class="my-place-sub">ул. Амиряна, 18</div>
             </div>
           </div>
@@ -290,7 +290,7 @@
               </svg>
             </div>
             <div class="my-place-info">
-              <div class="my-place-name">Work</div>
+              <div class="my-place-name" data-i18n="work">Работа</div>
               <div id="my-places-work-sub" class="my-place-sub">ул. Акоп Акопян, 3</div>
             </div>
           </div>
@@ -310,7 +310,7 @@
               </svg>
             </div>
             <div class="my-place-info">
-              <div class="my-place-name">Favorites</div>
+              <div class="my-place-name" data-i18n="favorites">Избранное</div>
               <div id="my-places-fav-subtitle" class="my-place-sub">0 places</div>
             </div>
           </div>
@@ -324,11 +324,11 @@
     <!-- Sub-View: Favorites Detailed List -->
     <div id="my-places-fav-view" class="my-places-view hidden">
       <div class="my-places-header">
-        <button id="btn-back-to-places" class="drawer-close-btn btn-back-places" title="Назад">
+        <button id="btn-back-to-places" class="drawer-close-btn btn-back-places" data-i18n-title="dismiss" title="Назад">
           <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="15 18 9 12 15 6"/></svg>
         </button>
-        <div class="my-places-title">Favorites</div>
-        <button id="btn-close-fav-view" class="drawer-close-btn" title="Закрыть">
+        <div class="my-places-title" data-i18n="favorites">Избранное</div>
+        <button id="btn-close-fav-view" class="drawer-close-btn" data-i18n-title="dismiss" title="Закрыть">
           <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
         </button>
       </div>
@@ -336,7 +336,7 @@
       <div style="padding: 12px 14px 4px 14px;">
         <button id="btn-add-new-favorite" class="btn-add-favorite-bar">
           <span style="font-size: 18px; line-height: 1;">+</span>
-          <span>Добавить место в избранное</span>
+          <span data-i18n="addFavorite">Добавить место в избранное</span>
         </button>
       </div>
 
@@ -353,9 +353,9 @@
       <div class="my-places-header">
         <div style="display: flex; align-items: center; gap: 8px;">
           <span style="font-size: 20px;">⚡</span>
-          <div class="my-places-title">Зарядные станции</div>
+          <div class="my-places-title" data-i18n="chargingStations">Зарядные станции</div>
         </div>
-        <button id="btn-close-chargers" class="drawer-close-btn" title="Закрыть">
+        <button id="btn-close-chargers" class="drawer-close-btn" data-i18n-title="dismiss" title="Закрыть">
           <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
         </button>
       </div>
@@ -470,16 +470,16 @@
   </div>
 
   <!-- GPS Status Banner (Visible when GPS signal or Phone is waiting/connecting) -->
-  <div id="gps-status-banner" class="gps-status-banner" title="Нажмите для подключения телефона">
+  <div id="gps-status-banner" class="gps-status-banner" data-i18n-title="phone" title="Нажмите для подключения телефона">
     <div class="gps-pulse-dot"></div>
-    <span class="gps-status-text">Ожидание GPS со смартфона • Нажмите для сопряжения</span>
+    <span class="gps-status-text" data-i18n="gpsWaiting">Ожидание GPS со смартфона • Нажмите для сопряжения</span>
   </div>
 
   <!-- 4. Speedometer & Speed Limit HUD + Auxiliary Controls (Mapsev Architecture) -->
   <div class="speed-limit-hud">
     <!-- Auxiliary Control Column: Fixed at right edge (Charger, Lane/Traffic, Sound Toggle) -->
     <div class="top-aux-row">
-      <button id="btn-quick-chargers" class="aux-btn aux-dark-btn" title="Зарядки EV">
+      <button id="btn-quick-chargers" class="aux-btn aux-dark-btn" data-i18n-title="chargingStations" title="Зарядки EV">
         <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
           <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
         </svg>
@@ -489,7 +489,7 @@
         <span class="traffic-divider"></span>
         <span id="traffic-score-val" class="traffic-num">2</span>
       </div>
-      <button id="btn-sound-toggle" class="sound-toggle-btn" title="Звук навигатора">
+      <button id="btn-sound-toggle" class="sound-toggle-btn" data-i18n-title="sound" title="Звук навигатора">
         <!-- Default Sound ON SVG: clean black speaker icon -->
         <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="#1e293b" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
           <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" fill="#1e293b"></polygon>
@@ -518,7 +518,7 @@
   <div id="bottom-nav-bar" class="bottom-nav-bar hidden">
     <div class="bottom-nav-handle"></div>
     <div class="bottom-nav-content">
-      <button id="btn-cancel-nav" class="nav-cancel-btn" title="Отменить маршрут">
+      <button id="btn-cancel-nav" class="nav-cancel-btn" data-i18n-title="cancelRoute" title="Отменить маршрут">
         <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#ff3b30" stroke-width="2.6" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
       </button>
 
@@ -527,7 +527,7 @@
           <span id="nav-duration" class="nav-metric-duration">0 мин</span>
           <span id="nav-distance" class="nav-metric-dist">0 км</span>
           <span id="nav-eta" class="nav-metric-eta">--:--</span>
-          <span class="nav-battery-pill" title="Запас батареи по прибытию">
+          <span class="nav-battery-pill" data-i18n-title="batteryAtArrival" title="Запас батареи по прибытию">
             <span class="nav-battery-outline"><span id="nav-battery-level-bar" class="nav-battery-level" style="width: 78%;"></span></span>
             <span id="nav-battery-val">78%</span>
           </span>
@@ -542,7 +542,7 @@
         </div>
       </div>
 
-      <button id="btn-nav-options" class="nav-options-btn" title="Маршрут">
+      <button id="btn-nav-options" class="nav-options-btn" data-i18n-title="btnRoute" title="Маршрут">
         <svg viewBox="0 0 24 24" width="20" height="20" fill="none">
           <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z" fill="#2563eb"/>
           <circle cx="17" cy="7" r="4.5" fill="#2563eb"/>
@@ -563,9 +563,9 @@
   <div class="right-map-controls">
     <!-- Zoom Controls Pill (+ / -) -->
     <div class="map-zoom-pill">
-      <button id="btn-zoom-in" class="zoom-btn" title="Приблизить">+</button>
+      <button id="btn-zoom-in" class="zoom-btn" data-i18n-title="zoomIn" title="Приблизить">+</button>
       <div class="zoom-divider"></div>
-      <button id="btn-zoom-out" class="zoom-btn" title="Отдалить">−</button>
+      <button id="btn-zoom-out" class="zoom-btn" data-i18n-title="zoomOut" title="Отдалить">−</button>
     </div>
 
     <!-- 2D / 3D Mode Toggle Button (MapsEV Style Isometric Cube) -->
@@ -579,13 +579,13 @@
     </button>
 
     <!-- Day / Night / Auto Theme Toggle Button (MapsEV Style Sun/Moon/Auto) -->
-    <button id="btn-toggle-theme" class="map-3d-toggle-btn" title="Тема: Авто (День / Ночь)">
+    <button id="btn-toggle-theme" class="map-3d-toggle-btn" data-i18n-title="theme" title="Тема: Авто (День / Ночь)">
       <span id="theme-icon-symbol" style="font-size: 17px; line-height: 1;">🌓</span>
       <span id="btn-theme-mode-label" class="mode-3d-text">АВТО</span>
     </button>
 
     <!-- Floating Recenter Navigation Arrow Button (Yandex Navigator Style) -->
-    <button id="floating-recenter-btn" class="floating-recenter-btn hidden" title="Вернуться к машине и сбросить zoom">
+    <button id="floating-recenter-btn" class="floating-recenter-btn hidden" data-i18n-title="recenterNav" title="Вернуться к машине и сбросить zoom">
       <svg class="recenter-nav-arrow" viewBox="0 0 24 24" width="24" height="24" fill="none">
         <path d="M4 12L20 4L12 20L10.5 13.5L4 12Z" fill="#1e293b" stroke="#1e293b" stroke-width="2" stroke-linejoin="round"/>
       </svg>
@@ -593,7 +593,7 @@
   </div>
 
   <!-- Compass / Heading-Up Toggle Button (Anchored to Very Bottom Right Corner) -->
-  <button id="btn-compass" class="map-compass-btn active" title="Компас (Поворот карты по ходу движения)">
+  <button id="btn-compass" class="map-compass-btn active" data-i18n-title="compass" title="Компас (Поворот карты по ходу движения)">
     <div id="compass-needle" class="compass-arrow-wrap">
       <svg viewBox="0 0 24 24" width="24" height="24" fill="none">
         <polygon points="12,2 17,12 12,9" fill="#ef4444"/>
@@ -610,8 +610,8 @@
   <div id="edit-place-modal" class="modal-overlay hidden">
     <div class="compact-card" style="width: 440px;">
       <div class="card-top-row">
-        <div id="edit-place-modal-title" class="card-title">Настройка места</div>
-        <button id="btn-close-edit-place-x" class="card-close-btn" title="Закрыть">
+        <div id="edit-place-modal-title" class="card-title" data-i18n="placeConfig">Настройка места</div>
+        <button id="btn-close-edit-place-x" class="card-close-btn" data-i18n-title="dismiss" title="Закрыть">
           <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
         </button>
       </div>
@@ -620,20 +620,20 @@
         <!-- Custom name for favorites (hidden when editing Home or Work) -->
         <div id="edit-place-name-wrap" class="drawer-search-wrap hidden">
           <span style="font-size: 16px;">🏷️</span>
-          <input id="edit-place-name-input" class="drawer-search-input" type="text" placeholder="Название (например: Спортзал, Дача, Мама...)" autocomplete="off" />
+          <input id="edit-place-name-input" class="drawer-search-input" type="text" data-i18n-placeholder="placeNamePlaceholder" placeholder="Название (например: Спортзал, Дача, Мама...)" autocomplete="off" />
         </div>
 
         <!-- Address Search input with live geocoder -->
         <div class="drawer-search-wrap">
           <span style="font-size: 16px;">📍</span>
-          <input id="edit-place-address-input" class="drawer-search-input" type="text" placeholder="Введите адрес или место в Ереване..." autocomplete="off" />
+          <input id="edit-place-address-input" class="drawer-search-input" type="text" data-i18n-placeholder="placeAddressPlaceholder" placeholder="Введите адрес или место в Ереване..." autocomplete="off" />
           <button id="btn-clear-place-input" class="card-close-btn hidden" style="width: 24px; height: 24px; font-size: 11px;">✕</button>
         </div>
 
         <!-- Quick Current Location button -->
         <button id="btn-use-current-gps-location" class="btn-quick-gps-pill" type="button">
           <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#2563eb" stroke-width="2.5" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><circle cx="12" cy="12" r="9"/></svg>
-          <span>Использовать текущее местоположение машины</span>
+          <span data-i18n="useCarLocation">Использовать текущее местоположение машины</span>
         </button>
 
         <!-- Address Suggestions List -->
@@ -641,16 +641,16 @@
       </div>
 
       <div class="modal-btn-row">
-        <button id="btn-delete-place" class="btn-delete-place-action hidden" type="button" title="Удалить это место">
+        <button id="btn-delete-place" class="btn-delete-place-action hidden" type="button" data-i18n-title="delete" title="Удалить это место">
           <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
             <polyline points="3 6 5 6 21 6"></polyline>
             <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
             <line x1="10" y1="11" x2="10" y2="17"></line>
             <line x1="14" y1="11" x2="14" y2="17"></line>
           </svg>
-          <span>Удалить</span>
+          <span data-i18n="delete">Удалить</span>
         </button>
-        <button id="btn-save-place" class="btn-primary-action" type="button">Сохранить</button>
+        <button id="btn-save-place" class="btn-primary-action" type="button" data-i18n="save">Сохранить</button>
       </div>
     </div>
   </div>
@@ -964,9 +964,9 @@
   </div>
 
   <!-- Scripts -->
-  <script src="js/config.js?v=21"></script>
-  <script src="js/realtime.js?v=21"></script>
-  <script src="js/maps/map-engine.js?v=21"></script>
-  <script src="js/tesla-cockpit.js?v=21"></script>
+  <script src="js/config.js?v=22"></script>
+  <script src="js/realtime.js?v=22"></script>
+  <script src="js/maps/map-engine.js?v=22"></script>
+  <script src="js/tesla-cockpit.js?v=22"></script>
 </body>
 </html>

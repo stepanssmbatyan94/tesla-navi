@@ -822,33 +822,69 @@ class TeslaMapEngine {
     }
   }
 
-  // Smart Maneuver & Route Distance Quantization
+  // Localized Step Maneuver Instruction Generator
+  formatStepInstruction(modifier, streetName) {
+    const lang = (typeof window !== 'undefined' && window.CURRENT_LANG) || 'ru';
+    const dict = (typeof I18N !== 'undefined' && I18N[lang]) ? I18N[lang] : (typeof I18N !== 'undefined' ? I18N.ru : {});
+    const mod = (modifier || '').toLowerCase();
+    const cleanName = (streetName || '').trim();
+
+    let base = dict.continueStraight || 'Двигайтесь прямо';
+    if (mod.includes('slight left') || mod.includes('keep left') || mod.includes('fork left') || mod.includes('bear left') || mod.includes('левее')) {
+      base = dict.keepLeft || 'Держитесь левее';
+    } else if (mod.includes('slight right') || mod.includes('keep right') || mod.includes('fork right') || mod.includes('bear right') || mod.includes('правее')) {
+      base = dict.keepRight || 'Держитесь правее';
+    } else if (mod.includes('uturn') || mod.includes('u-turn') || mod.includes('разворот')) {
+      return dict.makeUTurn || 'Развернитесь';
+    } else if (mod.includes('left') || mod.includes('налево')) {
+      base = dict.turnLeft || 'Поверните налево';
+    } else if (mod.includes('right') || mod.includes('направо')) {
+      base = dict.turnRight || 'Поверните направо';
+    } else if (cleanName) {
+      if (lang === 'hy') return `${dict.continueOn || 'Շարունակեք'} ${cleanName}`;
+      if (lang === 'en') return `${dict.continueOn || 'Continue on'} ${cleanName}`;
+      return `${dict.continueOn || 'Двигайтесь по'} ${cleanName}`;
+    }
+
+    if (cleanName) {
+      const ontoWord = dict.onto || (lang === 'hy' ? 'դեպի' : (lang === 'en' ? 'onto' : 'на'));
+      return `${base} ${ontoWord} ${cleanName}`;
+    }
+    return base;
+  }
+
+  // Smart Maneuver & Route Distance Quantization (Localized: м / մ / m, км / կմ / km)
   formatNavDistance(meters) {
     if (meters == null || isNaN(meters)) return '0 м';
+    const lang = (typeof window !== 'undefined' && window.CURRENT_LANG) || 'ru';
+    const dict = (typeof I18N !== 'undefined' && I18N[lang]) ? I18N[lang] : {};
+    const mUnit = dict.m || (lang === 'hy' ? 'մ' : (lang === 'en' ? 'm' : 'м'));
+    const kmUnit = dict.km || (lang === 'hy' ? 'կմ' : (lang === 'en' ? 'km' : 'км'));
+
     const m = Math.max(0, meters);
     if (m < 20) {
-      return `${Math.round(m)} м`;
+      return `${Math.round(m)} ${mUnit}`;
     }
     if (m < 100) {
-      return `${Math.round(m / 5) * 5} м`;
+      return `${Math.round(m / 5) * 5} ${mUnit}`;
     }
     if (m < 300) {
-      return `${Math.round(m / 10) * 10} м`;
+      return `${Math.round(m / 10) * 10} ${mUnit}`;
     }
     if (m < 800) {
-      return `${Math.round(m / 50) * 50} м`;
+      return `${Math.round(m / 50) * 50} ${mUnit}`;
     }
     if (m < 1500) {
       if (m < 1000) {
-        return `${Math.round(m / 100) * 100} м`;
+        return `${Math.round(m / 100) * 100} ${mUnit}`;
       } else {
-        return `${(Math.round(m / 100) / 10).toFixed(1)} км`;
+        return `${(Math.round(m / 100) / 10).toFixed(1)} ${kmUnit}`;
       }
     }
     if (m < 10000) {
-      return `${(Math.round(m / 100) / 10).toFixed(1)} км`;
+      return `${(Math.round(m / 100) / 10).toFixed(1)} ${kmUnit}`;
     }
-    return `${Math.round(m / 1000)} км`;
+    return `${Math.round(m / 1000)} ${kmUnit}`;
   }
 
   // Smart Navigation Duration Formatting (e.g. 171 min -> "2 ч 51 мин" / "2 ժ 51 ր" / "2 h 51 min")
@@ -1053,6 +1089,12 @@ class TeslaMapEngine {
   updateThemeUI() {
     const mode = this.getThemeMode();
     const isNight = this.isNightActive();
+    const lang = (typeof window !== 'undefined' && window.CURRENT_LANG) || 'ru';
+    const dict = (typeof I18N !== 'undefined' && I18N[lang]) ? I18N[lang] : (typeof I18N !== 'undefined' ? I18N.ru : {});
+
+    const autoText = dict.auto || 'АВТО';
+    const nightText = dict.night || 'НОЧЬ';
+    const dayText = dict.day || 'ДЕНЬ';
 
     // 1. Right floating button
     const btnLabel = document.getElementById('btn-theme-mode-label');
@@ -1061,17 +1103,17 @@ class TeslaMapEngine {
 
     if (btnLabel && iconSymbol && btn) {
       if (mode === 'auto') {
-        btnLabel.textContent = 'АВТО';
+        btnLabel.textContent = autoText;
         iconSymbol.textContent = isNight ? '🌓' : '⛅';
-        btn.title = `Тема: Авто (сейчас ${isNight ? 'Ночь' : 'День'}). Нажмите для переключения`;
+        btn.title = `${dict.themeAuto || 'Тема: Авто'} (${isNight ? nightText : dayText})`;
       } else if (mode === 'night') {
-        btnLabel.textContent = 'НОЧЬ';
+        btnLabel.textContent = nightText;
         iconSymbol.textContent = '🌙';
-        btn.title = 'Тема: Ночь (Всегда темная). Нажмите для переключения';
+        btn.title = dict.themeNight || 'Тема: Ночь';
       } else {
-        btnLabel.textContent = 'ДЕНЬ';
+        btnLabel.textContent = dayText;
         iconSymbol.textContent = '☀️';
-        btn.title = 'Тема: День (Всегда светлая). Нажмите для переключения';
+        btn.title = dict.themeDay || 'Тема: День';
       }
     }
 
@@ -1081,13 +1123,13 @@ class TeslaMapEngine {
     if (menuLabel && menuIcon) {
       if (mode === 'auto') {
         menuIcon.textContent = isNight ? '🌓' : '⛅';
-        menuLabel.textContent = `Тема: Авто (${isNight ? 'Ночь' : 'День'})`;
+        menuLabel.textContent = `${dict.theme || 'Тема'}: ${autoText}`;
       } else if (mode === 'night') {
         menuIcon.textContent = '🌙';
-        menuLabel.textContent = 'Тема: Ночь (Вкл)';
+        menuLabel.textContent = `${dict.theme || 'Тема'}: ${nightText}`;
       } else {
         menuIcon.textContent = '☀️';
-        menuLabel.textContent = 'Тема: День (Выкл)';
+        menuLabel.textContent = `${dict.theme || 'Тема'}: ${dayText}`;
       }
     }
   }
@@ -1626,11 +1668,16 @@ class TeslaMapEngine {
         ? upcomingLaneDist
         : activeDist;
 
+      const stepInstruction = this.formatStepInstruction(
+        (upcomingLaneInter && upcomingLaneDist <= 220 && upcomingLaneInter.modifier) ? upcomingLaneInter.modifier : (activeStep.modifier || 'straight'),
+        activeStep.name || dest.name
+      );
+
       this.onManeuverUpdate({
         distance: this.formatNavDistance(activeDist),
         distanceMeters: activeDist,
-        instruction: activeStep.instruction || activeStep.name || 'Двигайтесь прямо',
-        street: activeStep.name || activeStep.instruction || dest.name,
+        instruction: stepInstruction,
+        street: activeStep.name || dest.name,
         modifier: (upcomingLaneInter && upcomingLaneDist <= 220 && upcomingLaneInter.modifier)
           ? upcomingLaneInter.modifier
           : (activeStep.modifier || 'straight'),
@@ -2082,7 +2129,7 @@ class TeslaMapEngine {
     if (primaryRoute.steps && primaryRoute.steps.length > 0) {
       this.routeSteps = primaryRoute.steps.map(s => ({
         name: s.name || destination.name,
-        instruction: s.instruction || 'Двигайтесь прямо',
+        instruction: s.instruction || this.formatStepInstruction(s.modifier, s.name),
         action: s.action || '',
         modifier: s.modifier || 'straight',
         type: s.type || 'turn',
@@ -2096,13 +2143,7 @@ class TeslaMapEngine {
       primaryRoute.legs[0].steps.forEach(step => {
         const maneuver = step.maneuver || {};
         const mod = (maneuver.modifier || '').toLowerCase();
-        let instruction = 'Двигайтесь прямо';
-        if (mod.includes('slight left') || mod.includes('keep left') || mod.includes('fork left')) instruction = `Держитесь левее${step.name ? ` на ${step.name}` : ''}`;
-        else if (mod.includes('slight right') || mod.includes('keep right') || mod.includes('fork right')) instruction = `Держитесь правее${step.name ? ` на ${step.name}` : ''}`;
-        else if (mod.includes('left')) instruction = `Поверните налево${step.name ? ` на ${step.name}` : ''}`;
-        else if (mod.includes('right')) instruction = `Поверните направо${step.name ? ` на ${step.name}` : ''}`;
-        else if (mod.includes('uturn')) instruction = 'Развернитесь';
-        else if (step.name) instruction = `Двигайтесь по ${step.name}`;
+        const instruction = this.formatStepInstruction(mod, step.name);
 
         this.routeSteps.push({
           name: step.name || destination.name,
@@ -2116,9 +2157,11 @@ class TeslaMapEngine {
         });
       });
     } else {
+      const lang = (typeof window !== 'undefined' && window.CURRENT_LANG) || 'ru';
+      const dict = (typeof I18N !== 'undefined' && I18N[lang]) ? I18N[lang] : (typeof I18N !== 'undefined' ? I18N.ru : {});
       this.routeSteps.push({
-        name: destination.name || 'Пункт назначения',
-        instruction: 'Двигайтесь по маршруту',
+        name: destination.name || dict.destination || 'Пункт назначения',
+        instruction: dict.continueOnRoute || 'Двигайтесь по маршруту',
         type: 'straight',
         modifier: '',
         distance: distanceMeters,
@@ -2128,14 +2171,16 @@ class TeslaMapEngine {
 
     // Prepare list of all routes for cards (up to 3 routes)
     const fastestDurationSec = data.routes[0]?.duration || durationSec;
+    const lang = (typeof window !== 'undefined' && window.CURRENT_LANG) || 'ru';
+    const dict = (typeof I18N !== 'undefined' && I18N[lang]) ? I18N[lang] : (typeof I18N !== 'undefined' ? I18N.ru : {});
     const allRoutes = (data.routes || []).slice(0, 3).map((r, i) => {
       const diffMins = Math.round((r.duration - fastestDurationSec) / 60);
       return {
         index: i,
-        summary: r.summary || (i === 0 ? 'Самый быстрый' : `Вариант ${i + 1}`),
+        summary: r.summary || (i === 0 ? (dict.fastest || 'Самый быстрый') : `${dict.alternative || 'Вариант'} ${i + 1}`),
         duration: this.formatNavDuration(r.duration),
-        distance: r.distance >= 1000 ? `${(r.distance / 1000).toFixed(1)} км` : `${Math.round(r.distance)} м`,
-        diffMins: diffMins > 0 ? `+${this.formatNavDuration(diffMins, true)}` : '0 мин'
+        distance: this.formatNavDistance(r.distance),
+        diffMins: diffMins > 0 ? `+${this.formatNavDuration(diffMins, true)}` : `0 ${dict.min || 'мин'}`
       };
     });
 
