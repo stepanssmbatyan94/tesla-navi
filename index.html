@@ -24,7 +24,7 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
   <!-- Tesla Cockpit CSS -->
-  <link rel="stylesheet" href="css/tesla-display.css?v=16">
+  <link rel="stylesheet" href="css/tesla-display.css?v=17">
 </head>
 <body>
 
@@ -536,6 +536,7 @@
         <div class="nav-route-progress-wrap">
           <div id="nav-progress-track" class="nav-progress-track">
             <div id="nav-traffic-segments-bar" class="nav-traffic-segments-bar"></div>
+            <div id="prog-traveled-fill" class="nav-progress-traveled-fill" style="width: 0%;"></div>
             <div id="nav-progress-car-knob" class="nav-progress-car-knob" style="left: 0%;"></div>
           </div>
         </div>
@@ -820,32 +821,30 @@
     </div>
   </div>
 
-  <!-- Floating Mini Music Player (Tesla OS / CarPlay Style - Draggable & Expandable) -->
+  <!-- Floating Mini Music Player (Tesla Automotive Capsule - Draggable & Expandable) -->
   <div id="music-mini-player" class="music-mini-player hidden" title="Зажмите и перетащите в любое место экрана">
-    <div class="mini-player-drag-handle" id="btn-mini-info-expand" title="Нажмите, чтобы развернуть плеер">
+    <div class="mini-player-drag-handle" id="btn-mini-info-expand" title="Нажмите, чтобы развернуть YouTube плеер">
       <div class="mini-eq-bars" id="mini-eq-bars">
         <span></span><span></span><span></span>
       </div>
       <div class="mini-player-info">
         <span id="mini-player-title" class="mini-player-title">YouTube Music</span>
-        <span id="mini-player-sub" class="mini-player-sub">Нажмите для разворота</span>
+        <span id="mini-player-sub" class="mini-player-sub" style="display:none;"></span>
       </div>
     </div>
     <div class="mini-player-controls">
       <button id="btn-mini-prev" class="mini-ctrl-btn" title="Предыдущий трек">
-        <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><polygon points="11 19 2 12 11 5 11 19"/><polygon points="22 19 13 12 22 5 22 19"/></svg>
+        <svg viewBox="0 0 24 24" width="12" height="12" fill="currentColor"><polygon points="11 19 2 12 11 5 11 19"/><polygon points="22 19 13 12 22 5 22 19"/></svg>
       </button>
       <button id="btn-mini-play" class="mini-ctrl-btn mini-play-circle" title="Воспроизведение / Пауза">
-        <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><polygon points="6 4 20 12 6 20 6 4"/></svg>
+        <svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor"><polygon points="6 4 20 12 6 20 6 4"/></svg>
       </button>
       <button id="btn-mini-next" class="mini-ctrl-btn" title="Следующий трек">
-        <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><polygon points="5 5 14 12 5 19 5 5"/><polygon points="13 5 22 12 13 19 13 5"/></svg>
+        <svg viewBox="0 0 24 24" width="12" height="12" fill="currentColor"><polygon points="5 5 14 12 5 19 5 5"/><polygon points="13 5 22 12 13 19 13 5"/></svg>
       </button>
-      <button id="btn-mini-expand" class="mini-ctrl-btn mini-expand-btn" title="Развернуть окно видео">
-        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>
-      </button>
+      <button id="btn-mini-expand" class="mini-ctrl-btn mini-expand-btn" style="display:none;" title="Развернуть"></button>
       <button id="btn-mini-close" class="mini-ctrl-btn mini-close-btn" title="Остановить и закрыть">
-        <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
       </button>
     </div>
   </div>
@@ -969,9 +968,9 @@
   </div>
 
   <!-- Scripts -->
-  <script src="js/config.js?v=16"></script>
-  <script src="js/realtime.js?v=16"></script>
-  <script src="js/maps/map-engine.js?v=16"></script>
-  <script src="js/tesla-cockpit.js?v=16"></script>
+  <script src="js/config.js?v=17"></script>
+  <script src="js/realtime.js?v=17"></script>
+  <script src="js/maps/map-engine.js?v=17"></script>
+  <script src="js/tesla-cockpit.js?v=17"></script>
 </body>
 </html>

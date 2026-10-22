@@ -2169,7 +2169,8 @@ class TeslaMapEngine {
       });
     });
 
-    // 3.5. Traveled Route Line (Dimmed slate gray, rendered on top of traffic segments)
+    // 3.5. Traveled Route Line (Muted slate gray casing + solid gray line, covering driven road completely)
+    if (this.map.getLayer('route-traveled-casing')) this.map.removeLayer('route-traveled-casing');
     if (this.map.getLayer('route-traveled-line')) this.map.removeLayer('route-traveled-line');
     if (this.map.getSource('route-traveled')) this.map.removeSource('route-traveled');
 
@@ -2181,6 +2182,20 @@ class TeslaMapEngine {
       }
     });
 
+    // Traveled Casing: neutral slate casing covering green #223a18 route casing
+    this.map.addLayer({
+      id: 'route-traveled-casing',
+      type: 'line',
+      source: 'route-traveled',
+      layout: { 'line-join': 'round', 'line-cap': 'round' },
+      paint: {
+        'line-color': '#475569',
+        'line-width': 9.5,
+        'line-opacity': 0.8
+      }
+    });
+
+    // Traveled Core Line: solid distinct slate gray, 100% opaque (completely covering any green/red traffic colors underneath)
     this.map.addLayer({
       id: 'route-traveled-line',
       type: 'line',
@@ -2188,8 +2203,8 @@ class TeslaMapEngine {
       layout: { 'line-join': 'round', 'line-cap': 'round' },
       paint: {
         'line-color': '#94a3b8',
-        'line-width': 8.5,
-        'line-opacity': 0.85
+        'line-width': 7.5,
+        'line-opacity': 1.0
       }
     });
 
@@ -2250,8 +2265,8 @@ class TeslaMapEngine {
     // Traveled route polyline: rendered on top, starts empty, dims driven road with #94a3b8
     this.yandexTraveledPolyline = new window.ymaps.Polyline([], {}, {
       strokeColor: '#94a3b8',
-      strokeWidth: 8.5,
-      strokeOpacity: 0.85
+      strokeWidth: 7.5,
+      strokeOpacity: 1.0
     });
     this.map.geoObjects.add(this.yandexTraveledPolyline);
 
@@ -2367,6 +2382,7 @@ class TeslaMapEngine {
     this.specialRoadPoints = [];
 
     if (this.provider === 'maplibre' && this.map) {
+      if (this.map.getLayer('route-traveled-casing')) this.map.removeLayer('route-traveled-casing');
       if (this.map.getLayer('route-traveled-line')) this.map.removeLayer('route-traveled-line');
       if (this.map.getSource('route-traveled')) this.map.removeSource('route-traveled');
 

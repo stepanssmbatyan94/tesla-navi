@@ -2459,6 +2459,14 @@ function initWeatherAndMusic() {
         handle.releasePointerCapture(e.pointerId);
       } catch (err) {}
       element.style.transition = '';
+      if (element.id === 'music-mini-player') {
+        try {
+          localStorage.setItem('tesla_mini_player_pos', JSON.stringify({
+            left: element.style.left,
+            top: element.style.top
+          }));
+        } catch (err) {}
+      }
     };
 
     handle.addEventListener('pointerup', stopDrag);
@@ -2479,6 +2487,20 @@ function initWeatherAndMusic() {
   const btnMiniPlay = document.getElementById('btn-mini-play');
   const btnMiniPrev = document.getElementById('btn-mini-prev');
   const btnMiniNext = document.getElementById('btn-mini-next');
+
+  // Restore saved mini-player position if user dragged it before
+  try {
+    const savedMiniPos = localStorage.getItem('tesla_mini_player_pos');
+    if (savedMiniPos && miniPlayer) {
+      const parsedPos = JSON.parse(savedMiniPos);
+      if (parsedPos.left && parsedPos.top) {
+        miniPlayer.style.left = parsedPos.left;
+        miniPlayer.style.top = parsedPos.top;
+        miniPlayer.style.bottom = 'auto';
+        miniPlayer.style.right = 'auto';
+      }
+    }
+  } catch (err) {}
 
   const ytIdleScreen = document.getElementById('yt-idle-screen');
   const ytNowTitle = document.getElementById('yt-now-title');
@@ -2589,8 +2611,8 @@ function initWeatherAndMusic() {
     isMusicPlaying = playing;
     const playSvg = `<svg viewBox="0 0 24 24" width="24" height="24" fill="#ffffff"><polygon points="6 4 20 12 6 20 6 4"/></svg>`;
     const pauseSvg = `<svg viewBox="0 0 24 24" width="24" height="24" fill="#ffffff"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>`;
-    const miniPlaySvg = `<svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><polygon points="6 4 20 12 6 20 6 4"/></svg>`;
-    const miniPauseSvg = `<svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>`;
+    const miniPlaySvg = `<svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor"><polygon points="6 4 20 12 6 20 6 4"/></svg>`;
+    const miniPauseSvg = `<svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>`;
 
     if (btnMusicPlay) btnMusicPlay.innerHTML = playing ? pauseSvg : playSvg;
     if (btnMiniPlay) btnMiniPlay.innerHTML = playing ? miniPauseSvg : miniPlaySvg;
