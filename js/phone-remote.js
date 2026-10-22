@@ -13,6 +13,21 @@ document.addEventListener('DOMContentLoaded', () => {
   initGpsToggle();
   initDestinationHandlers();
   initVoiceSearch();
+
+  // Auto-start GPS sharing immediately when phone remote loads
+  startGpsSharing().catch(err => {
+    console.log('[Phone Remote] Auto GPS start deferred for user gesture:', err);
+  });
+
+  // Re-acquire GPS & send ping when phone tab becomes visible again
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') {
+      if (realtimeClient) realtimeClient.sendPing();
+      if (!isSharingGps) {
+        startGpsSharing();
+      }
+    }
+  });
 });
 
 function initParams() {

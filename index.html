@@ -469,6 +469,12 @@
     <div id="lane-guidance-pill" class="lane-guidance-pill hidden"></div>
   </div>
 
+  <!-- GPS Status Banner (Visible when GPS signal or Phone is waiting/connecting) -->
+  <div id="gps-status-banner" class="gps-status-banner" title="Нажмите для подключения телефона">
+    <div class="gps-pulse-dot"></div>
+    <span class="gps-status-text">Ожидание GPS со смартфона • Нажмите для сопряжения</span>
+  </div>
+
   <!-- 4. Speedometer & Speed Limit HUD + Auxiliary Controls (Mapsev Architecture) -->
   <div class="speed-limit-hud">
     <!-- Auxiliary Control Column: Fixed at right edge (Charger, Lane/Traffic, Sound Toggle) -->
@@ -872,19 +878,19 @@
       <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; background: rgba(0,0,0,0.25); border-radius: 14px; padding: 10px; text-align: center; font-family: var(--font-mono);">
         <div>
           <div style="font-size: 10px; color: var(--text-muted);" data-i18n="latitude">ШИРОТА</div>
-          <div id="tel-lat" style="font-size: 11px; font-weight: 700;">40.1895</div>
+          <div id="tel-lat" style="font-size: 11px; font-weight: 700;">--</div>
         </div>
         <div>
           <div style="font-size: 10px; color: var(--text-muted);" data-i18n="longitude">ДОЛГОТА</div>
-          <div id="tel-lng" style="font-size: 11px; font-weight: 700;">44.4686</div>
+          <div id="tel-lng" style="font-size: 11px; font-weight: 700;">--</div>
         </div>
         <div>
           <div style="font-size: 10px; color: var(--text-muted);" data-i18n="accuracy">ТОЧНОСТЬ</div>
-          <div id="tel-accuracy" style="font-size: 11px; font-weight: 700;">±3 м</div>
+          <div id="tel-accuracy" style="font-size: 11px; font-weight: 700;">--</div>
         </div>
         <div>
           <div style="font-size: 10px; color: var(--text-muted);" data-i18n="age">ПИНГ</div>
-          <div id="tel-age" style="font-size: 11px; font-weight: 700;">12 мс</div>
+          <div id="tel-age" style="font-size: 11px; font-weight: 700;">--</div>
         </div>
       </div>
 

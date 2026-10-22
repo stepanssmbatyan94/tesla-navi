@@ -56,7 +56,9 @@ class TeslaRealtime {
           .subscribe((status) => {
             console.log(`[Supabase Realtime] ${channelName} status:`, status);
             if (status === 'SUBSCRIBED') {
-              this.setConnected(true);
+              if (this.role === 'phone') {
+                this.setConnected(true);
+              }
               this.sendPing();
             }
           });
@@ -73,7 +75,9 @@ class TeslaRealtime {
 
       this.localWs.onopen = () => {
         console.log('[Local WS] Connected to room:', this.code);
-        this.setConnected(true);
+        if (this.role === 'phone') {
+          this.setConnected(true);
+        }
         this.sendPing();
       };
 
@@ -170,8 +174,11 @@ class TeslaRealtime {
   }
 
   handlePing(payload) {
-    this.lastPacketTime = Date.now();
-    this.setConnected(true);
+    // Only accept ping from the counterpart device
+    if (payload && payload.role && payload.role !== this.role) {
+      this.lastPacketTime = Date.now();
+      this.setConnected(true);
+    }
   }
 
   setConnected(connected) {
@@ -184,9 +191,13 @@ class TeslaRealtime {
   startHeartbeatWatcher() {
     this.heartbeatTimer = setInterval(() => {
       // If we haven't received a packet in 8 seconds and we are in display mode, mark connection lost
-      if (this.role === 'display' && this.lastPacketTime > 0) {
-        const elapsed = Date.now() - this.lastPacketTime;
-        if (elapsed > 8000) {
+      if (this.role === 'display') {
+        if (this.lastPacketTime > 0) {
+          const elapsed = Date.now() - this.lastPacketTime;
+          if (elapsed > 8000) {
+            this.setConnected(false);
+          }
+        } else {
           this.setConnected(false);
         }
       }

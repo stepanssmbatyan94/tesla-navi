@@ -7,6 +7,8 @@ let selectedDestination = null;
 let currentLang = 'ru';
 let activeChargersMarkers = [];
 let chargersVisible = false;
+let pendingGpsFix = null;
+let hasReceivedRealGps = false;
 
 // YouTube Queue & Player State (Dynamic, no hardcoded tracks)
 let youtubeQueue = [];
@@ -216,10 +218,21 @@ function updateSpeedometerDisplay(speedKmh) {
   }
 }
 
+function updateGpsStatusUI() {
+  const banner = document.getElementById('gps-status-banner');
+  if (!banner) return;
+  if (hasReceivedRealGps) {
+    banner.classList.add('hidden');
+  } else {
+    banner.classList.remove('hidden');
+  }
+}
+
 // 2. Direct In-Car Tesla Browser Geolocation
 function initTeslaCarGps() {
   if (!('geolocation' in navigator)) {
     console.warn('Geolocation not supported in this browser');
+    updateGpsStatusUI();
     return;
   }
 
@@ -229,22 +242,39 @@ function initTeslaCarGps() {
       const speedKmh = coords.speed ? Math.round(coords.speed * 3.6) : 0;
       const heading = coords.heading || 0;
 
+      hasReceivedRealGps = true;
+      pendingGpsFix = { lat: coords.latitude, lng: coords.longitude, heading, speed: speedKmh };
+      updateGpsStatusUI();
+
+      try {
+        localStorage.setItem('tesla_last_coords', JSON.stringify({ lat: Number(coords.latitude), lng: Number(coords.longitude) }));
+      } catch (e) {}
+
       // Update cluster speedometer with overspeed check
       updateSpeedometerDisplay(speedKmh);
 
       // Update telemetry
-      document.getElementById('tel-lat').textContent = Number(coords.latitude).toFixed(4);
-      document.getElementById('tel-lng').textContent = Number(coords.longitude).toFixed(4);
-      document.getElementById('tel-accuracy').textContent = `±${Math.round(coords.accuracy || 3)} м`;
-      document.getElementById('tel-age').textContent = `4 мс`;
+      const telLat = document.getElementById('tel-lat');
+      const telLng = document.getElementById('tel-lng');
+      const telAcc = document.getElementById('tel-accuracy');
+      const telAge = document.getElementById('tel-age');
+      if (telLat) telLat.textContent = Number(coords.latitude).toFixed(4);
+      if (telLng) telLng.textContent = Number(coords.longitude).toFixed(4);
+      if (telAcc) telAcc.textContent = `±${Math.round(coords.accuracy || 3)} м`;
+      if (telAge) telAge.textContent = `4 мс`;
 
       // Pass directly to Map Engine
       if (mapEngine) {
-        mapEngine.updateCarPosition(coords.latitude, coords.longitude, heading, speedKmh);
+        mapEngine.updateCarPosition(coords.latitude, coords.longitude, heading, speedKmh, true);
       }
     },
     (err) => {
       console.log('[In-Car GPS] Geolocation status:', err.message);
+      if (!hasReceivedRealGps) {
+        const telAcc = document.getElementById('tel-accuracy');
+        if (telAcc) telAcc.textContent = 'Ожидание...';
+        updateGpsStatusUI();
+      }
     },
     {
       enableHighAccuracy: true,
@@ -295,16 +325,29 @@ function generateCode() {
 }
 
 function handleIncomingGps(gps) {
+  if (!gps || isNaN(gps.lat) || isNaN(gps.lng)) return;
   const speedKmh = Math.round((gps.speed || 0) * 3.6);
   updateSpeedometerDisplay(speedKmh);
 
-  document.getElementById('tel-lat').textContent = Number(gps.lat).toFixed(4);
-  document.getElementById('tel-lng').textContent = Number(gps.lng).toFixed(4);
-  document.getElementById('tel-accuracy').textContent = `±${Math.round(gps.accuracy || 3)} м`;
-  document.getElementById('tel-age').textContent = `12 мс`;
+  hasReceivedRealGps = true;
+  pendingGpsFix = { lat: gps.lat, lng: gps.lng, heading: gps.heading || 0, speed: speedKmh };
+  updateGpsStatusUI();
+
+  try {
+    localStorage.setItem('tesla_last_coords', JSON.stringify({ lat: Number(gps.lat), lng: Number(gps.lng) }));
+  } catch (e) {}
+
+  const telLat = document.getElementById('tel-lat');
+  const telLng = document.getElementById('tel-lng');
+  const telAcc = document.getElementById('tel-accuracy');
+  const telAge = document.getElementById('tel-age');
+  if (telLat) telLat.textContent = Number(gps.lat).toFixed(4);
+  if (telLng) telLng.textContent = Number(gps.lng).toFixed(4);
+  if (telAcc) telAcc.textContent = `±${Math.round(gps.accuracy || 3)} м`;
+  if (telAge) telAge.textContent = `12 мс`;
 
   if (mapEngine) {
-    mapEngine.updateCarPosition(gps.lat, gps.lng, gps.heading || 0, speedKmh);
+    mapEngine.updateCarPosition(gps.lat, gps.lng, gps.heading || 0, speedKmh, true);
   }
 }
 
@@ -317,23 +360,26 @@ function updatePairingStatus(connected) {
     dot.classList.add('connected');
     statusText.textContent = dict.connectedPhone;
     statusText.style.color = 'var(--accent-green)';
-    // Auto-minimize pairing modal if connected
-    setTimeout(() => {
-      document.getElementById('pairing-modal').classList.add('hidden');
-    }, 1200);
+    // Auto-minimize pairing modal ONLY if real GPS has been received
+    if (hasReceivedRealGps) {
+      setTimeout(() => {
+        document.getElementById('pairing-modal').classList.add('hidden');
+      }, 1200);
+    }
   } else {
     dot.classList.remove('connected');
     statusText.textContent = dict.waitingPhone;
     statusText.style.color = 'var(--accent-amber)';
   }
+  updateGpsStatusUI();
 }
 
 // ==========================================================================
 // Saved Places Manager: Home, Work & Favorites (Mapsev & Yandex Architecture)
 // ==========================================================================
 const DEFAULT_SAVED_PLACES = {
-  home: { name: 'Дом', address: 'ул. Амиряна, 18', lat: 40.1772, lng: 44.5105 },
-  work: { name: 'Работа', address: 'ул. Акоп Акопян, 3', lat: 40.1982, lng: 44.4928 },
+  home: null,
+  work: null,
   favorites: [
     { id: 'fav_1', name: 'Dalma Garden Mall', address: 'Цицернакабердское шоссе, 3', lat: 40.1802, lng: 44.4842 },
     { id: 'fav_2', name: 'Yerevan Mall', address: 'проспект Аршакуняц, 34', lat: 40.1534, lng: 44.5026 }
@@ -348,8 +394,8 @@ function loadSavedPlaces() {
     if (raw) {
       const parsed = JSON.parse(raw);
       return {
-        home: (parsed.home && parsed.home.address) ? parsed.home : DEFAULT_SAVED_PLACES.home,
-        work: (parsed.work && parsed.work.address) ? parsed.work : DEFAULT_SAVED_PLACES.work,
+        home: (parsed.home && parsed.home.address) ? parsed.home : null,
+        work: (parsed.work && parsed.work.address) ? parsed.work : null,
         favorites: Array.isArray(parsed.favorites) ? parsed.favorites : DEFAULT_SAVED_PLACES.favorites
       };
     }
@@ -489,9 +535,24 @@ async function initMap() {
     localStorage.setItem('tesla_map_provider_v2', activeProvider);
   } catch (e) {}
 
+  let startCenter = CONFIG.defaultCenter;
+  try {
+    const savedLastCoords = localStorage.getItem('tesla_last_coords');
+    if (savedLastCoords) {
+      const parsed = JSON.parse(savedLastCoords);
+      if (parsed && !isNaN(parsed.lat) && !isNaN(parsed.lng)) {
+        startCenter = { lat: parsed.lat, lng: parsed.lng, zoom: CONFIG.navigationZoom || 16.5 };
+      }
+    }
+  } catch (e) {}
+
+  if (pendingGpsFix) {
+    startCenter = { lat: pendingGpsFix.lat, lng: pendingGpsFix.lng, zoom: CONFIG.navigationZoom || 16.5 };
+  }
+
   mapEngine = new TeslaMapEngine('map-container', {
     provider: activeProvider,
-    center: CONFIG.defaultCenter,
+    center: startCenter,
     onRouteCalculated: (route) => {
       showRouteAlternativesDrawer(route);
     },
@@ -548,6 +609,12 @@ async function initMap() {
 
   await mapEngine.init();
   window.mapEngine = mapEngine;
+
+  if (pendingGpsFix) {
+    mapEngine.updateCarPosition(pendingGpsFix.lat, pendingGpsFix.lng, pendingGpsFix.heading, pendingGpsFix.speed, true);
+  }
+  updateGpsStatusUI();
+
   updateCommuteEtas();
   updateLiveTrafficBadge();
   setInterval(updateLiveTrafficBadge, 45000); // Live poll Yandex Traffic every 45s
@@ -833,6 +900,12 @@ function initToolbarHandlers() {
   btnOpenPairing.addEventListener('click', () => {
     pairingModal.classList.remove('hidden');
   });
+  const gpsStatusBanner = document.getElementById('gps-status-banner');
+  if (gpsStatusBanner) {
+    gpsStatusBanner.addEventListener('click', () => {
+      pairingModal.classList.remove('hidden');
+    });
+  }
   [btnClosePairingX, btnPairingDone].forEach(btn => {
     btn.addEventListener('click', () => pairingModal.classList.add('hidden'));
   });

@@ -6,16 +6,16 @@ const CONFIG = {
     anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFzdHdxcmJpb3lreHF1ZnF0dHpnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM1MzM0OTIsImV4cCI6MjA5OTEwOTQ5Mn0.6Ho8uxn0MlgpyV2DHaKJ0An7Hi3-ItrTtO9Bki4zLkg'
   },
   
-  // Default regional centers (Yerevan, Kirk Kerkorian St / Leningradian St)
+  // Default regional centers (Yerevan Center / Republic Square)
   defaultCenter: {
-    lat: 40.189551, // Kirk Kerkorian St, Yerevan
-    lng: 44.468663,
+    lat: 40.1776, // Yerevan Center
+    lng: 44.5126,
     zoom: 16.5     // Optimal street navigation zoom
   },
   
   // Regional presets
   regions: {
-    am: { name: 'Հայաստան (Armenia)', lat: 40.189551, lng: 44.468663, lang: 'hy' },
+    am: { name: 'Հայաստան (Armenia)', lat: 40.1776, lng: 44.5126, lang: 'hy' },
     ge: { name: 'საქართველო (Georgia)', lat: 41.7151, lng: 44.8271, lang: 'ka' },
     ru: { name: 'Россия (CIS)', lat: 55.7558, lng: 37.6173, lang: 'ru' }
   },

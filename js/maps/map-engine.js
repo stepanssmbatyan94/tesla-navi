@@ -24,6 +24,7 @@ class TeslaMapEngine {
     const saved3D = typeof localStorage !== 'undefined' ? localStorage.getItem('tesla_map_3d_mode') : null;
     this.is3D = saved3D !== null ? saved3D === '3d' : false; // Default to authentic MapsEV 2D flat view
     this.voiceEnabled = true;
+    this.hasRealFix = false;
 
     this.currentPosition = { lat: this.center.lat, lng: this.center.lng, heading: 0, speed: 0 };
     this.currentHeading = 0;
@@ -302,7 +303,7 @@ class TeslaMapEngine {
           anchor: 'center',
           rotationAlignment: 'viewport'
         })
-          .setLngLat([this.center.lng, this.center.lat])
+          .setLngLat([this.currentPosition.lng, this.currentPosition.lat])
           .addTo(this.map);
 
         // Compass / heading change listeners
@@ -1236,6 +1237,36 @@ class TeslaMapEngine {
 
   // Primary Position Update Handler with Movement Bearing & Road Snapping
   updateCarPosition(lat, lng, rawHeading = 0, speed = 0, isRealFix = true) {
+    // 0. Instant Snap on First Real GPS Fix (Bypass smoothing from arbitrary initial center)
+    if (!this.hasRealFix && isRealFix) {
+      this.hasRealFix = true;
+      this.currentHeading = (rawHeading && !isNaN(rawHeading) && rawHeading > 0) ? rawHeading : this.currentHeading;
+      this.currentPosition = { lat, lng, heading: this.currentHeading, speed };
+      this.lastRawPosition = { lat, lng, time: Date.now() };
+
+      if (this.carMarker) {
+        if (this.provider === 'maplibre') {
+          this.carMarker.setLngLat([lng, lat]);
+        } else if (this.provider === 'yandex') {
+          this.carMarker.geometry.setCoordinates([lat, lng]);
+        }
+      }
+
+      if (this.map) {
+        if (this.provider === 'maplibre') {
+          this.map.jumpTo({
+            center: [lng, lat],
+            zoom: this.navZoom,
+            bearing: this.isHeadingUp ? this.currentHeading : 0,
+            pitch: (this.is3D && this.isHeadingUp) ? (CONFIG.navigationPitch || 45) : 0
+          });
+        } else if (this.provider === 'yandex') {
+          this.map.setCenter([lat, lng], this.navZoom, { duration: 0 });
+        }
+      }
+      return;
+    }
+
     let targetHeading = this.currentHeading;
     const isStationary = speed < 2.5 && !window.IS_SIMULATOR_RUNNING;
 
@@ -1293,7 +1324,11 @@ class TeslaMapEngine {
     // Anti-Jitter Deadband & Smoothing (Prevents nervous sub-pixel shaking)
     if (this.currentPosition) {
       const shiftDist = this.calculateDistance(this.currentPosition.lat, this.currentPosition.lng, displayLat, displayLng);
-      if (isStationary && shiftDist < 3.5) {
+      if (shiftDist > 60.0 && isRealFix) {
+        // Jump directly when position shift exceeds 60m (signal restoration / tunnel exit)
+        displayLat = lat;
+        displayLng = lng;
+      } else if (isStationary && shiftDist < 3.5) {
         // Stop micro-wandering when car is stationary at light/parking
         displayLat = this.currentPosition.lat;
         displayLng = this.currentPosition.lng;
