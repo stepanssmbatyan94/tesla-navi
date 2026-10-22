@@ -1086,7 +1086,8 @@ function updateCommuteEtas() {
     const durationMin = Math.max(3, Math.round(distMeters / (speedMps * 60)));
     const distStr = distMeters >= 1000 ? `${(distMeters / 1000).toFixed(1)} км` : `${Math.round(distMeters)} м`;
     if (badge) {
-      badge.textContent = `${durationMin} мин • ${distStr}`;
+      const durStr = mapEngine ? mapEngine.formatNavDuration(durationMin, true) : `${durationMin} мин`;
+      badge.textContent = `${durStr} • ${distStr}`;
       badge.className = 'commute-eta-badge';
     }
   });

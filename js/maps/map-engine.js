@@ -259,9 +259,6 @@ class TeslaMapEngine {
           }, 60000);
         }
 
-        // Render Traffic Lights and Speed Cameras
-        this.renderTrafficPoints();
-
         // High-Visibility Golden 3D Navigation Arrow (Matching Mapsev & Yandex Navigator)
         const el = document.createElement('div');
         el.id = 'maplibre-car-marker';
@@ -338,7 +335,7 @@ class TeslaMapEngine {
             name: c.name || `Камера ${c.limit || 60} км/ч`
           }));
           this.trafficPoints = [...lights, ...realCamPoints];
-          if (this.map) {
+          if (this.map && this.activeRoute) {
             this.renderTrafficPoints();
           }
         }
@@ -348,7 +345,7 @@ class TeslaMapEngine {
     }
   }
 
-  // Render Traffic Lights (🚦) and Speed Cameras (📷) matching Yandex Navigator
+  // Render Speed Cameras (📷) strictly when located ON THE ACTIVE ROUTE (Zero clutter on general map / overview)
   renderTrafficPoints() {
     if (!this.map) return;
 
@@ -368,36 +365,47 @@ class TeslaMapEngine {
       this.cameraMarkers = [];
     }
 
-    if (this.provider === 'maplibre' && window.maplibregl) {
-      this.trafficPoints.forEach(point => {
-        const el = document.createElement('div');
-        if (point.type === 'light') {
-          el.className = 'traffic-light-pill-icon';
-          el.innerHTML = `
-            <div class="tl-box">
-              <span class="tl-dot red"></span>
-              <span class="tl-dot yellow"></span>
-              <span class="tl-dot green"></span>
-            </div>
-          `;
-          const marker = new window.maplibregl.Marker({ element: el })
-            .setLngLat([point.lng, point.lat])
-            .addTo(this.map);
-          this.trafficLightMarkers.push(marker);
-        } else {
-          el.className = 'map-speed-camera-pin';
-          el.innerHTML = `
-            <div class="camera-map-badge" title="Камера контроля скорости ${point.limit || 60} км/ч">
-              <svg viewBox="0 0 24 24" width="16" height="16" fill="#1e293b">
-                <path d="M4 4h3l2-2h6l2 2h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2zm8 3a5 5 0 1 0 0 10 5 5 0 0 0 0-10zm0 2a3 3 0 1 1 0 6 3 3 0 0 1 0-6z"/>
-              </svg>
-            </div>
-          `;
-          const marker = new window.maplibregl.Marker({ element: el, anchor: 'center' })
-            .setLngLat([point.lng, point.lat])
-            .addTo(this.map);
-          this.cameraMarkers.push(marker);
+    // STRICT USER REQUIREMENT: Do NOT render speed cameras in general map or overview unless they are strictly on the active route!
+    if (!this.activeRoute || !this.routeCoordinates || this.routeCoordinates.length < 2) {
+      return;
+    }
+
+    // Filter cameras strictly to those located on the active route polyline (within 24m corridor)
+    const routeCameras = [];
+    const allCameras = (this.trafficPoints || []).filter(p => p.type === 'camera');
+
+    for (const cam of allCameras) {
+      let isOnRoute = false;
+      for (let i = 0; i < this.routeCoordinates.length - 1; i++) {
+        const p1 = this.routeCoordinates[i];
+        const p2 = this.routeCoordinates[i + 1];
+        const proj = this.projectPointToSegment(cam.lng, cam.lat, p1[0], p1[1], p2[0], p2[1]);
+        const d = this.calculateDistance(cam.lat, cam.lng, proj.y, proj.x);
+        if (d <= 24.0) {
+          isOnRoute = true;
+          break;
         }
+      }
+      if (isOnRoute) {
+        routeCameras.push(cam);
+      }
+    }
+
+    if (this.provider === 'maplibre' && window.maplibregl) {
+      routeCameras.forEach(point => {
+        const el = document.createElement('div');
+        el.className = 'map-speed-camera-pin';
+        el.innerHTML = `
+          <div class="camera-map-badge" title="Камера контроля скорости ${point.limit || 60} км/ч">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="#1e293b">
+              <path d="M4 4h3l2-2h6l2 2h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2zm8 3a5 5 0 1 0 0 10 5 5 0 0 0 0-10zm0 2a3 3 0 1 1 0 6 3 3 0 0 1 0-6z"/>
+            </svg>
+          </div>
+        `;
+        const marker = new window.maplibregl.Marker({ element: el, anchor: 'center' })
+          .setLngLat([point.lng, point.lat])
+          .addTo(this.map);
+        this.cameraMarkers.push(marker);
       });
     } else if (this.provider === 'yandex' && window.ymaps && this.map.geoObjects) {
       const CamLayout = window.ymaps.templateLayoutFactory.createClass(
@@ -410,18 +418,16 @@ class TeslaMapEngine {
         </div>`
       );
 
-      this.trafficPoints.forEach(point => {
-        if (point.type === 'camera') {
-          const placemark = new window.ymaps.Placemark([point.lat, point.lng], {
-            hintContent: `Камера контроля скорости ${point.limit || 60} км/ч`
-          }, {
-            iconLayout: CamLayout,
-            iconImageSize: [28, 28],
-            iconImageOffset: [0, 0]
-          });
-          this.map.geoObjects.add(placemark);
-          this.cameraMarkers.push(placemark);
-        }
+      routeCameras.forEach(point => {
+        const placemark = new window.ymaps.Placemark([point.lat, point.lng], {
+          hintContent: `Камера контроля скорости ${point.limit || 60} км/ч`
+        }, {
+          iconLayout: CamLayout,
+          iconImageSize: [28, 28],
+          iconImageOffset: [0, 0]
+        });
+        this.map.geoObjects.add(placemark);
+        this.cameraMarkers.push(placemark);
       });
     }
   }
@@ -843,6 +849,34 @@ class TeslaMapEngine {
       return `${(Math.round(m / 100) / 10).toFixed(1)} км`;
     }
     return `${Math.round(m / 1000)} км`;
+  }
+
+  // Smart Navigation Duration Formatting (e.g. 171 min -> "2 ч 51 мин" / "2 ժ 51 ր" / "2 h 51 min")
+  formatNavDuration(val, inputIsMinutes = false) {
+    if (val == null || isNaN(val)) return '1 мин';
+    const totalMins = Math.max(1, inputIsMinutes ? Math.round(val) : Math.round(val / 60));
+
+    const lang = window.CURRENT_LANG || 'ru';
+    let hLabel = 'ч';
+    let mLabel = 'мин';
+    if (lang === 'hy') {
+      hLabel = 'ժ';
+      mLabel = 'ր';
+    } else if (lang === 'en') {
+      hLabel = 'h';
+      mLabel = 'min';
+    }
+
+    if (totalMins < 60) {
+      return `${totalMins} ${mLabel}`;
+    }
+
+    const hours = Math.floor(totalMins / 60);
+    const remMins = totalMins % 60;
+    if (remMins === 0) {
+      return `${hours} ${hLabel}`;
+    }
+    return `${hours} ${hLabel} ${remMins} ${mLabel}`;
   }
 
   // Toggle Heading-Up Driving View vs North-Up Overview
@@ -1526,7 +1560,7 @@ class TeslaMapEngine {
       this.onProgressUpdate({
         percent: progressPercent,
         remainingDistance: this.formatNavDistance(remainingMeters),
-        remainingDuration: `${remainingMinutes} мин`,
+        remainingDuration: this.formatNavDuration(remainingMinutes, true),
         eta: `${etaHours}:${etaMins}`,
         remainingMeters: remainingMeters
       });
@@ -2099,9 +2133,9 @@ class TeslaMapEngine {
       return {
         index: i,
         summary: r.summary || (i === 0 ? 'Самый быстрый' : `Вариант ${i + 1}`),
-        duration: `${Math.round(r.duration / 60)} мин`,
+        duration: this.formatNavDuration(r.duration),
         distance: r.distance >= 1000 ? `${(r.distance / 1000).toFixed(1)} км` : `${Math.round(r.distance)} м`,
-        diffMins: diffMins > 0 ? `+${diffMins} мин` : '0 мин'
+        diffMins: diffMins > 0 ? `+${this.formatNavDuration(diffMins, true)}` : '0 мин'
       };
     });
 
@@ -2129,6 +2163,9 @@ class TeslaMapEngine {
       this.renderLeafletRoute(coordinates.map(c => [c[1], c[0]]), destination, trafficSegments);
     }
 
+    // Render speed cameras ONLY along the active route
+    this.renderTrafficPoints();
+
     // Automatically fit entire route within screen bounds during route overview / preview
     if (!this.isNavigating) {
       this.fitRouteOverview(coordinates, destination);
@@ -2142,7 +2179,7 @@ class TeslaMapEngine {
 
     const routeInfo = {
       distance: distanceMeters >= 1000 ? `${(distanceMeters / 1000).toFixed(1)} км` : `${Math.round(distanceMeters)} м`,
-      duration: `${Math.round(durationSec / 60)} мин`,
+      duration: this.formatNavDuration(durationSec),
       eta: `${etaHours}:${etaMins}`,
       name: destination.name || 'Маршрут',
       summary: primaryRoute.summary || (activeIndex === 0 ? 'Самый быстрый' : `Вариант ${activeIndex + 1}`),
@@ -2503,6 +2540,7 @@ class TeslaMapEngine {
     this.followCar = true;
     this.navZoom = CONFIG.navigationZoom || 16.5;
     this.clearRoadLaneMarker();
+    this.renderTrafficPoints(); // Completely removes route cameras from map
     this.lastProgressIndex = 0;
     this.routeCoordinates = [];
     this.alternativeCoordinates = null;
