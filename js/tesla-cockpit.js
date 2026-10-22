@@ -112,7 +112,9 @@ function initLanguage() {
 
     if (mapEngine) {
       if (currentLang === 'hy') {
-        mapEngine.speakVoice('welcome', 'gor');
+        const savedVoice = localStorage.getItem('tesla_navi_voice') || 'female';
+        const isMale = (savedVoice === 'male' || savedVoice === 'dmitry' || savedVoice === 'gor' || savedVoice === 'andrew');
+        mapEngine.speakVoice('welcome', isMale ? 'gor' : 'suzie');
       } else if (currentLang === 'en') {
         mapEngine.speakVoice('Voice navigation switched to Ava.', 'ava');
       } else {
@@ -159,7 +161,8 @@ function initVoiceSelector() {
       if (mapEngine) {
         const lang = window.CURRENT_LANG || 'ru';
         if (lang === 'hy') {
-          mapEngine.speakVoice('voice_switched', 'gor');
+          const hyVoice = (currentVoice === 'male') ? 'gor' : 'suzie';
+          mapEngine.speakVoice('voice_switched', hyVoice);
         } else if (lang === 'en') {
           const phrase = currentVoice === 'male'
             ? 'Voice switched to Andrew'
@@ -181,14 +184,18 @@ function updateVoiceIndicator(voice) {
   if (ind) {
     const isMale = (voice === 'male' || voice === 'dmitry' || voice === 'gor' || voice === 'andrew');
     const lang = window.CURRENT_LANG || 'ru';
+    ind.style.whiteSpace = 'nowrap';
     if (lang === 'hy') {
-      ind.textContent = '👨 Գոռ';
-      ind.title = 'Ձայն: Գոռ (Նեյրոնային բնական հայերեն)';
+      ind.textContent = isMale ? '👨 Գոռ' : '👩 Սյուզի';
+      ind.style.fontSize = isMale ? '11px' : '10px';
+      ind.title = isMale ? 'Ձայն: Գոռ (Արական, նեյրոնային)' : 'Ձայն: Սյուզի (Իգական, նեյրոնային)';
     } else if (lang === 'en') {
       ind.textContent = isMale ? '👨 EN' : '👩 EN';
+      ind.style.fontSize = '12px';
       ind.title = isMale ? 'Voice: Andrew (Male)' : 'Voice: Ava (Female)';
     } else {
       ind.textContent = isMale ? '👨' : '👩';
+      ind.style.fontSize = '16px';
       ind.title = isMale ? 'Голос: Дмитрий (Мужской)' : 'Голос: Светлана (Женский)';
     }
   }
@@ -3656,6 +3663,18 @@ function initDevMode() {
         mapEngine.playNavChime();
         mapEngine.speakVoice('welcome', 'gor');
         console.log('🗣️ Запущена фраза самопрезентации Գոռ (Հայերեն)');
+      }
+    });
+  }
+
+  const btnDiagTtsSuzie = document.getElementById('btn-diag-tts-suzie');
+  if (btnDiagTtsSuzie) {
+    btnDiagTtsSuzie.addEventListener('click', () => {
+      console.log('👩 [Диагностика] Воспроизведение армянского голоса: Սյուզի (Suzie)...');
+      if (mapEngine) {
+        mapEngine.playNavChime();
+        mapEngine.speakVoice('welcome', 'suzie');
+        console.log('🗣️ Запущена фраза самопрезентации Սյուզի (Հայերեն)');
       }
     });
   }

@@ -338,11 +338,11 @@ async function fetchYandexSuggestResults(q, userLng = 44.5125, userLat = 40.1776
     return;
   }
 
-// Authentic Armenian Neural Voice Pack (Gor - High-Fidelity Eastern Armenian)
+// Authentic Armenian Neural Voice Pack (Gor & Suzie - High-Fidelity Eastern Armenian)
 function getArmenianAudio(text, voiceChoice = 'gor') {
   const t = (text || '').toLowerCase().trim();
   const v = (voiceChoice || '').toLowerCase();
-  const folder = (v === 'suzie') ? 'suzie' : 'gor';
+  const folder = (v === 'suzie' || v === 'female' || v === 'svetlana' || v === 'ava') ? 'suzie' : 'gor';
 
   let file = 'welcome.mp3';
 
