@@ -1984,9 +1984,121 @@ function updateManeuverHud(m) {
   renderLaneGuidance(m);
 }
 
-// Lane Guidance SVG Generator (Matching Yandex Navigator Road Sign - Screenshots 4 & 5)
-function getLaneColumnsHtml(modifier) {
-  const mod = (modifier || '').toLowerCase();
+// Single Lane Arrow SVG Generator matching authentic road traffic signs
+function getSingleLaneSvg(indications, isActive) {
+  const color = isActive ? '#ffffff' : 'rgba(255,255,255,0.35)';
+  const strokeWidth = isActive ? '3.5' : '3';
+  const inds = (Array.isArray(indications) ? indications : [indications || 'straight']).map(s => String(s).toLowerCase());
+
+  const hasStraight = inds.some(i => i.includes('straight'));
+  const hasRight = inds.some(i => i === 'right');
+  const hasSlightRight = inds.some(i => i.includes('slight right') || i.includes('fork right') || i.includes('keep right') || i.includes('bear right') || i.includes('правее'));
+  const hasLeft = inds.some(i => i === 'left');
+  const hasSlightLeft = inds.some(i => i.includes('slight left') || i.includes('fork left') || i.includes('keep left') || i.includes('bear left') || i.includes('левее'));
+  const hasUTurn = inds.some(i => i.includes('uturn') || i.includes('u-turn') || i.includes('разворот'));
+
+  // 1. Combined Straight + Right
+  if (hasStraight && (hasRight || hasSlightRight)) {
+    return `
+      <svg viewBox="0 0 32 36" width="22" height="28" fill="none">
+        <line x1="10" y1="32" x2="10" y2="8" stroke="${color}" stroke-width="${strokeWidth}" stroke-linecap="round"/>
+        <polyline points="5 13 10 7 15 13" stroke="${color}" stroke-width="${strokeWidth}" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M10 20a6 6 0 0 1 6-6h9" stroke="${color}" stroke-width="${strokeWidth}" stroke-linecap="round"/>
+        <polyline points="20 9 26 14 20 19" stroke="${color}" stroke-width="${strokeWidth}" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    `;
+  }
+
+  // 2. Combined Straight + Left
+  if (hasStraight && (hasLeft || hasSlightLeft)) {
+    return `
+      <svg viewBox="0 0 32 36" width="22" height="28" fill="none">
+        <line x1="22" y1="32" x2="22" y2="8" stroke="${color}" stroke-width="${strokeWidth}" stroke-linecap="round"/>
+        <polyline points="17 13 22 7 27 13" stroke="${color}" stroke-width="${strokeWidth}" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M22 20a6 6 0 0 0-6-6H7" stroke="${color}" stroke-width="${strokeWidth}" stroke-linecap="round"/>
+        <polyline points="12 9 6 14 12 19" stroke="${color}" stroke-width="${strokeWidth}" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    `;
+  }
+
+  // 3. Right 90 deg
+  if (hasRight) {
+    return `
+      <svg viewBox="0 0 28 36" width="20" height="28" fill="none">
+        <line x1="9" y1="32" x2="9" y2="18" stroke="${color}" stroke-width="${strokeWidth}" stroke-linecap="round"/>
+        <path d="M9 18a6 6 0 0 1 6-6h8" stroke="${color}" stroke-width="${strokeWidth}" stroke-linecap="round"/>
+        <polyline points="18 7 24 12 18 17" stroke="${color}" stroke-width="${strokeWidth}" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    `;
+  }
+
+  // 4. Slight Right / Fork Right
+  if (hasSlightRight) {
+    return `
+      <svg viewBox="0 0 28 36" width="20" height="28" fill="none">
+        <line x1="9" y1="32" x2="9" y2="18" stroke="${color}" stroke-width="${strokeWidth}" stroke-linecap="round"/>
+        <path d="M9 18l8-9 4-3" stroke="${color}" stroke-width="${strokeWidth}" stroke-linecap="round"/>
+        <polyline points="16 6 22 6 22 12" stroke="${color}" stroke-width="${strokeWidth}" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    `;
+  }
+
+  // 5. Left 90 deg
+  if (hasLeft) {
+    return `
+      <svg viewBox="0 0 28 36" width="20" height="28" fill="none">
+        <line x1="19" y1="32" x2="19" y2="18" stroke="${color}" stroke-width="${strokeWidth}" stroke-linecap="round"/>
+        <path d="M19 18a6 6 0 0 0-6-6H5" stroke="${color}" stroke-width="${strokeWidth}" stroke-linecap="round"/>
+        <polyline points="10 7 4 12 10 17" stroke="${color}" stroke-width="${strokeWidth}" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    `;
+  }
+
+  // 6. Slight Left / Fork Left
+  if (hasSlightLeft) {
+    return `
+      <svg viewBox="0 0 28 36" width="20" height="28" fill="none">
+        <line x1="19" y1="32" x2="19" y2="18" stroke="${color}" stroke-width="${strokeWidth}" stroke-linecap="round"/>
+        <path d="M19 18l-8-9-4-3" stroke="${color}" stroke-width="${strokeWidth}" stroke-linecap="round"/>
+        <polyline points="12 6 6 6 6 12" stroke="${color}" stroke-width="${strokeWidth}" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    `;
+  }
+
+  // 7. U-turn
+  if (hasUTurn) {
+    return `
+      <svg viewBox="0 0 28 36" width="20" height="28" fill="none">
+        <path d="M20 32V16a6 6 0 0 0-12 0v10" stroke="${color}" stroke-width="${strokeWidth}" stroke-linecap="round"/>
+        <polyline points="13 21 8 26 3 21" stroke="${color}" stroke-width="${strokeWidth}" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    `;
+  }
+
+  // Default: Straight
+  return `
+    <svg viewBox="0 0 24 36" width="18" height="28" fill="none">
+      <line x1="12" y1="32" x2="12" y2="8" stroke="${color}" stroke-width="${strokeWidth}" stroke-linecap="round"/>
+      <polyline points="7 13 12 7 17 13" stroke="${color}" stroke-width="${strokeWidth}" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+  `;
+}
+
+// Lane Guidance SVG Generator (Supporting real OSM lane configurations + fallback modifier synthesis)
+function getLaneColumnsHtml(lanesOrModifier) {
+  // If array of real OSM lanes is provided:
+  if (Array.isArray(lanesOrModifier) && lanesOrModifier.length > 0) {
+    return lanesOrModifier.map((lane, idx) => {
+      const isActive = !!lane.valid;
+      const stateClass = isActive ? 'is-active' : 'is-faded';
+      const svg = getSingleLaneSvg(lane.indications, isActive);
+      const dot = isActive ? '<span class="lane-active-dot"></span>' : '';
+      return `<div class="lane-col-item ${stateClass}" title="Полоса ${idx + 1}">${svg}${dot}</div>`;
+    }).join('');
+  }
+
+  // Fallback to modifier-based synthesis if no lane array available
+  const mod = (typeof lanesOrModifier === 'string' ? lanesOrModifier : '').toLowerCase();
   const isSlightLeft = mod.includes('slight left') || mod.includes('fork left') || mod.includes('keep left') || mod.includes('bear left') || mod.includes('левее');
   const isSlightRight = mod.includes('slight right') || mod.includes('fork right') || mod.includes('keep right') || mod.includes('bear right') || mod.includes('правее');
   const isUTurn = mod.includes('uturn') || mod.includes('u-turn') || mod.includes('разворот');
@@ -1996,100 +2108,60 @@ function getLaneColumnsHtml(modifier) {
   if (isSlightLeft) {
     return `
       <div class="lane-col-item is-active" title="Ваша полоса: Держитесь левее">
-        <svg viewBox="0 0 32 36" width="26" height="30" fill="none">
-          <line x1="20" y1="32" x2="20" y2="18" stroke="#ffffff" stroke-width="3.5" stroke-linecap="round"/>
-          <path d="M20 18l-8-9-4-3" stroke="#ffffff" stroke-width="3.5" stroke-linecap="round"/>
-          <polyline points="14 6 7 6 7 13" stroke="#ffffff" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>
-        </svg>
+        ${getSingleLaneSvg(['slight left'], true)}
         <span class="lane-active-dot"></span>
       </div>
       <div class="lane-col-item is-faded" title="Другая полоса: Прямо">
-        <svg viewBox="0 0 24 36" width="20" height="30" fill="none">
-          <line x1="12" y1="32" x2="12" y2="9" stroke="rgba(255,255,255,0.35)" stroke-width="3" stroke-linecap="round"/>
-          <polyline points="7 14 12 8 17 14" stroke="rgba(255,255,255,0.35)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
-        </svg>
+        ${getSingleLaneSvg(['straight'], false)}
       </div>
     `;
   } else if (isSlightRight) {
     return `
       <div class="lane-col-item is-faded" title="Другая полоса: Прямо">
-        <svg viewBox="0 0 24 36" width="20" height="30" fill="none">
-          <line x1="12" y1="32" x2="12" y2="9" stroke="rgba(255,255,255,0.35)" stroke-width="3" stroke-linecap="round"/>
-          <polyline points="7 14 12 8 17 14" stroke="rgba(255,255,255,0.35)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
-        </svg>
+        ${getSingleLaneSvg(['straight'], false)}
       </div>
       <div class="lane-col-item is-active" title="Ваша полоса: Держитесь правее">
-        <svg viewBox="0 0 32 36" width="26" height="30" fill="none">
-          <line x1="12" y1="32" x2="12" y2="18" stroke="#ffffff" stroke-width="3.5" stroke-linecap="round"/>
-          <path d="M12 18l8-9 4-3" stroke="#ffffff" stroke-width="3.5" stroke-linecap="round"/>
-          <polyline points="18 6 25 6 25 13" stroke="#ffffff" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>
-        </svg>
+        ${getSingleLaneSvg(['slight right'], true)}
         <span class="lane-active-dot"></span>
       </div>
     `;
   } else if (isLeft) {
     return `
       <div class="lane-col-item is-active" title="Ваша полоса: Поворот налево">
-        <svg viewBox="0 0 32 36" width="26" height="30" fill="none">
-          <line x1="20" y1="32" x2="20" y2="17" stroke="#ffffff" stroke-width="3.5" stroke-linecap="round"/>
-          <path d="M20 17a6 6 0 0 0-6-6H6" stroke="#ffffff" stroke-width="3.5" stroke-linecap="round"/>
-          <polyline points="11 6 5 11 11 16" stroke="#ffffff" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>
-        </svg>
+        ${getSingleLaneSvg(['left'], true)}
         <span class="lane-active-dot"></span>
       </div>
       <div class="lane-col-item is-faded" title="Другая полоса: Прямо">
-        <svg viewBox="0 0 24 36" width="20" height="30" fill="none">
-          <line x1="12" y1="32" x2="12" y2="9" stroke="rgba(255,255,255,0.35)" stroke-width="3" stroke-linecap="round"/>
-          <polyline points="7 14 12 8 17 14" stroke="rgba(255,255,255,0.35)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
-        </svg>
+        ${getSingleLaneSvg(['straight'], false)}
       </div>
     `;
   } else if (isRight) {
     return `
       <div class="lane-col-item is-faded" title="Другая полоса: Прямо">
-        <svg viewBox="0 0 24 36" width="20" height="30" fill="none">
-          <line x1="12" y1="32" x2="12" y2="9" stroke="rgba(255,255,255,0.35)" stroke-width="3" stroke-linecap="round"/>
-          <polyline points="7 14 12 8 17 14" stroke="rgba(255,255,255,0.35)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
-        </svg>
+        ${getSingleLaneSvg(['straight'], false)}
       </div>
       <div class="lane-col-item is-active" title="Ваша полоса: Поворот направо">
-        <svg viewBox="0 0 32 36" width="26" height="30" fill="none">
-          <line x1="12" y1="32" x2="12" y2="17" stroke="#ffffff" stroke-width="3.5" stroke-linecap="round"/>
-          <path d="M12 17a6 6 0 0 1 6-6h8" stroke="#ffffff" stroke-width="3.5" stroke-linecap="round"/>
-          <polyline points="21 6 27 11 21 16" stroke="#ffffff" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>
-        </svg>
+        ${getSingleLaneSvg(['right'], true)}
         <span class="lane-active-dot"></span>
       </div>
     `;
   } else if (isUTurn) {
     return `
       <div class="lane-col-item is-active" title="Ваша полоса: Разворот">
-        <svg viewBox="0 0 32 36" width="26" height="30" fill="none">
-          <path d="M22 32V16a7 7 0 0 0-14 0v12" stroke="#ffffff" stroke-width="3.5" stroke-linecap="round"/>
-          <polyline points="13 24 8 29 3 24" stroke="#ffffff" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>
-        </svg>
+        ${getSingleLaneSvg(['uturn'], true)}
         <span class="lane-active-dot"></span>
       </div>
       <div class="lane-col-item is-faded" title="Другая полоса: Прямо">
-        <svg viewBox="0 0 24 36" width="20" height="30" fill="none">
-          <line x1="12" y1="32" x2="12" y2="9" stroke="rgba(255,255,255,0.35)" stroke-width="3" stroke-linecap="round"/>
-          <polyline points="7 14 12 8 17 14" stroke="rgba(255,255,255,0.35)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
-        </svg>
+        ${getSingleLaneSvg(['straight'], false)}
       </div>
     `;
   } else {
     return `
       <div class="lane-col-item is-active" title="Полоса 1: Прямо">
-        <svg viewBox="0 0 24 36" width="20" height="30" fill="none">
-          <line x1="12" y1="32" x2="12" y2="9" stroke="#ffffff" stroke-width="3.5" stroke-linecap="round"/>
-          <polyline points="7 14 12 8 17 14" stroke="#ffffff" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>
-        </svg>
+        ${getSingleLaneSvg(['straight'], true)}
       </div>
       <div class="lane-col-item is-active" title="Полоса 2: Прямо">
-        <svg viewBox="0 0 24 36" width="20" height="30" fill="none">
-          <line x1="12" y1="32" x2="12" y2="9" stroke="#ffffff" stroke-width="3.5" stroke-linecap="round"/>
-          <polyline points="7 14 12 8 17 14" stroke="#ffffff" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>
-        </svg>
+        ${getSingleLaneSvg(['straight'], true)}
       </div>
     `;
   }
@@ -2099,31 +2171,26 @@ function renderLaneGuidance(m) {
   const lanePill = document.getElementById('lane-guidance-pill');
   if (!lanePill) return;
 
-  const rawDist = (typeof m.distanceMeters === 'number') ? m.distanceMeters : ((typeof m.rawDistance === 'number') ? m.rawDistance : 100);
+  const rawDist = (typeof m.laneDistanceMeters === 'number')
+    ? m.laneDistanceMeters
+    : ((typeof m.distanceMeters === 'number') ? m.distanceMeters : ((typeof m.rawDistance === 'number') ? m.rawDistance : 100));
   const mod = (m.modifier || '').toLowerCase();
   const isTurn = mod.includes('left') || mod.includes('right') || mod.includes('uturn') || mod.includes('fork') || mod.includes('roundabout') || mod.includes('левее') || mod.includes('правее');
+  const hasLanes = Array.isArray(m.lanes) && m.lanes.length > 0;
 
-  // Activate lane guidance within 700m of turn or within 400m of next maneuver
-  if (rawDist <= 700 && (isTurn || rawDist <= 400)) {
+  // Strict proximity threshold: only activate within 220m of intersection or upcoming turn (never 700m!)
+  const withinThreshold = rawDist <= 220;
+
+  if (withinThreshold && (hasLanes || isTurn || rawDist <= 120)) {
+    const lanesData = hasLanes ? m.lanes : m.modifier;
     lanePill.innerHTML = `
-      <div class="lane-guidance-badge">
-        <span class="lane-badge-text">Полоса для поворота:</span>
-      </div>
       <div class="lane-guidance-arrows">
-        ${getLaneColumnsHtml(m.modifier)}
+        ${getLaneColumnsHtml(lanesData)}
       </div>
     `;
     lanePill.classList.remove('hidden');
-
-    // Also render on-road callout bubble directly at the intersection node on the map
-    if (mapEngine && m.location) {
-      mapEngine.renderRoadLaneMarker(m.location, m.modifier);
-    }
   } else {
     lanePill.classList.add('hidden');
-    if (mapEngine) {
-      mapEngine.clearRoadLaneMarker();
-    }
   }
 }
 

@@ -38,6 +38,7 @@ class TeslaMapEngine {
     this.activeRoute = null;
     this.isNavigating = false;
     this.routeSteps = [];
+    this.laneIntersections = [];
     this.currentStepIndex = 0;
     this.totalDistance = 0;
     this.spokenDistanceThresholds = {};
@@ -425,39 +426,9 @@ class TeslaMapEngine {
     }
   }
 
-  // On-Road Lane Callout Marker (speech bubble anchored at upcoming turn)
+  // On-Road Lane Callout Marker (Disabled: prevents elongated blue lines on the map; lanes are cleanly in HUD)
   renderRoadLaneMarker(location, modifier) {
-    if (!this.map || !location) return;
-    if (this.provider === 'maplibre' && window.maplibregl) {
-      if (!this.roadLaneMarkerEl) {
-        this.roadLaneMarkerEl = document.createElement('div');
-        this.roadLaneMarkerEl.className = 'map-lane-callout-marker';
-        this.roadLaneMarker = new window.maplibregl.Marker({
-          element: this.roadLaneMarkerEl,
-          anchor: 'bottom-left'
-        });
-      }
-      if (typeof getLaneColumnsHtml === 'function') {
-        this.roadLaneMarkerEl.innerHTML = getLaneColumnsHtml(modifier);
-      }
-      this.roadLaneMarker.setLngLat([location[0], location[1]]).addTo(this.map);
-    } else if (this.provider === 'yandex' && window.ymaps && this.map.geoObjects) {
-      if (this.yandexRoadLaneMarker) {
-        this.map.geoObjects.remove(this.yandexRoadLaneMarker);
-        this.yandexRoadLaneMarker = null;
-      }
-      if (typeof getLaneColumnsHtml === 'function') {
-        const inner = getLaneColumnsHtml(modifier);
-        const html = `<div class="map-lane-callout-marker" style="transform: translate(-10%, -100%);">${inner}</div>`;
-        const Layout = window.ymaps.templateLayoutFactory.createClass(html);
-        this.yandexRoadLaneMarker = new window.ymaps.Placemark([location[1], location[0]], {}, {
-          iconLayout: Layout,
-          iconImageSize: [90, 44],
-          iconImageOffset: [0, 0]
-        });
-        this.map.geoObjects.add(this.yandexRoadLaneMarker);
-      }
-    }
+    this.clearRoadLaneMarker();
   }
 
   clearRoadLaneMarker() {
@@ -1587,22 +1558,45 @@ class TeslaMapEngine {
         activeDist = Math.max(0, distToDest);
       }
 
-      // Check distance from Yerevan center to adjust speed limit if outside
-      const dLatYerevan = (currentLat - 40.1772) * 111;
-      const dLngYerevan = (currentLng - 44.5105) * 85;
-      const distFromYerevan = Math.sqrt(dLatYerevan * dLatYerevan + dLngYerevan * dLngYerevan);
-      const currentSpeedLimit = activeStep.speedLimit || (distFromYerevan > 14 ? 90 : 60);
+      // Search for the closest upcoming lane intersection along route (within 220m)
+      let upcomingLaneInter = null;
+      let upcomingLaneDist = Infinity;
+      const currentCarDist = this.simulatedNavDistance != null
+        ? this.simulatedNavDistance
+        : (this.routeCumulativeDistances?.[this.lastProgressIndex || 0] || 0);
+
+      if (this.laneIntersections && this.laneIntersections.length > 0) {
+        for (const li of this.laneIntersections) {
+          const dAhead = (li.routeDist != null ? li.routeDist : 0) - currentCarDist;
+          if (dAhead >= -15 && dAhead <= 220) {
+            upcomingLaneInter = li;
+            upcomingLaneDist = Math.max(0, dAhead);
+            break;
+          }
+        }
+      }
+
+      const activeLanes = (upcomingLaneInter && upcomingLaneDist <= 220)
+        ? upcomingLaneInter.lanes
+        : (activeDist <= 220 ? (activeStep.lanes || null) : null);
+
+      const activeLaneDist = (upcomingLaneInter && upcomingLaneDist <= 220)
+        ? upcomingLaneDist
+        : activeDist;
 
       this.onManeuverUpdate({
         distance: this.formatNavDistance(activeDist),
         distanceMeters: activeDist,
         instruction: activeStep.instruction || activeStep.name || 'Двигайтесь прямо',
         street: activeStep.name || activeStep.instruction || dest.name,
-        modifier: activeStep.modifier || 'straight',
+        modifier: (upcomingLaneInter && upcomingLaneDist <= 220 && upcomingLaneInter.modifier)
+          ? upcomingLaneInter.modifier
+          : (activeStep.modifier || 'straight'),
         type: activeStep.type || 'turn',
         speedLimit: currentSpeedLimit,
         location: activeStep.location || null,
-        lanes: activeStep.lanes || null
+        lanes: activeLanes,
+        laneDistanceMeters: activeLaneDist
       });
 
       // Voice announcements at 250m and 50m (localized phraseology)
@@ -1902,6 +1896,29 @@ class TeslaMapEngine {
     this.spokenDistanceThresholds = {};
     this.specialRoadPoints = primaryRoute.specialRoadPoints || [];
     this.activeRoute = { destination, durationSec, distanceMeters };
+    this.laneIntersections = primaryRoute.laneIntersections || [];
+
+    // Pre-calculate route distance for each lane intersection along routeCoordinates
+    if (this.laneIntersections.length > 0 && this.routeCoordinates && this.routeCumulativeDistances) {
+      this.laneIntersections.forEach(li => {
+        let bestDist = 0;
+        let minD = Infinity;
+        for (let i = 0; i < this.routeCoordinates.length - 1; i++) {
+          const p1 = this.routeCoordinates[i];
+          const p2 = this.routeCoordinates[i + 1];
+          const proj = this.projectPointToSegment(li.location[0], li.location[1], p1[0], p1[1], p2[0], p2[1]);
+          const d = this.calculateDistance(li.location[1], li.location[0], proj.y, proj.x);
+          if (d < minD) {
+            minD = d;
+            const segStartDist = this.routeCumulativeDistances[i] || 0;
+            const segLen = (this.routeCumulativeDistances[i + 1] || segStartDist) - segStartDist;
+            bestDist = segStartDist + proj.t * segLen;
+          }
+        }
+        li.routeDist = bestDist;
+      });
+      this.laneIntersections.sort((a, b) => a.routeDist - b.routeDist);
+    }
 
     if (primaryRoute.steps && primaryRoute.steps.length > 0) {
       this.routeSteps = primaryRoute.steps.map(s => ({
@@ -2344,6 +2361,7 @@ class TeslaMapEngine {
     this.routeCoordinates = [];
     this.alternativeCoordinates = null;
     this.routeSteps = [];
+    this.laneIntersections = [];
     this.currentStepIndex = 0;
     this.totalDistance = 0;
     this.specialRoadPoints = [];

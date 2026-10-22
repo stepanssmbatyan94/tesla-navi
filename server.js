@@ -533,10 +533,37 @@ function getArmenianAudio(text, voiceChoice = 'gor') {
       return;
     }
 
-    // 1. Query live Yandex Maps Router (genuine Yerevan traffic segments, ETA, and congestion delays)
+    // 1. Fetch OSRM route in parallel to extract exact OpenStreetMap intersection lane data
+    const osrmUrl = `https://router.project-osrm.org/route/v1/driving/${startLng},${startLat};${destLng},${destLat}?overview=full&geometries=geojson&steps=true&annotations=true`;
+    const osrmPromise = fetch(osrmUrl)
+      .then(r => r.json())
+      .catch(err => {
+        console.warn('OSRM parallel route fetch warning:', err.message);
+        return null;
+      });
+
+    const extractLaneIntersections = (osrmResult) => {
+      const laneIntersections = [];
+      if (osrmResult && osrmResult.routes && osrmResult.routes[0] && osrmResult.routes[0].legs) {
+        osrmResult.routes[0].legs[0].steps.forEach(s => {
+          (s.intersections || []).forEach(inter => {
+            if (inter.lanes && inter.lanes.length > 0) {
+              laneIntersections.push({
+                location: inter.location, // [lng, lat]
+                lanes: inter.lanes,
+                name: s.name || '',
+                modifier: s.maneuver?.modifier || 'straight',
+                type: s.maneuver?.type || 'turn'
+              });
+            }
+          });
+        });
+      }
+      return laneIntersections;
+    };
 
     try {
-      // 2. Query live Yandex Maps Router (when provider is yandex or as fallback)
+      // 2. Query live Yandex Maps Router (when provider is yandex or as primary traffic engine)
       const yandexUrl = `https://yandex.com/maps/10262/yerevan/?mode=routes&rtext=${startLat}%2C${startLng}~${destLat}%2C${destLng}&rtt=auto`;
       const yRes = await fetch(yandexUrl, {
         headers: {
@@ -558,6 +585,9 @@ function getArmenianAudio(text, voiceChoice = 'gor') {
             'VERY_HARD': '#a80000',  // 100% Sampled Yandex Navigator Burgundy
             'UNKNOWN': '#82ea0d'
           };
+
+          const osrmData = await osrmPromise;
+          const laneIntersections = extractLaneIntersections(osrmData);
 
           const parsedRoutes = yRoutes.map((r, idx) => {
             const coords = r.coordinates || [];
@@ -620,7 +650,8 @@ function getArmenianAudio(text, voiceChoice = 'gor') {
               const isNorthSouthExp = /север-юг|north-south|\bm-1\b|\bm-2\b/i.test(streetLower);
               const isHwy = /highway|трасса|шоссе|\bh-\d+|\bm-\d+/i.test(streetLower);
               const isFastAvenue = /исаков|isakov|сараландж|saralanj|багреванд|bagrevand|давиташен|davitashen/i.test(streetLower);
-              const loc = (sec.edgePoints && sec.edgePoints[0]) ? sec.edgePoints[0] : null;
+              // Maneuver location is the junction at the end of the section (or start if last)
+              const loc = (sec.edgePoints && sec.edgePoints[1]) ? sec.edgePoints[1] : ((sec.edgePoints && sec.edgePoints[0]) ? sec.edgePoints[0] : null);
 
               if (isNorthSouthExp) {
                 speedLimit = 110; // Скоростная автомагистраль Север-Юг (Севан, Арташат)
@@ -663,6 +694,7 @@ function getArmenianAudio(text, voiceChoice = 'gor') {
               coordinates: coords, // [lng, lat]
               segments: segments.length ? segments : [{ type: 'FREE', color: '#22c55e', coords }],
               steps: steps,
+              laneIntersections: laneIntersections,
               specialRoadPoints: r.specialRoadPoints || []
             };
           });
@@ -704,9 +736,13 @@ function getArmenianAudio(text, voiceChoice = 'gor') {
 
     // 2. Fallback to OSRM if Yandex fails
     try {
-      const osrmUrl = `https://router.project-osrm.org/route/v1/driving/${startLng},${startLat};${destLng},${destLat}?overview=full&geometries=geojson&steps=true&alternatives=true`;
-      const osrmRes = await fetch(osrmUrl);
-      const osrmData = await osrmRes.json();
+      const osrmData = (await osrmPromise) || await (await fetch(osrmUrl)).json();
+      const laneIntersections = extractLaneIntersections(osrmData);
+      if (osrmData && osrmData.routes) {
+        osrmData.routes.forEach(r => {
+          r.laneIntersections = laneIntersections;
+        });
+      }
 
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({

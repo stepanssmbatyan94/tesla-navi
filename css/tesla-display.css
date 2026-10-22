@@ -1241,16 +1241,18 @@ html, body {
   max-width: 320px;
 }
 
-/* Authentic Yandex Navigator Lane Guidance Sign (Integrated directly below street name) */
+/* Authentic Lane Guidance Sign (Integrated directly below street name in HUD Maneuver Card) */
 .lane-guidance-pill {
   background: #0066ff;
-  border-radius: 12px;
-  padding: 6px 12px;
-  display: flex;
+  border-radius: 10px;
+  padding: 3px 6px;
+  display: inline-flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 10px;
+  justify-content: center;
+  gap: 4px;
   box-shadow: 0 4px 14px rgba(0, 102, 255, 0.35);
+  margin-top: 6px;
+  width: fit-content;
   transition: opacity 0.2s ease, transform 0.2s ease;
 }
 
@@ -1258,25 +1260,10 @@ html, body {
   display: none !important;
 }
 
-.lane-guidance-badge {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-}
-
-.lane-badge-text {
-  font-size: 11px;
-  font-weight: 700;
-  color: rgba(255, 255, 255, 0.92);
-  letter-spacing: 0.3px;
-  text-transform: uppercase;
-  white-space: nowrap;
-}
-
 .lane-guidance-arrows {
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
 }
 
 .lane-col-item {
@@ -1284,9 +1271,9 @@ html, body {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  min-width: 32px;
-  height: 38px;
-  padding: 2px 4px;
+  min-width: 26px;
+  height: 34px;
+  padding: 1px 3px;
   border-radius: 6px;
   transition: all 0.15s ease;
 }
@@ -1294,48 +1281,21 @@ html, body {
 .lane-col-item.is-active {
   background: rgba(255, 255, 255, 0.22);
   border: 1.5px solid #ffffff;
-  box-shadow: 0 0 10px rgba(255, 255, 255, 0.4);
+  box-shadow: 0 0 8px rgba(255, 255, 255, 0.4);
 }
 
 .lane-col-item.is-faded {
-  opacity: 0.45;
+  opacity: 0.38;
 }
 
 .lane-active-dot {
   display: block;
-  width: 5px;
-  height: 5px;
+  width: 4px;
+  height: 4px;
   border-radius: 50%;
   background: #ffffff;
-  box-shadow: 0 0 6px #ffffff;
+  box-shadow: 0 0 5px #ffffff;
   margin-top: 2px;
-}
-
-/* Authentic Yandex Road Lane Bubble Marker (Floating with pointer tail on the road) */
-.map-lane-callout-marker {
-  position: relative;
-  background: #0066ff;
-  border-radius: 14px;
-  padding: 6px 14px;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  box-shadow: 0 8px 24px rgba(0, 102, 255, 0.55), 0 2px 8px rgba(0, 0, 0, 0.25);
-  pointer-events: none;
-  z-index: 35;
-  transform: translate(-15%, -115%);
-}
-
-.map-lane-callout-marker::after {
-  content: '';
-  position: absolute;
-  bottom: -8px;
-  left: 18px;
-  width: 0;
-  height: 0;
-  border-left: 7px solid transparent;
-  border-right: 7px solid transparent;
-  border-top: 9px solid #0066ff;
 }
 
 /* 5. Speedometer & Speed Limit HUD + Auxiliary Controls (Mapsev Architecture) */
