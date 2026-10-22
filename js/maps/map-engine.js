@@ -1873,6 +1873,123 @@ class TeslaMapEngine {
     return segments.filter(s => s.coords.length >= 2);
   }
 
+  // Dynamic Route Framing: Mathematically fits entire route (start to finish) inside screen
+  fitRouteOverview(coords = null, destination = null) {
+    const routeCoords = coords || this.routeCoordinates;
+    if (!routeCoords || routeCoords.length < 2) return;
+
+    // 1. Calculate geographic Bounding Box from all route polyline coordinates
+    let minLng = Infinity, maxLng = -Infinity;
+    let minLat = Infinity, maxLat = -Infinity;
+
+    for (let i = 0; i < routeCoords.length; i++) {
+      const pt = routeCoords[i]; // [lng, lat]
+      if (!pt || pt.length < 2) continue;
+      const lng = pt[0];
+      const lat = pt[1];
+      if (lng < minLng) minLng = lng;
+      if (lng > maxLng) maxLng = lng;
+      if (lat < minLat) minLat = lat;
+      if (lat > maxLat) maxLat = lat;
+    }
+
+    // Include vehicle's current position to ensure car marker is in view
+    if (this.currentPosition) {
+      const cLng = this.currentPosition.lng;
+      const cLat = this.currentPosition.lat;
+      if (cLng < minLng) minLng = cLng;
+      if (cLng > maxLng) maxLng = cLng;
+      if (cLat < minLat) minLat = cLat;
+      if (cLat > maxLat) maxLat = cLat;
+    }
+
+    // Include destination pin if provided
+    const dest = destination || (this.activeRoute && this.activeRoute.destination);
+    if (dest && dest.lat && dest.lng) {
+      if (dest.lng < minLng) minLng = dest.lng;
+      if (dest.lng > maxLng) maxLng = dest.lng;
+      if (dest.lat < minLat) minLat = dest.lat;
+      if (dest.lat > maxLat) maxLat = dest.lat;
+    }
+
+    // Safety padding for micro-routes (avoids zero-area bounding box)
+    if (Math.abs(maxLng - minLng) < 0.002) {
+      minLng -= 0.002;
+      maxLng += 0.002;
+    }
+    if (Math.abs(maxLat - minLat) < 0.002) {
+      minLat -= 0.002;
+      maxLat += 0.002;
+    }
+
+    // 2. Responsive UI Clearance:
+    // Left alternatives drawer is ~380px wide with 78px margin = 458px.
+    // We clear space on the left so the route stays visible in the open right half of the screen.
+    const screenW = typeof window !== 'undefined' ? window.innerWidth : 1280;
+    const screenH = typeof window !== 'undefined' ? window.innerHeight : 800;
+    const isLandscape = screenW >= 768;
+
+    const padLeft = isLandscape ? Math.min(500, Math.round(screenW * 0.36)) : 30;
+    const padRight = isLandscape ? 80 : 30;
+    const padTop = isLandscape ? 80 : 90;
+    const padBottom = isLandscape ? 80 : Math.round(screenH * 0.38);
+
+    // Stop followCar so GPS ticks don't jump camera back to vehicle during route preview
+    this.followCar = false;
+
+    // 3. MapLibre GL JS
+    if (this.provider === 'maplibre' && this.map) {
+      try {
+        this.map.stop();
+        this.map.fitBounds(
+          [[minLng, minLat], [maxLng, maxLat]],
+          {
+            padding: { top: padTop, bottom: padBottom, left: padLeft, right: padRight },
+            pitch: 0,
+            bearing: 0,
+            maxZoom: 15.5,
+            duration: 900
+          }
+        );
+      } catch (err) {
+        console.warn('[MapEngine] fitBounds MapLibre error:', err);
+      }
+    }
+    // 4. Yandex Maps 2.1
+    else if (this.provider === 'yandex' && this.map) {
+      try {
+        const yBounds = [[minLat, minLng], [maxLat, maxLng]];
+        const p = this.map.setBounds(yBounds, {
+          checkZoomRange: true,
+          duration: 900,
+          zoomMargin: [padTop, padRight, padBottom, padLeft]
+        });
+        if (p && typeof p.then === 'function') {
+          p.then(() => {
+            if (!this.isNavigating && this.map && this.map.getZoom() > 15.5) {
+              this.map.setZoom(15.5, { duration: 250 });
+            }
+          });
+        }
+      } catch (err) {
+        console.warn('[MapEngine] setBounds Yandex error:', err);
+      }
+    }
+    // 5. Leaflet
+    else if (this.map && window.L && typeof this.map.fitBounds === 'function') {
+      try {
+        this.map.fitBounds(
+          [[minLat, minLng], [maxLat, maxLng]],
+          {
+            paddingTopLeft: [padLeft, padTop],
+            paddingBottomRight: [padRight, padBottom],
+            maxZoom: 15.5
+          }
+        );
+      } catch (err) {}
+    }
+  }
+
   // Parse Yandex or OSRM route data and render on map (with full route alternatives support)
   applyRouteData(data, destination, activeIndex = 0) {
     this.rawRouteData = data;
@@ -2010,6 +2127,11 @@ class TeslaMapEngine {
     // 3. Render on LEAFLET
     else if (this.map && window.L) {
       this.renderLeafletRoute(coordinates.map(c => [c[1], c[0]]), destination, trafficSegments);
+    }
+
+    // Automatically fit entire route within screen bounds during route overview / preview
+    if (!this.isNavigating) {
+      this.fitRouteOverview(coordinates, destination);
     }
 
     // Calculate ETA
@@ -2284,15 +2406,6 @@ class TeslaMapEngine {
       preset: 'islands#redDotIconWithCaption'
     });
     this.map.geoObjects.add(this.destMarker);
-
-    try {
-      if (!this.isNavigating && this.routePolyline && this.routePolyline.getBounds()) {
-        this.map.setBounds(this.routePolyline.getBounds(), {
-          checkZoomRange: true,
-          zoomMargin: 60
-        });
-      }
-    } catch (e) {}
   }
 
   renderLeafletRoute(latLngs, destination, trafficSegments = null) {
@@ -2351,24 +2464,32 @@ class TeslaMapEngine {
     this.lastProgressIndex = 0;
     this.currentStepIndex = 0;
     this.spokenDistanceThresholds = {};
+    // Strictly reset to default driving zoom (e.g. 16.5) from overview
+    this.navZoom = CONFIG.navigationZoom || 16.5;
+
+    const recenterBtn = document.getElementById('floating-recenter-btn');
+    if (recenterBtn) recenterBtn.classList.add('hidden');
 
     if (this.provider === 'maplibre' && this.map) {
       const markerEl = document.querySelector('#maplibre-car-marker .tesla-car-arrow');
       if (markerEl) markerEl.style.transform = 'rotate(0deg)';
       this.map.stop();
+      const navPadding = { top: Math.round(window.innerHeight * 0.28), bottom: 0, left: 0, right: 0 };
       this.map.easeTo({
         center: [this.currentPosition.lng, this.currentPosition.lat],
-        bearing: this.currentHeading,
+        bearing: this.isHeadingUp ? this.currentHeading : 0,
         pitch: (this.is3D && this.isHeadingUp) ? (CONFIG.navigationPitch || 45) : 0,
-        padding: { top: 220, bottom: 0, left: 0, right: 0 },
+        padding: navPadding,
         zoom: this.navZoom,
-        duration: 500
+        duration: 850
       });
     } else if (this.provider === 'yandex' && this.map) {
       this.map.setCenter([this.currentPosition.lat, this.currentPosition.lng], this.navZoom, {
         checkZoomRange: true,
-        duration: 500
+        duration: 700
       });
+    } else if (this.map && typeof this.map.setView === 'function') {
+      this.map.setView([this.currentPosition.lat, this.currentPosition.lng], this.navZoom);
     }
 
     const lang = window.CURRENT_LANG || 'ru';
@@ -2379,6 +2500,8 @@ class TeslaMapEngine {
   cancelRoute() {
     this.activeRoute = null;
     this.isNavigating = false;
+    this.followCar = true;
+    this.navZoom = CONFIG.navigationZoom || 16.5;
     this.clearRoadLaneMarker();
     this.lastProgressIndex = 0;
     this.routeCoordinates = [];

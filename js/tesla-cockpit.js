@@ -780,6 +780,10 @@ function initToolbarHandlers() {
         document.getElementById('quick-dest-bar')?.classList.remove('hidden');
       }
       document.getElementById('route-alternatives-drawer').classList.add('hidden');
+      if (mapEngine && !mapEngine.isNavigating) {
+        mapEngine.cancelRoute();
+        mapEngine.recenter();
+      }
     });
   }
 
@@ -807,7 +811,6 @@ function initToolbarHandlers() {
       }
       if (mapEngine) {
         mapEngine.startNavigation(); // Activates movement tracking, audio cue & off-route rerouting
-        mapEngine.recenter();
       }
     };
     btnStartRouteNav.addEventListener('click', handleStartNav);
