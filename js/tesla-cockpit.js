@@ -303,7 +303,7 @@ function initTeslaCarGps() {
     (pos) => {
       const coords = pos.coords;
       const speedKmh = coords.speed ? Math.round(coords.speed * 3.6) : 0;
-      const heading = coords.heading || 0;
+      const heading = (coords.heading != null && !isNaN(coords.heading) && coords.heading > 0) ? coords.heading : null;
 
       hasReceivedRealGps = true;
       pendingGpsFix = { lat: coords.latitude, lng: coords.longitude, heading, speed: speedKmh };
@@ -410,7 +410,8 @@ function handleIncomingGps(gps) {
   if (telAge) telAge.textContent = `12 мс`;
 
   if (mapEngine) {
-    mapEngine.updateCarPosition(gps.lat, gps.lng, gps.heading || 0, speedKmh, true);
+    const rawHeading = (gps.heading != null && !isNaN(gps.heading) && gps.heading > 0) ? gps.heading : null;
+    mapEngine.updateCarPosition(gps.lat, gps.lng, rawHeading, speedKmh, true);
   }
 }
 

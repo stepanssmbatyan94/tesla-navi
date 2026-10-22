@@ -372,7 +372,7 @@ function getArmenianAudio(text, voiceChoice = 'gor') {
     file = 'rerouting.mp3';
   } else if (t.includes('հասել եք') || t.includes('նպատակակետ') || t === 'arrived') {
     file = 'arrived.mp3';
-  } else if (t.includes('տեսախցիկ') || t === 'camera_ahead') {
+  } else if (t.includes('տեսախցիկ') || t.includes('արագաչափ') || t.includes('կամերա') || t === 'camera_ahead') {
     file = 'camera_ahead.mp3';
   } else if (t.includes('արագություն') || t === 'speed_limit') {
     file = 'speed_limit.mp3';

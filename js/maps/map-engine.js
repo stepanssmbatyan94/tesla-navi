@@ -128,8 +128,8 @@ class TeslaMapEngine {
       const dt = Math.min(0.08, (now - lastTime) / 1000);
       lastTime = now;
 
-      // Only extrapolate during live driving when simulator is NOT active, vehicle speed > 2 km/h, and followCar is true
-      if (!window.IS_SIMULATOR_RUNNING && this.currentPosition && this.currentPosition.speed > 2 && this.followCar) {
+      // Only extrapolate in developer simulator mode - never during real driving to avoid phantom drift or MCU thread stalls
+      if (window.IS_SIMULATOR_RUNNING && this.currentPosition && this.currentPosition.speed > 2 && this.followCar) {
         if (this.activeRoute && this.routeCoordinates && this.routeCoordinates.length > 1 && this.totalRouteMeters) {
           const speedMps = this.currentPosition.speed / 3.6;
           const distMeters = speedMps * dt;
@@ -138,13 +138,6 @@ class TeslaMapEngine {
           if (pt) {
             this.updateCarPosition(pt.lat, pt.lng, pt.heading, this.currentPosition.speed, false);
           }
-        } else if (this.currentPosition) {
-          const speedMps = this.currentPosition.speed / 3.6;
-          const distMeters = speedMps * dt;
-          const headingRad = (this.currentHeading * Math.PI) / 180;
-          const dLat = (distMeters * Math.cos(headingRad)) / 111111;
-          const dLng = (distMeters * Math.sin(headingRad)) / (111111 * Math.cos((this.currentPosition.lat * Math.PI) / 180));
-          this.updateCarPosition(this.currentPosition.lat + dLat, this.currentPosition.lng + dLng, this.currentHeading, this.currentPosition.speed, false);
         }
       }
 
@@ -224,13 +217,16 @@ class TeslaMapEngine {
         const recenterBtn = document.getElementById('floating-recenter-btn');
         if (recenterBtn) recenterBtn.classList.remove('hidden');
         if (this.onUserPan) this.onUserPan();
-        this.resetAutoFollowTimer();
+        this.startAutoFollowTimer();
       };
       this.map.on('dragstart', handleUserPan);
+      this.map.on('dragend', () => this.startAutoFollowTimer());
+      this.map.on('touchend', () => this.startAutoFollowTimer());
       this.map.on('zoomstart', (e) => {
         if (e && e.originalEvent) {
           const recenterBtn = document.getElementById('floating-recenter-btn');
           if (recenterBtn) recenterBtn.classList.remove('hidden');
+          this.startAutoFollowTimer();
         }
       });
 
@@ -623,9 +619,9 @@ class TeslaMapEngine {
         });
 
         const CarLayout = window.ymaps.templateLayoutFactory.createClass(
-          `<div id="yandex-car-marker" class="tesla-3d-car-marker" style="transform: translate(-50%, -50%);">
+          `<div id="yandex-car-marker" class="tesla-3d-car-marker" style="width: 52px; height: 52px; display: flex; align-items: center; justify-content: center;">
             <div class="tesla-car-pulse"></div>
-            <div class="tesla-car-arrow" style="transform: rotate(0deg); transition: none;">
+            <div class="tesla-car-arrow" style="transform: rotate(0deg); transition: none; display: flex; align-items: center; justify-content: center;">
               <svg viewBox="0 0 54 54" width="52" height="52">
                 <defs>
                   <filter id="yandex-car-shadow" x="-30%" y="-30%" width="160%" height="160%">
@@ -656,7 +652,7 @@ class TeslaMapEngine {
         this.carMarker = new window.ymaps.Placemark([this.center.lat, this.center.lng], {}, {
           iconLayout: CarLayout,
           iconImageSize: [52, 52],
-          iconImageOffset: [0, 0]
+          iconImageOffset: [-26, -26]
         });
 
         this.map.geoObjects.add(this.carMarker);
@@ -761,7 +757,7 @@ class TeslaMapEngine {
   }
 
   resetAutoFollowTimer() {
-    this.clearAutoFollowTimer();
+    this.startAutoFollowTimer();
   }
 
   // Zoom In map (anchored strictly on vehicle position with perspective padding)
@@ -1242,32 +1238,29 @@ class TeslaMapEngine {
       bestHeadingDiff = diff;
     }
 
-    // Intelligent Road Snap Criteria:
-    // 1. If car is driving (speed >= 8 km/h): only snap if within 20m AND heading aligns with road (diff <= 45°)
-    //    If heading differs > 45° (car turned onto a cross street), DO NOT SNAP!
-    // 2. If crawling/stopping (speed < 8 km/h): snap if within 16m
-    const isMoving = speed >= 8 && rawHeading != null && !isNaN(rawHeading);
-    const allowSnap = isMoving
-      ? (minDistance <= 20 && bestHeadingDiff <= 45)
-      : (minDistance <= 16);
+    // Robust Road Snap Criteria:
+    // Allow snapping within 28m of the route polyline. If moving with valid heading, ensure not turning into perpendicular road (<= 55°)
+    const hasValidHeading = rawHeading != null && !isNaN(rawHeading) && rawHeading > 0;
+    const allowSnap = (minDistance <= 28) && (!hasValidHeading || speed < 6 || bestHeadingDiff <= 55);
 
-    if (allowSnap) {
-      let roadBearing = bestBearing;
-      let snappedDist = null;
-      if (this.routeCumulativeDistances && this.routeCumulativeDistances.length > bestSegIndex) {
-        const segDist = this.routeCumulativeDistances[bestSegIndex] || 0;
-        const segLen = Math.max(0.1, (this.routeCumulativeDistances[bestSegIndex + 1] || (segDist + 1)) - segDist);
-        const p1 = this.routeCoordinates[bestSegIndex];
-        const p2 = this.routeCoordinates[bestSegIndex + 1];
-        if (p1 && p2) {
-          const projT = this.projectPointToSegment(lng, lat, p1[0], p1[1], p2[0], p2[1]).t;
-          snappedDist = segDist + (projT * segLen);
-          const aheadPt = this.getPositionAtDistance(snappedDist + 22);
-          if (aheadPt) {
-            roadBearing = this.calculateBearing(bestPoint.lat, bestPoint.lng, aheadPt.lat, aheadPt.lng);
-          }
+    let roadBearing = bestBearing;
+    let snappedDist = null;
+    if (this.routeCumulativeDistances && this.routeCumulativeDistances.length > bestSegIndex) {
+      const segDist = this.routeCumulativeDistances[bestSegIndex] || 0;
+      const segLen = Math.max(0.1, (this.routeCumulativeDistances[bestSegIndex + 1] || (segDist + 1)) - segDist);
+      const p1 = this.routeCoordinates[bestSegIndex];
+      const p2 = this.routeCoordinates[bestSegIndex + 1];
+      if (p1 && p2) {
+        const projT = this.projectPointToSegment(lng, lat, p1[0], p1[1], p2[0], p2[1]).t;
+        snappedDist = segDist + (projT * segLen);
+        const aheadPt = this.getPositionAtDistance(snappedDist + 22);
+        if (aheadPt) {
+          roadBearing = this.calculateBearing(bestPoint.lat, bestPoint.lng, aheadPt.lat, aheadPt.lng);
         }
       }
+    }
+
+    if (allowSnap) {
       return {
         snapped: true,
         lat: bestPoint.lat,
@@ -1287,7 +1280,7 @@ class TeslaMapEngine {
       bearing: null,
       dist: minDistance,
       segIndex: bestSegIndex,
-      routeDistance: null,
+      routeDistance: snappedDist,
       headingDiff: bestHeadingDiff
     };
   }
@@ -1416,6 +1409,24 @@ class TeslaMapEngine {
       speed
     };
 
+    // Auto-recover followCar when vehicle is moving and user isn't interacting
+    if (!this.followCar && speed > 4 && !this.isUserTouching && !this.isUserPinching) {
+      this.movingWithoutTouchFrames = (this.movingWithoutTouchFrames || 0) + 1;
+      if (this.movingWithoutTouchFrames > 12) { // ~1.2s of driving
+        this.followCar = true;
+        this.movingWithoutTouchFrames = 0;
+        const recenterBtn = document.getElementById('floating-recenter-btn');
+        if (recenterBtn) recenterBtn.classList.add('hidden');
+      }
+    } else if (speed <= 4) {
+      this.movingWithoutTouchFrames = 0;
+    }
+
+    // In Navigation Mode: strictly enforce Heading-Up orientation ("носом на верх")
+    if (this.isNavigating) {
+      this.isHeadingUp = true;
+    }
+
     // 4. Update Marker and Camera on MapLibre GL
     if (this.provider === 'maplibre' && this.map) {
       if (this.carMarker) {
@@ -1445,7 +1456,7 @@ class TeslaMapEngine {
         // North-Up: Map fixed to North (bearing 0), arrow rotates to vehicle heading
         if (markerEl) markerEl.style.transform = `rotate(${Math.round(this.currentHeading)}deg)`;
         if (this.carMarker && typeof this.carMarker.setRotation === 'function') {
-          this.carMarker.setRotation(this.currentHeading);
+          this.carMarker.setRotation(0);
         }
 
         if (this.followCar) {
@@ -1463,34 +1474,10 @@ class TeslaMapEngine {
       const markerEl = document.querySelector('#yandex-car-marker .tesla-car-arrow');
       if (markerEl) markerEl.style.transform = `rotate(${this.currentHeading.toFixed(1)}deg)`;
 
-      // Auto-recover followCar when vehicle is moving and user isn't interacting
-      if (!this.followCar && speed > 4 && !this.isUserTouching && !this.isUserPinching) {
-        this.movingWithoutTouchFrames = (this.movingWithoutTouchFrames || 0) + 1;
-        if (this.movingWithoutTouchFrames > 15) { // ~1.5 - 2s of driving
-          this.followCar = true;
-          this.movingWithoutTouchFrames = 0;
-          const recenterBtn = document.getElementById('floating-recenter-btn');
-          if (recenterBtn) recenterBtn.classList.add('hidden');
-        }
-      } else {
-        this.movingWithoutTouchFrames = 0;
-      }
-
       if (this.followCar && !this.isUserPinching) {
-        if (!this._isYandexCentering) {
-          this._isYandexCentering = true;
-          // Pan map without passing fixed zoom on every frame to avoid heavy tile re-layouts
-          const centerPromise = this.map.setCenter([displayLat, displayLng], undefined, { duration: 0, checkZoomRange: false });
-          if (centerPromise) {
-            if (typeof centerPromise.always === 'function') {
-              centerPromise.always(() => { this._isYandexCentering = false; });
-            } else if (typeof centerPromise.then === 'function') {
-              centerPromise.then(() => { this._isYandexCentering = false; }, () => { this._isYandexCentering = false; });
-            }
-          }
-          // Guaranteed failsafe release timeout
-          setTimeout(() => { this._isYandexCentering = false; }, 200);
-        }
+        try {
+          this.map.setCenter([displayLat, displayLng], this.map.getZoom(), { duration: 0, checkZoomRange: false });
+        } catch (e) {}
       }
     } else if (this.carMarker && window.L && this.provider === 'osm') {
       this.carMarker.setLatLng([displayLat, displayLng]);
@@ -1528,6 +1515,53 @@ class TeslaMapEngine {
     return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   }
 
+  getVehicleDistanceAlongRoute(currentLat, currentLng) {
+    if (!this.routeCoordinates || this.routeCoordinates.length < 2 || !this.routeCumulativeDistances) {
+      return 0;
+    }
+    const totalSegs = this.routeCoordinates.length - 1;
+    // Localized search window around currentSegIndex, with full fallback
+    const startIdx = Math.max(0, (this.currentSegIndex || 0) - 5);
+    const endIdx = Math.min(totalSegs, startIdx + 45);
+
+    let bestDist = 0;
+    let minPerpDist = Infinity;
+    let bestSeg = this.currentSegIndex || 0;
+
+    for (let i = startIdx; i < endIdx; i++) {
+      const p1 = this.routeCoordinates[i];
+      const p2 = this.routeCoordinates[i + 1];
+      const proj = this.projectPointToSegment(currentLng, currentLat, p1[0], p1[1], p2[0], p2[1]);
+      const d = this.calculateDistance(currentLat, currentLng, proj.y, proj.x);
+      if (d < minPerpDist) {
+        minPerpDist = d;
+        bestSeg = i;
+        const segStartDist = this.routeCumulativeDistances[i] || 0;
+        const segLen = (this.routeCumulativeDistances[i + 1] || segStartDist) - segStartDist;
+        bestDist = segStartDist + proj.t * segLen;
+      }
+    }
+
+    if (minPerpDist > 45) {
+      for (let i = 0; i < totalSegs; i++) {
+        const p1 = this.routeCoordinates[i];
+        const p2 = this.routeCoordinates[i + 1];
+        const proj = this.projectPointToSegment(currentLng, currentLat, p1[0], p1[1], p2[0], p2[1]);
+        const d = this.calculateDistance(currentLat, currentLng, proj.y, proj.x);
+        if (d < minPerpDist) {
+          minPerpDist = d;
+          bestSeg = i;
+          const segStartDist = this.routeCumulativeDistances[i] || 0;
+          const segLen = (this.routeCumulativeDistances[i + 1] || segStartDist) - segStartDist;
+          bestDist = segStartDist + proj.t * segLen;
+        }
+      }
+    }
+
+    this.currentSegIndex = bestSeg;
+    return Math.max(0, Math.min(this.totalRouteMeters || Infinity, bestDist));
+  }
+
   trackNavigationProgress(currentLat, currentLng, isOffRoute = false, distToRoute = 0, speed = 0, isRealFix = true) {
     if (!this.activeRoute) return;
 
@@ -1546,77 +1580,56 @@ class TeslaMapEngine {
     const dest = this.activeRoute.destination;
     const distToDest = this.calculateDistance(currentLat, currentLng, dest.lat, dest.lng);
 
-    // 1. Determine vehicle progress along route polyline
-    let closestIdx = 0;
-    let minDist = Infinity;
-    if (this.routeCoordinates && this.routeCoordinates.length > 1) {
-      const startSearch = Math.max(0, (this.lastProgressIndex || 0) - 2);
-      const endSearch = Math.min(this.routeCoordinates.length, startSearch + 50);
-      for (let i = startSearch; i < endSearch; i++) {
-        const pt = this.routeCoordinates[i];
-        const d = this.calculateDistance(currentLat, currentLng, pt[1], pt[0]);
-        if (d < minDist) {
-          minDist = d;
-          closestIdx = i;
-        }
-      }
-      const prevProgressIdx = this.lastProgressIndex || 0;
-      const currentSeg = (this.currentSegIndex != null) ? this.currentSegIndex : Math.max(0, closestIdx - 1);
-      this.lastProgressIndex = Math.max(prevProgressIdx, currentSeg);
+    // 1. Accurate vehicle progress along the active route
+    const vehicleRouteDist = this.getVehicleDistanceAlongRoute(currentLat, currentLng);
+    const totalDist = this.totalRouteMeters || this.totalDistance || 1000;
+    const remainingMeters = Math.max(0, Math.round(totalDist - vehicleRouteDist));
+    const progressPercent = Math.min(100, Math.max(0, Math.round((vehicleRouteDist / totalDist) * 100)));
 
-      // 2. Update traveled route line on MapLibre GL
-      // Traveled route line must strictly end AT the vehicle position [currentLng, currentLat]:
-      // Slicing 0..currentSeg + 1 includes only vertices 0..currentSeg (all passed vertices behind the car).
-      // Vertex currentSeg + 1 (the upcoming vertex ahead of the car) is NEVER included!
-      const now = performance.now();
-      if (this.provider === 'maplibre' && this.map && (this.lastProgressIndex > prevProgressIdx || !this.lastTraveledUpdate || (now - this.lastTraveledUpdate > 120))) {
-        this.lastTraveledUpdate = now;
-        const traveledSource = this.map.getSource('route-traveled');
-        if (traveledSource) {
-          const traveledCoords = this.routeCoordinates.slice(0, currentSeg + 1);
-          traveledCoords.push([currentLng, currentLat]);
-          traveledSource.setData({
-            type: 'Feature',
-            geometry: { type: 'LineString', coordinates: traveledCoords }
-          });
-        }
-      } else if (this.provider === 'yandex' && this.map && this.yandexTraveledPolyline && (this.lastProgressIndex > prevProgressIdx || !this.lastTraveledUpdate || (now - this.lastTraveledUpdate > 120))) {
-        this.lastTraveledUpdate = now;
+    const prevProgressIdx = this.lastProgressIndex || 0;
+    const currentSeg = this.currentSegIndex || 0;
+    this.lastProgressIndex = Math.max(prevProgressIdx, currentSeg);
+
+    // 2. Update traveled route line on MapLibre GL and Yandex
+    const now = performance.now();
+    if (this.provider === 'maplibre' && this.map && (this.lastProgressIndex > prevProgressIdx || !this.lastTraveledUpdate || (now - this.lastTraveledUpdate > 120))) {
+      this.lastTraveledUpdate = now;
+      const traveledSource = this.map.getSource('route-traveled');
+      if (traveledSource && this.routeCoordinates) {
+        const traveledCoords = this.routeCoordinates.slice(0, currentSeg + 1);
+        traveledCoords.push([currentLng, currentLat]);
+        traveledSource.setData({
+          type: 'Feature',
+          geometry: { type: 'LineString', coordinates: traveledCoords }
+        });
+      }
+    } else if (this.provider === 'yandex' && this.map && this.yandexTraveledPolyline && (this.lastProgressIndex > prevProgressIdx || !this.lastTraveledUpdate || (now - this.lastTraveledUpdate > 120))) {
+      this.lastTraveledUpdate = now;
+      if (this.routeCoordinates) {
         const traveledCoords = this.routeCoordinates.slice(0, currentSeg + 1).map(c => [c[1], c[0]]);
         traveledCoords.push([currentLat, currentLng]);
         this.yandexTraveledPolyline.geometry.setCoordinates(traveledCoords);
       }
-
-      // 3. Instant O(1) Remaining Route Distance
-      const totalDist = this.totalRouteMeters || this.totalDistance || 1000;
-      let remainingMeters = 0;
-      if (this.routeCumulativeDistances && this.routeCumulativeDistances[this.lastProgressIndex] != null) {
-        remainingMeters = Math.max(0, totalDist - this.routeCumulativeDistances[this.lastProgressIndex]);
-      } else {
-        remainingMeters = Math.max(0, distToDest);
-      }
-
-      const progressPercent = Math.min(96, Math.max(0, Math.round((1 - remainingMeters / totalDist) * 100)));
-
-      // Calculate remaining duration and ETA
-      const totalDurSec = this.activeRoute.durationSec || (totalDist / 11);
-      const remainingRatio = Math.max(0, Math.min(1, remainingMeters / totalDist));
-      const remainingDurationSec = Math.max(30, Math.round(totalDurSec * remainingRatio));
-      const remainingMinutes = Math.max(1, Math.round(remainingDurationSec / 60));
-
-      const nowTime = new Date();
-      const etaDate = new Date(nowTime.getTime() + remainingDurationSec * 1000);
-      const etaHours = String(etaDate.getHours()).padStart(2, '0');
-      const etaMins = String(etaDate.getMinutes()).padStart(2, '0');
-
-      this.onProgressUpdate({
-        percent: progressPercent,
-        remainingDistance: this.formatNavDistance(remainingMeters),
-        remainingDuration: this.formatNavDuration(remainingMinutes, true),
-        eta: `${etaHours}:${etaMins}`,
-        remainingMeters: remainingMeters
-      });
     }
+
+    // Calculate remaining duration and ETA
+    const totalDurSec = this.activeRoute.durationSec || (totalDist / 11);
+    const remainingRatio = Math.max(0, Math.min(1, remainingMeters / totalDist));
+    const remainingDurationSec = Math.max(30, Math.round(totalDurSec * remainingRatio));
+    const remainingMinutes = Math.max(1, Math.round(remainingDurationSec / 60));
+
+    const nowTime = new Date();
+    const etaDate = new Date(nowTime.getTime() + remainingDurationSec * 1000);
+    const etaHours = String(etaDate.getHours()).padStart(2, '0');
+    const etaMins = String(etaDate.getMinutes()).padStart(2, '0');
+
+    this.onProgressUpdate({
+      percent: progressPercent,
+      remainingDistance: this.formatNavDistance(remainingMeters),
+      remainingDuration: this.formatNavDuration(remainingMinutes, true),
+      eta: `${etaHours}:${etaMins}`,
+      remainingMeters: remainingMeters
+    });
 
     // Destination Arrival
     if (distToDest < 25) {
@@ -1628,43 +1641,38 @@ class TeslaMapEngine {
       return;
     }
 
-    // 4. Maneuver advancement & countdown with smart rounding
+    // 4. Maneuver advancement & countdown strictly based on route progression
     if (this.routeSteps && this.routeSteps.length > 0) {
-      while (this.currentStepIndex < this.routeSteps.length - 1) {
-        const step = this.routeSteps[this.currentStepIndex];
-        if (!step.location) {
-          break;
-        }
-        const stepDist = this.calculateDistance(currentLat, currentLng, step.location[1], step.location[0]);
-        if (stepDist < 30) {
-          this.currentStepIndex++;
-          this.spokenDistanceThresholds = {};
-        } else {
-          break;
-        }
+      // Advance maneuver step when vehicle reaches within 25m of the step's end
+      while (
+        this.currentStepIndex < this.routeSteps.length - 1 &&
+        (vehicleRouteDist >= (this.routeSteps[this.currentStepIndex].endRouteDist - 25))
+      ) {
+        this.currentStepIndex++;
       }
 
       const activeStep = this.routeSteps[this.currentStepIndex] || this.routeSteps[this.routeSteps.length - 1];
+      const isLastStep = (this.currentStepIndex >= this.routeSteps.length - 1);
+      const currentSpeedLimit = activeStep.speedLimit || 60;
+
+      // Distance to upcoming maneuver continuously counts down to 0
       let activeDist = 0;
-      if (activeStep.location) {
-        activeDist = Math.max(0, this.calculateDistance(currentLat, currentLng, activeStep.location[1], activeStep.location[0]));
+      if (isLastStep) {
+        activeDist = Math.max(0, Math.round(distToDest));
       } else {
-        activeDist = Math.max(0, distToDest);
+        activeDist = Math.max(0, Math.round((activeStep.endRouteDist || totalDist) - vehicleRouteDist));
       }
 
       // Search for the closest upcoming lane intersection along route (within 220m)
       let upcomingLaneInter = null;
       let upcomingLaneDist = Infinity;
-      const currentCarDist = this.simulatedNavDistance != null
-        ? this.simulatedNavDistance
-        : (this.routeCumulativeDistances?.[this.lastProgressIndex || 0] || 0);
 
       if (this.laneIntersections && this.laneIntersections.length > 0) {
         for (const li of this.laneIntersections) {
-          const dAhead = (li.routeDist != null ? li.routeDist : 0) - currentCarDist;
+          const dAhead = (li.routeDist != null ? li.routeDist : 0) - vehicleRouteDist;
           if (dAhead >= -15 && dAhead <= 220) {
             upcomingLaneInter = li;
-            upcomingLaneDist = Math.max(0, dAhead);
+            upcomingLaneDist = Math.max(0, Math.round(dAhead));
             break;
           }
         }
@@ -1678,19 +1686,18 @@ class TeslaMapEngine {
         ? upcomingLaneDist
         : activeDist;
 
-      const stepInstruction = this.formatStepInstruction(
-        (upcomingLaneInter && upcomingLaneDist <= 220 && upcomingLaneInter.modifier) ? upcomingLaneInter.modifier : (activeStep.modifier || 'straight'),
-        activeStep.name || dest.name
-      );
+      const activeModifier = (upcomingLaneInter && upcomingLaneDist <= 220 && upcomingLaneInter.modifier)
+        ? upcomingLaneInter.modifier
+        : (activeStep.modifier || 'straight');
+
+      const stepInstruction = this.formatStepInstruction(activeModifier, activeStep.name || dest.name);
 
       this.onManeuverUpdate({
         distance: this.formatNavDistance(activeDist),
         distanceMeters: activeDist,
         instruction: stepInstruction,
         street: activeStep.name || dest.name,
-        modifier: (upcomingLaneInter && upcomingLaneDist <= 220 && upcomingLaneInter.modifier)
-          ? upcomingLaneInter.modifier
-          : (activeStep.modifier || 'straight'),
+        modifier: activeModifier,
         type: activeStep.type || 'turn',
         speedLimit: currentSpeedLimit,
         location: activeStep.location || null,
@@ -1698,16 +1705,16 @@ class TeslaMapEngine {
         laneDistanceMeters: activeLaneDist
       });
 
-      // Voice announcements at 250m and 50m (localized phraseology)
+      // Voice announcements with reliable wide windows (350m-100m and 85m-15m)
       if (this.voiceEnabled) {
-        if (activeDist <= 260 && activeDist >= 200 && !this.spokenDistanceThresholds['250']) {
-          this.spokenDistanceThresholds['250'] = true;
+        if (activeDist <= 350 && activeDist >= 100 && !activeStep.spoken300) {
+          activeStep.spoken300 = true;
           const lang = window.CURRENT_LANG || 'ru';
           const turnText = this.getTurnSpeech(activeStep.modifier);
           let phrase = '';
           if (lang === 'en') {
             const streetText = activeStep.name ? ` onto ${activeStep.name}` : '';
-            phrase = `In 250 meters ${turnText.toLowerCase()}${streetText}`;
+            phrase = `In 300 meters ${turnText.toLowerCase()}${streetText}`;
           } else if (lang === 'hy') {
             const mod = (activeStep.modifier || '').toLowerCase();
             if (mod.includes('slight left') || mod.includes('keep left') || mod.includes('fork left')) phrase = 'dist_250_keep_left';
@@ -1717,11 +1724,11 @@ class TeslaMapEngine {
             else phrase = 'dist_250_straight';
           } else {
             const streetText = activeStep.name ? ` на ${activeStep.name}` : '';
-            phrase = `Через 250 метров ${turnText.toLowerCase()}${streetText}`;
+            phrase = `Через 300 метров ${turnText.toLowerCase()}${streetText}`;
           }
           this.speakVoice(phrase);
-        } else if (activeDist <= 70 && activeDist >= 30 && !this.spokenDistanceThresholds['50']) {
-          this.spokenDistanceThresholds['50'] = true;
+        } else if (activeDist <= 85 && activeDist >= 15 && !activeStep.spokenImmediate) {
+          activeStep.spokenImmediate = true;
           this.speakVoice(this.getTurnSpeech(activeStep.modifier));
         }
       }
@@ -1730,36 +1737,38 @@ class TeslaMapEngine {
     // 5. Proximity to speed cameras: strictly along the active route ahead
     let nearestCameraDist = Infinity;
     let upcomingCameraLimit = null;
+    let upcomingCameraObj = null;
 
-    if (this.routeCoordinates && this.routeCoordinates.length > 1) {
-      const totalSegs = this.routeCoordinates.length - 1;
-      const currentSeg = this.currentSegIndex || 0;
-
-      for (const cam of this.trafficPoints.filter(p => p.type === 'camera')) {
-        for (let i = currentSeg; i < Math.min(totalSegs, currentSeg + 60); i++) {
-          const p1 = this.routeCoordinates[i];
-          const p2 = this.routeCoordinates[i + 1];
-          const proj = this.projectPointToSegment(cam.lng, cam.lat, p1[0], p1[1], p2[0], p2[1]);
-          const perpDist = this.calculateDistance(cam.lat, cam.lng, proj.y, proj.x);
-          // Strict corridor: camera must be within 24m of the route polyline
-          if (perpDist <= 24) {
-            const segDist = this.routeCumulativeDistances?.[i] || 0;
-            const segLen = Math.max(0.1, (this.routeCumulativeDistances?.[i + 1] || (segDist + 1)) - segDist);
-            const camRouteDist = segDist + (proj.t * segLen);
-            const currentRouteDist = this.simulatedNavDistance || (this.routeCumulativeDistances?.[currentSeg] || 0);
-            const distAlongRoute = camRouteDist - currentRouteDist;
-
-            if (distAlongRoute > 15 && distAlongRoute < 550 && distAlongRoute < nearestCameraDist) {
-              nearestCameraDist = Math.round(distAlongRoute);
-              upcomingCameraLimit = cam.limit || 60;
-            }
-            break;
-          }
+    if (this.routeCameras && this.routeCameras.length > 0) {
+      for (const cam of this.routeCameras) {
+        const distAlongRoute = cam.routeDist - vehicleRouteDist;
+        if (distAlongRoute > -15 && distAlongRoute < 600) {
+          nearestCameraDist = Math.round(distAlongRoute);
+          upcomingCameraLimit = cam.limit || 60;
+          upcomingCameraObj = cam;
+          break;
         }
       }
     }
 
-    if (nearestCameraDist < 550) {
+    if (upcomingCameraObj && nearestCameraDist < 600) {
+      // Audio chime and voice prompt when approaching speed camera
+      if (!upcomingCameraObj.alerted && nearestCameraDist <= 350 && nearestCameraDist >= 80) {
+        upcomingCameraObj.alerted = true;
+        this.playNavChime();
+        const limit = upcomingCameraLimit || 60;
+        const lang = window.CURRENT_LANG || 'ru';
+        let phrase = '';
+        if (lang === 'en') {
+          phrase = `Speed camera ahead, limit ${limit}`;
+        } else if (lang === 'hy') {
+          phrase = `Ուշադրություն, արագաչափ ${limit}`;
+        } else {
+          phrase = `Внимание, камера на ${limit}`;
+        }
+        this.speakVoice(phrase);
+      }
+
       this.onCameraAlert({
         visible: true,
         distance: this.formatNavDistance(nearestCameraDist),
@@ -1775,6 +1784,7 @@ class TeslaMapEngine {
   checkFreeDrivingCameraAlert(currentLat, currentLng, speed) {
     let nearestCameraDist = Infinity;
     let upcomingCameraLimit = null;
+    let upcomingCamObj = null;
 
     for (const cam of this.trafficPoints.filter(p => p.type === 'camera')) {
       const d = this.calculateDistance(currentLat, currentLng, cam.lat, cam.lng);
@@ -1786,12 +1796,25 @@ class TeslaMapEngine {
           if (perp <= 24 && d < nearestCameraDist) {
             nearestCameraDist = Math.round(d);
             upcomingCameraLimit = cam.limit || 60;
+            upcomingCamObj = cam;
           }
         }
       }
     }
 
-    if (nearestCameraDist < 450) {
+    if (upcomingCamObj && nearestCameraDist < 450) {
+      if (!upcomingCamObj.alerted && nearestCameraDist <= 350 && nearestCameraDist >= 80) {
+        upcomingCamObj.alerted = true;
+        this.playNavChime();
+        const limit = upcomingCameraLimit || 60;
+        const lang = window.CURRENT_LANG || 'ru';
+        let phrase = '';
+        if (lang === 'en') phrase = `Speed camera ahead, limit ${limit}`;
+        else if (lang === 'hy') phrase = `Ուշադրություն, արագաչափ ${limit}`;
+        else phrase = `Внимание, камера на ${limit}`;
+        this.speakVoice(phrase);
+      }
+
       this.onCameraAlert({
         visible: true,
         distance: this.formatNavDistance(nearestCameraDist),
@@ -2177,6 +2200,38 @@ class TeslaMapEngine {
         distance: distanceMeters,
         speedLimit: 60
       });
+    }
+
+    // Pre-calculate cumulative end distance for every maneuver step along route
+    let runningStepDist = 0;
+    this.routeSteps.forEach((step, idx) => {
+      runningStepDist += (step.distance || 0);
+      step.endRouteDist = (idx === this.routeSteps.length - 1) ? this.totalRouteMeters : runningStepDist;
+    });
+
+    // Pre-calculate route positions for speed cameras strictly along this route
+    this.routeCameras = [];
+    if (this.trafficPoints && this.routeCoordinates && this.routeCumulativeDistances) {
+      for (const cam of this.trafficPoints.filter(p => p.type === 'camera')) {
+        let bestDist = 0;
+        let minD = Infinity;
+        for (let i = 0; i < this.routeCoordinates.length - 1; i++) {
+          const p1 = this.routeCoordinates[i];
+          const p2 = this.routeCoordinates[i + 1];
+          const proj = this.projectPointToSegment(cam.lng, cam.lat, p1[0], p1[1], p2[0], p2[1]);
+          const d = this.calculateDistance(cam.lat, cam.lng, proj.y, proj.x);
+          if (d < minD) {
+            minD = d;
+            const segStartDist = this.routeCumulativeDistances[i] || 0;
+            const segLen = (this.routeCumulativeDistances[i + 1] || segStartDist) - segStartDist;
+            bestDist = segStartDist + proj.t * segLen;
+          }
+        }
+        if (minD <= 28) {
+          this.routeCameras.push({ ...cam, routeDist: bestDist });
+        }
+      }
+      this.routeCameras.sort((a, b) => a.routeDist - b.routeDist);
     }
 
     // Prepare list of all routes for cards (up to 3 routes)
@@ -2600,10 +2655,16 @@ class TeslaMapEngine {
     this.routeCoordinates = [];
     this.alternativeCoordinates = null;
     this.routeSteps = [];
+    this.routeCameras = [];
+    this.spokenDistanceThresholds = {};
     this.laneIntersections = [];
     this.currentStepIndex = 0;
     this.totalDistance = 0;
     this.specialRoadPoints = [];
+    if (this.currentAudioVoice) {
+      try { this.currentAudioVoice.pause(); } catch (e) {}
+      this.currentAudioVoice = null;
+    }
 
     if (this.provider === 'maplibre' && this.map) {
       if (this.map.getLayer('route-traveled-casing')) this.map.removeLayer('route-traveled-casing');
