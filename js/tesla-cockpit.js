@@ -34,8 +34,14 @@ const EV_CHARGERS = [
   { name: 'Cascade Plaza EV Hub', lat: 40.191500, lng: 44.515200, power: '60 kW', stalls: '1/2 свободно', address: 'Antarayin St 160, Yerevan' }
 ];
 
-document.addEventListener('DOMContentLoaded', async () => {
+// Global hooks
+window.updateManeuverHud = updateManeuverHud;
+window.renderLaneGuidance = renderLaneGuidance;
+
+async function initTeslaCockpit() {
   console.log('🚗 Initializing Tesla Navi Automotive Cockpit...');
+  window.updateManeuverHud = updateManeuverHud;
+  window.renderLaneGuidance = renderLaneGuidance;
 
   // Universal Audio Pipeline Unlock for Tesla Browser Autoplay Policy
   const unlockAudioPipeline = () => {
@@ -80,7 +86,13 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // 8. Developer Mode & In-Car Simulator (?mode=dev)
   initDevMode();
-});
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initTeslaCockpit);
+} else {
+  initTeslaCockpit();
+}
 
 // 1. Language Management (RU, HY, EN)
 function initLanguage() {
@@ -1983,6 +1995,7 @@ function updateManeuverHud(m) {
   // Real Lane Guidance matching Yandex Navigator (Screenshots 4 & 5)
   renderLaneGuidance(m);
 }
+window.updateManeuverHud = updateManeuverHud;
 
 // Single Lane Arrow SVG Generator matching authentic road traffic signs
 function getSingleLaneSvg(indications, isActive) {
