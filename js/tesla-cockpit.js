@@ -10,6 +10,11 @@ let chargersVisible = false;
 let pendingGpsFix = null;
 let hasReceivedRealGps = false;
 
+// GPS source arbitration: phone fixes win; the car's own geolocation is used only
+// when no phone fix arrived within this window (phone not paired, asleep, out of range)
+const PHONE_GPS_PRIORITY_MS = 5000;
+let lastPhoneGpsAt = 0;
+
 // YouTube Queue & Player State (Dynamic, no hardcoded tracks)
 let youtubeQueue = [];
 let currentTrackIndex = -1;
@@ -312,6 +317,10 @@ function initTeslaCarGps() {
 
   navigator.geolocation.watchPosition(
     (pos) => {
+      // The paired phone is the more accurate source: while it streams, ignore the car's
+      // own fixes, otherwise the arrow alternates between two receivers and jumps around
+      if (Date.now() - lastPhoneGpsAt < PHONE_GPS_PRIORITY_MS) return;
+
       const coords = pos.coords;
       const speedKmh = coords.speed ? Math.round(coords.speed * 3.6) : 0;
       const heading = (coords.heading != null && !isNaN(coords.heading) && coords.heading > 0) ? coords.heading : null;
@@ -400,6 +409,7 @@ function generateCode() {
 
 function handleIncomingGps(gps) {
   if (!gps || isNaN(gps.lat) || isNaN(gps.lng)) return;
+  lastPhoneGpsAt = Date.now();
   const speedKmh = Math.round((gps.speed || 0) * 3.6);
   updateSpeedometerDisplay(speedKmh);
 
