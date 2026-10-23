@@ -34,6 +34,17 @@ const EV_CHARGERS = [
   { name: 'Cascade Plaza EV Hub', lat: 40.191500, lng: 44.515200, power: '60 kW', stalls: '1/2 свободно', address: 'Antarayin St 160, Yerevan' }
 ];
 
+// Escape untrusted text (geocoder/Yandex/YouTube results, phone packets, saved places)
+// before interpolating it into innerHTML templates
+function escapeHtml(value) {
+  return String(value == null ? '' : value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 // Global hooks
 window.updateManeuverHud = updateManeuverHud;
 window.renderLaneGuidance = renderLaneGuidance;
@@ -1204,8 +1215,8 @@ function renderQuickDestChips() {
     btn.dataset.dest = item.type;
     btn.title = `${dict.btnRoute || 'Маршрут'}: ${item.title}`;
     btn.innerHTML = `
-      <span class="chip-ico">${item.icon}</span>
-      <span class="chip-title">${item.title}</span>
+      <span class="chip-ico">${escapeHtml(item.icon)}</span>
+      <span class="chip-title">${escapeHtml(item.title)}</span>
       ${distStr ? `<span class="chip-dist">${distStr}</span>` : ''}
     `;
 
@@ -1405,8 +1416,8 @@ function renderFavoritesList() {
       <div class="my-place-left">
         <div class="my-place-icon-box star-box">⭐</div>
         <div class="my-place-info">
-          <div class="my-place-name">${fav.name}</div>
-          <div class="my-place-sub">${fav.address || ''}${distStr ? ' • ' + distStr : ''}</div>
+          <div class="my-place-name">${escapeHtml(fav.name)}</div>
+          <div class="my-place-sub">${escapeHtml(fav.address || '')}${distStr ? ' • ' + distStr : ''}</div>
         </div>
       </div>
       <div class="my-place-actions">
@@ -1568,8 +1579,8 @@ function initEditPlaceModalHandlers() {
                   <div class="item-left">
                     <div class="item-icon">📍</div>
                     <div>
-                      <div class="item-title">${title}</div>
-                      <div class="item-subtitle">${subtitle}</div>
+                      <div class="item-title">${escapeHtml(title)}</div>
+                      <div class="item-subtitle">${escapeHtml(subtitle)}</div>
                     </div>
                   </div>
                 `;
@@ -1781,8 +1792,8 @@ function renderSearchHistory() {
       <div class="item-left">
         <div class="item-icon">📍</div>
         <div>
-          <div class="item-title">${h.name}</div>
-          <div class="item-subtitle">${h.address || 'Yerevan, Armenia'}</div>
+          <div class="item-title">${escapeHtml(h.name)}</div>
+          <div class="item-subtitle">${escapeHtml(h.address || 'Yerevan, Armenia')}</div>
         </div>
       </div>
       <div style="display: flex; align-items: center; gap: 6px;">
@@ -1881,8 +1892,8 @@ function initSearchHandlers() {
               <div class="item-left">
                 <div class="item-icon">📍</div>
                 <div>
-                  <div class="item-title">${title}</div>
-                  <div class="item-subtitle">${subtitle}</div>
+                  <div class="item-title">${escapeHtml(title)}</div>
+                  <div class="item-subtitle">${escapeHtml(subtitle)}</div>
                 </div>
               </div>
               <div style="display: flex; align-items: center; gap: 8px;">
@@ -1957,8 +1968,16 @@ async function startNavigationTo(destination) {
 }
 
 function handleIncomingDestination(destination) {
-  console.log('📍 Destination received from Phone:', destination);
-  startNavigationTo(destination);
+  // Anyone who knows the 6-char room code can publish on the channel: accept only a sane payload
+  const lat = Number(destination && destination.lat);
+  const lng = Number(destination && destination.lng);
+  if (!Number.isFinite(lat) || !Number.isFinite(lng) || Math.abs(lat) > 90 || Math.abs(lng) > 180) {
+    console.warn('📍 Ignored malformed destination packet from Phone');
+    return;
+  }
+  const name = String((destination && destination.name) || 'Destination').slice(0, 120);
+  console.log('📍 Destination received from Phone:', name, lat, lng);
+  startNavigationTo({ name, lat, lng });
 }
 
 // Route Alternatives & Turn Details Drawer (Mapsev IMG_3693)
@@ -2059,7 +2078,7 @@ function showRouteAlternativesDrawer(route) {
       item.innerHTML = `
         <div class="turn-step-icon">${icon}</div>
         <div class="turn-step-info">
-          <div class="turn-step-street">${localizedInstruction}</div>
+          <div class="turn-step-street">${escapeHtml(localizedInstruction)}</div>
         </div>
         <div class="turn-step-dist">${distStr}</div>
       `;
@@ -2073,9 +2092,9 @@ function showRouteAlternativesDrawer(route) {
   arrivalItem.innerHTML = `
     <div class="turn-step-icon" style="color: #10b981;">🏁</div>
     <div class="turn-step-info">
-      <div class="turn-step-street">${route.name}</div>
+      <div class="turn-step-street">${escapeHtml(route.name)}</div>
     </div>
-    <div class="turn-step-dist">${route.eta}</div>
+    <div class="turn-step-dist">${escapeHtml(route.eta)}</div>
   `;
   listEl.appendChild(arrivalItem);
 
@@ -2556,10 +2575,10 @@ function renderChargingStationsList() {
     card.className = 'ev-charger-card';
     card.innerHTML = `
       <div class="ev-charger-top">
-        <div class="ev-charger-name">⚡ ${charger.name}</div>
+        <div class="ev-charger-name">⚡ ${escapeHtml(charger.name)}</div>
         <span class="ev-charger-power">${charger.power}</span>
       </div>
-      <div style="font-size: 12px; color: #64748b; line-height: 1.3;">${charger.address}</div>
+      <div style="font-size: 12px; color: #64748b; line-height: 1.3;">${escapeHtml(charger.address)}</div>
       <div class="ev-charger-meta">
         <span class="ev-stalls-free">● ${charger.stalls}</span>
         <div style="display: flex; align-items: center; gap: 8px;">
@@ -3064,12 +3083,12 @@ function initWeatherAndMusic() {
 
     item.innerHTML = `
       <div class="yt-thumb-wrap">
-        <img class="yt-thumb-img" src="${thumbUrl}" alt="" loading="lazy" />
-        <span class="yt-duration-badge">${track.duration || '3:30'}</span>
+        <img class="yt-thumb-img" src="${escapeHtml(thumbUrl)}" alt="" loading="lazy" />
+        <span class="yt-duration-badge">${escapeHtml(track.duration || '3:30')}</span>
       </div>
       <div class="yt-info-wrap">
-        <div class="yt-item-title">${track.title}</div>
-        <div class="yt-item-meta">${metaText}</div>
+        <div class="yt-item-title">${escapeHtml(track.title)}</div>
+        <div class="yt-item-meta">${escapeHtml(metaText)}</div>
       </div>
     `;
 
@@ -3325,7 +3344,7 @@ function initWeatherAndMusic() {
       item.className = 'yt-suggestion-item';
       item.innerHTML = `
         <svg class="yt-suggest-icon" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-        <span>${s}</span>
+        <span>${escapeHtml(s)}</span>
       `;
       item.addEventListener('click', () => {
         if (ytSearchInput) ytSearchInput.value = s;
@@ -3534,7 +3553,7 @@ function initDevMode() {
 
     const line = document.createElement('div');
     line.className = `dev-log-line ${level}`;
-    line.innerHTML = `<span>[${timeStr}]</span> <strong>[${level.toUpperCase()}]</strong> ${text}`;
+    line.innerHTML = `<span>[${timeStr}]</span> <strong>[${level.toUpperCase()}]</strong> ${escapeHtml(text)}`;
     logBox.appendChild(line);
     logBox.scrollTop = logBox.scrollHeight;
   }
