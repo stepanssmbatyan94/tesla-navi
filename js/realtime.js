@@ -2,6 +2,8 @@
 
 const WS_RECONNECT_MIN_MS = 1000;
 const WS_RECONNECT_MAX_MS = 15000;
+// How many recent packet identities to remember for duplicate detection (~1 min of GPS)
+const RECENT_PACKET_KEYS_MAX = 64;
 
 // 6-character easy-to-read pairing code (e.g. 24W84Z), no confusable 0/O/1/I.
 // The code is the only thing guarding a pairing channel, so use the CSPRNG; 32 symbols
@@ -189,28 +191,32 @@ class TeslaRealtime {
     }
   }
 
-  // Every packet travels over both Supabase and the local WS: drop the second copy
-  // (and any stale out-of-order packet) by its sender timestamp
-  isDuplicate(payload, key) {
-    const ts = payload && payload.timestamp;
-    if (!ts) return false;
-    // A much older timestamp means a new sender with a skewed clock: accept and resync
-    if (this[key] && ts <= this[key] && this[key] - ts < 30000) return true;
-    this[key] = ts;
+  // Every packet travels over both Supabase and the local WS: drop only the exact second
+  // copy. Ordering by timestamp is not used, so a second phone (or one whose clock is
+  // behind the previous sender's) is never silenced.
+  isDuplicate(payload, kind) {
+    if (!payload || !payload.timestamp) return false;
+    const key = `${kind}|${payload.timestamp}|${payload.lat}|${payload.lng}`;
+    if (!this.recentPacketKeys) this.recentPacketKeys = new Set();
+    if (this.recentPacketKeys.has(key)) return true;
+    this.recentPacketKeys.add(key);
+    if (this.recentPacketKeys.size > RECENT_PACKET_KEYS_MAX) {
+      this.recentPacketKeys.delete(this.recentPacketKeys.values().next().value);
+    }
     return false;
   }
 
   handleGpsPacket(payload) {
     this.lastPacketTime = Date.now();
     this.setConnected(true);
-    if (this.isDuplicate(payload, 'lastGpsTimestamp')) return;
+    if (this.isDuplicate(payload, 'gps')) return;
     this.onGpsUpdate(payload);
   }
 
   handleDestinationPacket(payload) {
     this.lastPacketTime = Date.now();
     this.setConnected(true);
-    if (this.isDuplicate(payload, 'lastDestinationTimestamp')) return;
+    if (this.isDuplicate(payload, 'destination')) return;
     this.onDestinationSet(payload);
   }
 
