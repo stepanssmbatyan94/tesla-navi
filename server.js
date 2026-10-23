@@ -390,10 +390,20 @@ function getArmenianAudio(text, voiceChoice = 'gor') {
   const v = (voiceChoice || '').toLowerCase();
   const folder = (v === 'suzie' || v === 'female' || v === 'svetlana' || v === 'ava') ? 'suzie' : 'gor';
 
-  let file = 'welcome.mp3';
+  // Unknown phrases get no clip (the caller answers 404) instead of replaying the greeting
+  let file = null;
+  const is250 = t.includes('250') || t.includes('հիսուն');
 
   if (t.includes('կառուցված') || t.includes('գնացինք') || t === 'route_start') {
     file = 'route_start.mp3';
+  } else if ((t.includes('հետադարձ') && is250) || t === 'dist_250_uturn') {
+    file = 'dist_250_uturn.mp3';
+  } else if (t.includes('հետադարձ') || t === 'uturn') {
+    file = 'uturn.mp3';
+  } else if ((t.includes('պահեք ձախ') && is250) || t === 'dist_250_keep_left') {
+    file = 'dist_250_keep_left.mp3';
+  } else if ((t.includes('պահեք աջ') && is250) || t === 'dist_250_keep_right') {
+    file = 'dist_250_keep_right.mp3';
   } else if ((t.includes('ձախ') && (t.includes('250') || t.includes('հիսուն'))) || t === 'dist_250_left') {
     file = 'dist_250_left.mp3';
   } else if ((t.includes('աջ') && (t.includes('250') || t.includes('հիսուն'))) || t === 'dist_250_right') {
@@ -427,6 +437,8 @@ function getArmenianAudio(text, voiceChoice = 'gor') {
   } else if (t.includes('գոռն') || t.includes('սյուզի') || t.includes('բարև') || t === 'welcome') {
     file = 'welcome.mp3';
   }
+
+  if (!file) return null;
 
   let filePath = path.join(__dirname, 'sounds', 'hy', folder, file);
   if (!fs.existsSync(filePath)) {
@@ -465,6 +477,10 @@ function getArmenianAudio(text, voiceChoice = 'gor') {
         res.end(armenianBuf);
         return;
       }
+      // No recorded clip: the Russian/English neural voices can't read Armenian text
+      res.writeHead(404, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'No Armenian clip for this phrase' }));
+      return;
     }
 
     try {

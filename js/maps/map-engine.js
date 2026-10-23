@@ -1731,7 +1731,8 @@ class TeslaMapEngine {
             phrase = `In 300 meters ${turnText.toLowerCase()}${streetText}`;
           } else if (lang === 'hy') {
             const mod = maneuverModifier.toLowerCase();
-            if (mod.includes('slight left') || mod.includes('keep left') || mod.includes('fork left')) phrase = 'dist_250_keep_left';
+            if (mod.includes('uturn') || mod.includes('u-turn')) phrase = 'dist_250_uturn';
+            else if (mod.includes('slight left') || mod.includes('keep left') || mod.includes('fork left')) phrase = 'dist_250_keep_left';
             else if (mod.includes('slight right') || mod.includes('keep right') || mod.includes('fork right')) phrase = 'dist_250_keep_right';
             else if (mod.includes('left')) phrase = 'dist_250_left';
             else if (mod.includes('right')) phrase = 'dist_250_right';
