@@ -2350,46 +2350,43 @@ class TeslaMapEngine {
     }
   }
 
+  // Remove every runtime route layer/source (layers first: a source can't go while in use)
+  clearMapLibreRouteLayers() {
+    if (!this.map) return;
+    const layerIds = ['route-traveled-line', 'route-traveled-casing', 'route-traffic', 'route-casing', 'route-alt-line', 'route-alt-casing'];
+    const sourceIds = ['route-traveled', 'route-traffic', 'route-full', 'route-alt'];
+    layerIds.forEach(id => { if (this.map.getLayer(id)) this.map.removeLayer(id); });
+    sourceIds.forEach(id => { if (this.map.getSource(id)) this.map.removeSource(id); });
+  }
+
   // Render Route on MapLibre GL with Yandex Navigator Styling & Alternative Blue Routes
   renderMapLibreRoute(coordinates, destination, alternatives = null, trafficSegments = null) {
     // Remembered so the route can be redrawn after a day/night style swap
     this.lastRouteRender = { coordinates, destination, alternatives, trafficSegments };
 
-    // Clear old alternative layers (alt 0, 1, 2, etc.)
-    for (let a = 0; a < 5; a++) {
-      if (this.map.getLayer(`route-alt-casing-${a}`)) this.map.removeLayer(`route-alt-casing-${a}`);
-      if (this.map.getLayer(`route-alt-line-${a}`)) this.map.removeLayer(`route-alt-line-${a}`);
-      if (this.map.getSource(`route-alt-${a}`)) this.map.removeSource(`route-alt-${a}`);
-    }
-    if (this.map.getLayer('route-alt-casing')) this.map.removeLayer('route-alt-casing');
-    if (this.map.getLayer('route-alt-line')) this.map.removeLayer('route-alt-line');
-    if (this.map.getSource('route-alt')) this.map.removeSource('route-alt');
+    this.clearMapLibreRouteLayers();
 
-    if (this.map.getLayer('route-casing')) this.map.removeLayer('route-casing');
-    for (let i = 0; i < 200; i++) {
-      if (this.map.getLayer(`route-seg-${i}`)) this.map.removeLayer(`route-seg-${i}`);
-      if (this.map.getSource(`route-seg-${i}`)) this.map.removeSource(`route-seg-${i}`);
-    }
-    if (this.map.getSource('route-full')) this.map.removeSource('route-full');
-
-    // 1. Alternative Routes (Cyan Blue lines underneath, like MapsEV & Yandex)
+    // 1. Alternative Routes (Cyan Blue lines underneath, like MapsEV & Yandex) — one source for all
     const altList = Array.isArray(alternatives) ? alternatives : (alternatives ? [{ coordinates: alternatives, index: 1 }] : []);
-    altList.forEach((alt, aIdx) => {
-      const altCoords = alt.coordinates || alt;
-      if (!altCoords || altCoords.length < 2) return;
-      const srcId = `route-alt-${aIdx}`;
-      this.map.addSource(srcId, {
+    const altFeatures = altList
+      .map((alt, aIdx) => ({ coords: alt.coordinates || alt, aIdx }))
+      .filter(a => a.coords && a.coords.length >= 2)
+      .map(a => ({
+        type: 'Feature',
+        properties: { rank: a.aIdx },
+        geometry: { type: 'LineString', coordinates: a.coords }
+      }));
+
+    if (altFeatures.length > 0) {
+      this.map.addSource('route-alt', {
         type: 'geojson',
-        data: {
-          type: 'Feature',
-          geometry: { type: 'LineString', coordinates: altCoords }
-        }
+        data: { type: 'FeatureCollection', features: altFeatures }
       });
 
       this.map.addLayer({
-        id: `route-alt-casing-${aIdx}`,
+        id: 'route-alt-casing',
         type: 'line',
-        source: srcId,
+        source: 'route-alt',
         layout: { 'line-join': 'round', 'line-cap': 'round' },
         paint: {
           'line-color': '#0f172a',
@@ -2399,17 +2396,17 @@ class TeslaMapEngine {
       });
 
       this.map.addLayer({
-        id: `route-alt-line-${aIdx}`,
+        id: 'route-alt-line',
         type: 'line',
-        source: srcId,
+        source: 'route-alt',
         layout: { 'line-join': 'round', 'line-cap': 'round' },
         paint: {
-          'line-color': aIdx === 0 ? '#0284c7' : '#0ea5e9', // Vibrant Sky/Cyan Blue
+          'line-color': ['match', ['get', 'rank'], 0, '#0284c7', '#0ea5e9'], // Vibrant Sky/Cyan Blue
           'line-width': 5.0,
           'line-opacity': 0.80
         }
       });
-    });
+    }
 
     // 2. Primary Route Dark Navy Casing
     this.map.addSource('route-full', {
@@ -2433,38 +2430,39 @@ class TeslaMapEngine {
     });
 
     // 3. Colored Traffic Segments (100% Genuine Yandex Traffic or Smooth Fallback)
+    // A single data-driven layer: long routes carry hundreds of segments, and one
+    // layer per segment both overloads the MCU and leaked ids past the cleanup range
     const segments = (trafficSegments && trafficSegments.length > 0)
       ? trafficSegments
       : this.generateTrafficSegments(coordinates);
 
-    segments.forEach((seg, i) => {
-      const sourceId = `route-seg-${i}`;
-      this.map.addSource(sourceId, {
-        type: 'geojson',
-        data: {
-          type: 'Feature',
-          geometry: { type: 'LineString', coordinates: seg.coords }
-        }
-      });
+    this.map.addSource('route-traffic', {
+      type: 'geojson',
+      data: {
+        type: 'FeatureCollection',
+        features: segments
+          .filter(seg => seg.coords && seg.coords.length >= 2)
+          .map(seg => ({
+            type: 'Feature',
+            properties: { color: seg.color || '#10b981' },
+            geometry: { type: 'LineString', coordinates: seg.coords }
+          }))
+      }
+    });
 
-      this.map.addLayer({
-        id: `route-seg-${i}`,
-        type: 'line',
-        source: sourceId,
-        layout: { 'line-join': 'round', 'line-cap': 'round' },
-        paint: {
-          'line-color': seg.color,
-          'line-width': 7.5,
-          'line-opacity': 1.0
-        }
-      });
+    this.map.addLayer({
+      id: 'route-traffic',
+      type: 'line',
+      source: 'route-traffic',
+      layout: { 'line-join': 'round', 'line-cap': 'round' },
+      paint: {
+        'line-color': ['get', 'color'],
+        'line-width': 7.5,
+        'line-opacity': 1.0
+      }
     });
 
     // 3.5. Traveled Route Line (Muted slate gray casing + solid gray line, covering driven road completely)
-    if (this.map.getLayer('route-traveled-casing')) this.map.removeLayer('route-traveled-casing');
-    if (this.map.getLayer('route-traveled-line')) this.map.removeLayer('route-traveled-line');
-    if (this.map.getSource('route-traveled')) this.map.removeSource('route-traveled');
-
     this.map.addSource('route-traveled', {
       type: 'geojson',
       data: {
@@ -2682,20 +2680,7 @@ class TeslaMapEngine {
     }
 
     if (this.provider === 'maplibre' && this.map) {
-      if (this.map.getLayer('route-traveled-casing')) this.map.removeLayer('route-traveled-casing');
-      if (this.map.getLayer('route-traveled-line')) this.map.removeLayer('route-traveled-line');
-      if (this.map.getSource('route-traveled')) this.map.removeSource('route-traveled');
-
-      if (this.map.getLayer('route-alt-casing')) this.map.removeLayer('route-alt-casing');
-      if (this.map.getLayer('route-alt-line')) this.map.removeLayer('route-alt-line');
-      if (this.map.getSource('route-alt')) this.map.removeSource('route-alt');
-
-      if (this.map.getLayer('route-casing')) this.map.removeLayer('route-casing');
-      if (this.map.getSource('route-full')) this.map.removeSource('route-full');
-      for (let i = 0; i < 200; i++) {
-        if (this.map.getLayer(`route-seg-${i}`)) this.map.removeLayer(`route-seg-${i}`);
-        if (this.map.getSource(`route-seg-${i}`)) this.map.removeSource(`route-seg-${i}`);
-      }
+      this.clearMapLibreRouteLayers();
       if (this.destMarker) {
         this.destMarker.remove();
         this.destMarker = null;
