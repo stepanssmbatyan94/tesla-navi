@@ -1,0 +1,16 @@
+# Files excluded from `gcloud run deploy --source .` uploads.
+# Runtime needs only server.js, package*.json, the two pages, css/ js/ styles/ sounds/ data/.
+#!include:.gitignore
+.gcloudignore
+.git
+.gitignore
+.github
+.claude
+.gemini
+.agents
+.stitch.json
+docs
+scripts
+refs
+models
+*.md
