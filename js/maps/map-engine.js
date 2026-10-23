@@ -2366,7 +2366,9 @@ class TeslaMapEngine {
         summary: r.summary || (i === 0 ? (dict.fastest || 'Самый быстрый') : `${dict.alternative || 'Вариант'} ${i + 1}`),
         duration: this.formatNavDuration(r.duration),
         distance: this.formatNavDistance(r.distance),
-        diffMins: diffMins > 0 ? `+${this.formatNavDuration(diffMins, true)}` : `0 ${dict.min || 'мин'}`
+        diffMins: diffMins > 0 ? `+${this.formatNavDuration(diffMins, true)}` : `0 ${dict.min || 'мин'}`,
+        // Real traffic delay from Yandex (with vs. without traffic); null when unknown (OSRM)
+        trafficDelayMin: (isYandex && r.durationWithoutTraffic) ? Math.max(0, Math.round((r.duration - r.durationWithoutTraffic) / 60)) : null
       };
     });
 

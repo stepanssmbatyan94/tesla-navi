@@ -2085,12 +2085,18 @@ function showRouteAlternativesDrawer(route) {
 
   // Update card detail tags (Traffic lights & Alternative labels)
   const dict = (typeof I18N !== 'undefined' && I18N[currentLang]) ? I18N[currentLang] : (I18N ? I18N.ru : {});
-  const card0Tag = document.querySelector('#route-card-0 .card-tag');
-  if (card0Tag) card0Tag.textContent = `8 ${dict.trafficLights || 'светофоров'}`;
-  const card1Tag = document.querySelector('#route-card-1 .card-tag');
-  if (card1Tag) card1Tag.textContent = `${dict.alternative || 'Альтернатива'} 1`;
-  const card2Tag = document.querySelector('#route-card-2 .card-tag');
-  if (card2Tag) card2Tag.textContent = `${dict.alternative || 'Альтернатива'} 2`;
+  // Card tag: the real delay caused by traffic (Yandex), otherwise a plain label
+  [r0, r1, r2].forEach((r, i) => {
+    const tag = document.querySelector(`#route-card-${i} .card-tag`);
+    if (!tag || !r) return;
+    if (r.trafficDelayMin > 0) {
+      tag.textContent = `+${mapEngine ? mapEngine.formatNavDuration(r.trafficDelayMin, true) : r.trafficDelayMin} ${dict.trafficDelay}`;
+    } else if (r.trafficDelayMin === 0) {
+      tag.textContent = dict.noTrafficDelay;
+    } else {
+      tag.textContent = i === 0 ? '' : `${dict.alternative || 'Альтернатива'} ${i}`;
+    }
+  });
 
   const goTextEl = document.querySelector('#btn-start-route-nav .go-text');
   if (goTextEl) goTextEl.textContent = dict.go || 'Поехали';
@@ -3563,16 +3569,43 @@ function initWeatherAndMusic() {
   if (btnMiniPrev) btnMiniPrev.addEventListener('click', playPrevTrack);
 }
 
+// WMO weather codes (Open-Meteo) → icon + localized description
+const WEATHER_CODES = [
+  { codes: [0], icon: '☀️', night: '🌙', text: { ru: 'Ясно', hy: 'Պարզ', en: 'Clear' } },
+  { codes: [1, 2], icon: '🌤️', night: '☁️', text: { ru: 'Переменная облачность', hy: 'Մասամբ ամպամած', en: 'Partly cloudy' } },
+  { codes: [3], icon: '☁️', text: { ru: 'Пасмурно', hy: 'Ամպամած', en: 'Overcast' } },
+  { codes: [45, 48], icon: '🌫️', text: { ru: 'Туман', hy: 'Մառախուղ', en: 'Fog' } },
+  { codes: [51, 53, 55, 56, 57], icon: '🌦️', text: { ru: 'Морось', hy: 'Մանրամաղ անձրև', en: 'Drizzle' } },
+  { codes: [61, 63, 65, 66, 67, 80, 81, 82], icon: '🌧️', text: { ru: 'Дождь', hy: 'Անձրև', en: 'Rain' } },
+  { codes: [71, 73, 75, 77, 85, 86], icon: '🌨️', text: { ru: 'Снег', hy: 'Ձյուն', en: 'Snow' } },
+  { codes: [95, 96, 99], icon: '⛈️', text: { ru: 'Гроза', hy: 'Ամպրոպ', en: 'Thunderstorm' } }
+];
+
+function describeWeather(code, isDay = true) {
+  const lang = window.CURRENT_LANG || 'ru';
+  const entry = WEATHER_CODES.find(w => w.codes.includes(code));
+  if (!entry) return { icon: '🌡️', text: '' };
+  return { icon: (!isDay && entry.night) ? entry.night : entry.icon, text: entry.text[lang] || entry.text.ru };
+}
+
 async function loadLiveYerevanWeather() {
+  // Forecast for where the car is (Yerevan center until the first fix)
+  const pos = (mapEngine && mapEngine.currentPosition) || CONFIG.defaultCenter;
+  const lat = Number(pos.lat).toFixed(3);
+  const lng = Number(pos.lng).toFixed(3);
   try {
-    const res = await fetch('https://api.open-meteo.com/v1/forecast?latitude=40.18&longitude=44.51&current=temperature_2m,relative_humidity_2m,weather_code,wind_speed_10m&hourly=temperature_2m,weather_code&timezone=auto');
+    const res = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}&current=temperature_2m,relative_humidity_2m,weather_code,wind_speed_10m,is_day,uv_index&hourly=temperature_2m,weather_code,is_day&timezone=auto&forecast_days=1`);
     const data = await res.json();
+    const dict = I18N[window.CURRENT_LANG || 'ru'] || I18N.ru;
 
     if (data.current) {
       const temp = Math.round(data.current.temperature_2m);
-      document.getElementById('weather-desc').textContent = `Облачно · ${temp}°C`;
+      const now = describeWeather(data.current.weather_code, data.current.is_day === 1);
+      document.getElementById('weather-desc').textContent = `${now.icon} ${now.text} · ${temp}°C`;
       document.getElementById('weather-humidity').textContent = `${data.current.relative_humidity_2m}%`;
-      document.getElementById('weather-wind').textContent = `${Math.round(data.current.wind_speed_10m)} км/ч`;
+      document.getElementById('weather-wind').textContent = `${Math.round(data.current.wind_speed_10m)} ${dict.kmh}`;
+      const uvEl = document.getElementById('weather-uv');
+      if (uvEl) uvEl.textContent = data.current.uv_index != null ? Math.round(data.current.uv_index) : '—';
     }
 
     if (data.hourly && data.hourly.time) {
@@ -3580,19 +3613,23 @@ async function loadLiveYerevanWeather() {
       row.innerHTML = '';
       const times = [9, 12, 15, 18, 21];
       times.forEach(hour => {
-        const temp = Math.round(data.hourly.temperature_2m[hour] || 15);
+        const temp = data.hourly.temperature_2m[hour];
+        if (temp == null) return;
+        const w = describeWeather(data.hourly.weather_code[hour], data.hourly.is_day[hour] === 1);
         const col = document.createElement('div');
         col.className = 'weather-hour-col';
         col.innerHTML = `
           <span>${String(hour).padStart(2, '0')}:00</span>
-          <span>${hour < 18 ? '☀️' : '🌙'}</span>
-          <span class="weather-hour-temp">${temp}°</span>
+          <span title="${escapeHtml(w.text)}">${w.icon}</span>
+          <span class="weather-hour-temp">${Math.round(temp)}°</span>
         `;
         row.appendChild(col);
       });
     }
   } catch (e) {
     console.warn('Weather fetch error:', e);
+    const dict = I18N[window.CURRENT_LANG || 'ru'] || I18N.ru;
+    document.getElementById('weather-desc').textContent = dict.weatherUnavailable;
   }
 }
 

@@ -20,7 +20,7 @@
   <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.118.0"></script>
 
   <!-- Tesla Cockpit CSS -->
-  <link rel="stylesheet" href="css/tesla-display.css?v=43">
+  <link rel="stylesheet" href="css/tesla-display.css?v=46">
 </head>
 <body>
 
@@ -379,7 +379,7 @@
           <span id="route-0-dist" class="card-dist">2.4 км</span>
         </div>
         <div class="card-details-row">
-          <span class="card-tag">8 светофоров</span>
+          <span class="card-tag"></span>
         </div>
       </div>
 
@@ -637,8 +637,8 @@
     <div class="compact-card">
       <div class="card-top-row">
         <div>
-          <div class="card-title">Yerevan, AM</div>
-          <div id="weather-desc" style="font-size: 13px; color: var(--text-secondary);">Облачно · 15°C</div>
+          <div class="card-title" data-i18n="weather">Погода</div>
+          <div id="weather-desc" style="font-size: 13px; color: var(--text-secondary);">—</div>
         </div>
         <button id="btn-close-weather-x" class="card-close-btn">
           <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
@@ -646,38 +646,12 @@
       </div>
 
       <!-- Real Forecast Hourly Row -->
-      <div id="weather-hourly-row" class="weather-forecast-row">
-        <div class="weather-hour-col">
-          <span>09:00</span>
-          <span>☀️</span>
-          <span class="weather-hour-temp">14°</span>
-        </div>
-        <div class="weather-hour-col">
-          <span>12:00</span>
-          <span>⛅</span>
-          <span class="weather-hour-temp">17°</span>
-        </div>
-        <div class="weather-hour-col">
-          <span>15:00</span>
-          <span>☁️</span>
-          <span class="weather-hour-temp">16°</span>
-        </div>
-        <div class="weather-hour-col">
-          <span>18:00</span>
-          <span>🌙</span>
-          <span class="weather-hour-temp">13°</span>
-        </div>
-        <div class="weather-hour-col">
-          <span>21:00</span>
-          <span>✨</span>
-          <span class="weather-hour-temp">11°</span>
-        </div>
-      </div>
+      <div id="weather-hourly-row" class="weather-forecast-row"></div>
 
       <div style="display: flex; justify-content: space-between; font-size: 13px; color: var(--text-secondary);">
-        <span>Влажность: <b id="weather-humidity" style="color: #fff;">45%</b></span>
-        <span>Ветер: <b id="weather-wind" style="color: #fff;">8 км/ч</b></span>
-        <span>UV: <b style="color: #fff;">2</b></span>
+        <span><span data-i18n="humidity">Влажность</span>: <b id="weather-humidity" style="color: #fff;">—</b></span>
+        <span><span data-i18n="wind">Ветер</span>: <b id="weather-wind" style="color: #fff;">—</b></span>
+        <span>UV: <b id="weather-uv" style="color: #fff;">—</b></span>
       </div>
 
       <button id="btn-weather-done" class="btn-primary-action" data-i18n="done">Готово</button>
@@ -931,9 +905,9 @@
   </div>
 
   <!-- Scripts -->
-  <script src="js/config.js?v=43"></script>
-  <script src="js/realtime.js?v=43"></script>
-  <script src="js/maps/map-engine.js?v=43"></script>
-  <script src="js/tesla-cockpit.js?v=43"></script>
+  <script src="js/config.js?v=46"></script>
+  <script src="js/realtime.js?v=46"></script>
+  <script src="js/maps/map-engine.js?v=46"></script>
+  <script src="js/tesla-cockpit.js?v=46"></script>
 </body>
 </html>
