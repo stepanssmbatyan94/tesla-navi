@@ -1,5 +1,10 @@
 // Tesla Navi Advanced Map Engine (MapLibre GL Clean 2D/Heading-Up + Yandex Navigator Styling)
 
+// OSRM lane junctions further than this from the Yandex polyline, or leaving in a
+// different direction, belong to another path and are dropped
+const LANE_MATCH_MAX_DIST_M = 20;
+const LANE_MATCH_MAX_BEARING_DIFF = 35;
+
 class TeslaMapEngine {
   constructor(containerId, options = {}) {
     this.containerId = containerId;
@@ -12,7 +17,8 @@ class TeslaMapEngine {
     this.onUserPan = options.onUserPan || (() => {});
     this.onProgressUpdate = options.onProgressUpdate || (() => {});
     this.onCameraAlert = options.onCameraAlert || (() => {});
-    
+    this.onPositionUpdate = options.onPositionUpdate || (() => {});
+
     this.map = null;
     this.carMarker = null;
     this.destMarker = null;
@@ -1067,13 +1073,16 @@ class TeslaMapEngine {
 
     if (this.provider === 'maplibre' && this.map) {
       try {
-        this.map.setStyle(targetStyle);
+        // setStyle drops every runtime source/layer (route, traffic, traveled line):
+        // force a full reload so 'style.load' always fires, then redraw the route
         this.map.once('style.load', () => {
           this.update3DMode(this.is3D);
-          if (this.activeRoute) {
-            this.drawRoute(this.activeRoute);
+          if (this.activeRoute && this.lastRouteRender) {
+            const { coordinates, destination, alternatives, trafficSegments } = this.lastRouteRender;
+            this.renderMapLibreRoute(coordinates, destination, alternatives, trafficSegments);
           }
         });
+        this.map.setStyle(targetStyle, { diff: false });
       } catch (err) {
         console.warn('[Theme] Error switching style:', err);
       }
@@ -1314,6 +1323,8 @@ class TeslaMapEngine {
           this.map.setCenter([lat, lng], this.navZoom, { duration: 0 });
         }
       }
+      this._lastPosUpdateCb = performance.now();
+      this.onPositionUpdate({ lat, lng, speed });
       return;
     }
 
@@ -1493,11 +1504,11 @@ class TeslaMapEngine {
       this.checkFreeDrivingCameraAlert(displayLat, displayLng, speed);
     }
 
-    if (this.options && this.options.onPositionUpdate && isRealFix) {
+    if (isRealFix) {
       const now = performance.now();
       if (!this._lastPosUpdateCb || (now - this._lastPosUpdateCb > 2500)) {
         this._lastPosUpdateCb = now;
-        this.options.onPositionUpdate({ lat: displayLat, lng: displayLng, speed });
+        this.onPositionUpdate({ lat: displayLat, lng: displayLng, speed });
       }
     }
   }
@@ -1564,6 +1575,13 @@ class TeslaMapEngine {
 
   trackNavigationProgress(currentLat, currentLng, isOffRoute = false, distToRoute = 0, speed = 0, isRealFix = true) {
     if (!this.activeRoute) return;
+
+    // Route preview (before "Поехали"): no turn prompts, route-camera voice or arrival yet,
+    // only the same camera warnings as free driving
+    if (!this.isNavigating) {
+      this.checkFreeDrivingCameraAlert(currentLat, currentLng, speed);
+      return;
+    }
 
     // Off-route automatic rerouting: ONLY on genuine GPS fixes!
     // Triggers instantly after 2 consecutive ticks (~1.5s) of staying off-route, exactly like Yandex Navigator
@@ -1655,6 +1673,13 @@ class TeslaMapEngine {
       const isLastStep = (this.currentStepIndex >= this.routeSteps.length - 1);
       const currentSpeedLimit = activeStep.speedLimit || 60;
 
+      // Yandex & OSRM steps carry the maneuver at their START: the turn at the end of the
+      // current step is the NEXT step's maneuver. The last step ends at the destination.
+      const nextStep = isLastStep ? null : this.routeSteps[this.currentStepIndex + 1];
+      const maneuverModifier = nextStep ? (nextStep.modifier || 'straight') : 'straight';
+      const maneuverType = nextStep ? (nextStep.type || 'turn') : 'arrive';
+      const maneuverStreet = nextStep ? (nextStep.name || dest.name) : dest.name;
+
       // Distance to upcoming maneuver continuously counts down to 0
       let activeDist = 0;
       if (isLastStep) {
@@ -1680,25 +1705,25 @@ class TeslaMapEngine {
 
       const activeLanes = (upcomingLaneInter && upcomingLaneDist <= 220)
         ? upcomingLaneInter.lanes
-        : (activeDist <= 220 ? (activeStep.lanes || null) : null);
+        : (activeDist <= 220 ? ((nextStep && nextStep.lanes) || null) : null);
 
       const activeLaneDist = (upcomingLaneInter && upcomingLaneDist <= 220)
         ? upcomingLaneDist
         : activeDist;
 
-      const activeModifier = (upcomingLaneInter && upcomingLaneDist <= 220 && upcomingLaneInter.modifier)
-        ? upcomingLaneInter.modifier
-        : (activeStep.modifier || 'straight');
+      // The Yandex maneuver stays authoritative: OSRM only contributes lane arrows. Its step
+      // modifier is repeated on every pass-through junction, which made the HUD flip left/right
+      const activeModifier = maneuverModifier;
 
-      const stepInstruction = this.formatStepInstruction(activeModifier, activeStep.name || dest.name);
+      const stepInstruction = this.formatStepInstruction(activeModifier, maneuverStreet);
 
       this.onManeuverUpdate({
         distance: this.formatNavDistance(activeDist),
         distanceMeters: activeDist,
         instruction: stepInstruction,
-        street: activeStep.name || dest.name,
+        street: maneuverStreet,
         modifier: activeModifier,
-        type: activeStep.type || 'turn',
+        type: maneuverType,
         speedLimit: currentSpeedLimit,
         location: activeStep.location || null,
         lanes: activeLanes,
@@ -1706,30 +1731,32 @@ class TeslaMapEngine {
       });
 
       // Voice announcements with reliable wide windows (350m-100m and 85m-15m)
-      if (this.voiceEnabled) {
+      // The arrival itself is announced separately within 25m of the destination
+      if (this.voiceEnabled && nextStep) {
         if (activeDist <= 350 && activeDist >= 100 && !activeStep.spoken300) {
           activeStep.spoken300 = true;
           const lang = window.CURRENT_LANG || 'ru';
-          const turnText = this.getTurnSpeech(activeStep.modifier);
+          const turnText = this.getTurnSpeech(maneuverModifier);
           let phrase = '';
           if (lang === 'en') {
-            const streetText = activeStep.name ? ` onto ${activeStep.name}` : '';
+            const streetText = nextStep.name ? ` onto ${nextStep.name}` : '';
             phrase = `In 300 meters ${turnText.toLowerCase()}${streetText}`;
           } else if (lang === 'hy') {
-            const mod = (activeStep.modifier || '').toLowerCase();
-            if (mod.includes('slight left') || mod.includes('keep left') || mod.includes('fork left')) phrase = 'dist_250_keep_left';
+            const mod = maneuverModifier.toLowerCase();
+            if (mod.includes('uturn') || mod.includes('u-turn')) phrase = 'dist_250_uturn';
+            else if (mod.includes('slight left') || mod.includes('keep left') || mod.includes('fork left')) phrase = 'dist_250_keep_left';
             else if (mod.includes('slight right') || mod.includes('keep right') || mod.includes('fork right')) phrase = 'dist_250_keep_right';
             else if (mod.includes('left')) phrase = 'dist_250_left';
             else if (mod.includes('right')) phrase = 'dist_250_right';
             else phrase = 'dist_250_straight';
           } else {
-            const streetText = activeStep.name ? ` на ${activeStep.name}` : '';
+            const streetText = nextStep.name ? ` на ${nextStep.name}` : '';
             phrase = `Через 300 метров ${turnText.toLowerCase()}${streetText}`;
           }
           this.speakVoice(phrase);
         } else if (activeDist <= 85 && activeDist >= 15 && !activeStep.spokenImmediate) {
           activeStep.spokenImmediate = true;
-          this.speakVoice(this.getTurnSpeech(activeStep.modifier));
+          this.speakVoice(this.getTurnSpeech(maneuverModifier));
         }
       }
     }
@@ -2137,8 +2164,11 @@ class TeslaMapEngine {
     this.activeRoute = { destination, durationSec, distanceMeters };
     this.laneIntersections = primaryRoute.laneIntersections || [];
 
-    // Pre-calculate route distance for each lane intersection along routeCoordinates
+    // Pre-calculate route distance for each lane intersection along routeCoordinates.
+    // Lanes come from a separate OSRM route: keep only junctions that lie on this route
+    // and that OSRM leaves in the same direction, otherwise the arrows describe another path
     if (this.laneIntersections.length > 0 && this.routeCoordinates && this.routeCumulativeDistances) {
+      const keptLanes = [];
       this.laneIntersections.forEach(li => {
         let bestDist = 0;
         let minD = Infinity;
@@ -2155,8 +2185,19 @@ class TeslaMapEngine {
           }
         }
         li.routeDist = bestDist;
+        if (minD > LANE_MATCH_MAX_DIST_M) return;
+        if (li.outBearing != null) {
+          const here = this.getPositionAtDistance(bestDist, 0);
+          const ahead = this.getPositionAtDistance(bestDist + 15, 0);
+          if (here && ahead) {
+            const routeBearing = this.calculateBearing(here.lat, here.lng, ahead.lat, ahead.lng);
+            const diff = Math.abs(((li.outBearing - routeBearing) % 360 + 540) % 360 - 180);
+            if (diff > LANE_MATCH_MAX_BEARING_DIFF) return;
+          }
+        }
+        keptLanes.push(li);
       });
-      this.laneIntersections.sort((a, b) => a.routeDist - b.routeDist);
+      this.laneIntersections = keptLanes.sort((a, b) => a.routeDist - b.routeDist);
     }
 
     if (primaryRoute.steps && primaryRoute.steps.length > 0) {
@@ -2339,43 +2380,43 @@ class TeslaMapEngine {
     }
   }
 
+  // Remove every runtime route layer/source (layers first: a source can't go while in use)
+  clearMapLibreRouteLayers() {
+    if (!this.map) return;
+    const layerIds = ['route-traveled-line', 'route-traveled-casing', 'route-traffic', 'route-casing', 'route-alt-line', 'route-alt-casing'];
+    const sourceIds = ['route-traveled', 'route-traffic', 'route-full', 'route-alt'];
+    layerIds.forEach(id => { if (this.map.getLayer(id)) this.map.removeLayer(id); });
+    sourceIds.forEach(id => { if (this.map.getSource(id)) this.map.removeSource(id); });
+  }
+
   // Render Route on MapLibre GL with Yandex Navigator Styling & Alternative Blue Routes
   renderMapLibreRoute(coordinates, destination, alternatives = null, trafficSegments = null) {
-    // Clear old alternative layers (alt 0, 1, 2, etc.)
-    for (let a = 0; a < 5; a++) {
-      if (this.map.getLayer(`route-alt-casing-${a}`)) this.map.removeLayer(`route-alt-casing-${a}`);
-      if (this.map.getLayer(`route-alt-line-${a}`)) this.map.removeLayer(`route-alt-line-${a}`);
-      if (this.map.getSource(`route-alt-${a}`)) this.map.removeSource(`route-alt-${a}`);
-    }
-    if (this.map.getLayer('route-alt-casing')) this.map.removeLayer('route-alt-casing');
-    if (this.map.getLayer('route-alt-line')) this.map.removeLayer('route-alt-line');
-    if (this.map.getSource('route-alt')) this.map.removeSource('route-alt');
+    // Remembered so the route can be redrawn after a day/night style swap
+    this.lastRouteRender = { coordinates, destination, alternatives, trafficSegments };
 
-    if (this.map.getLayer('route-casing')) this.map.removeLayer('route-casing');
-    for (let i = 0; i < 200; i++) {
-      if (this.map.getLayer(`route-seg-${i}`)) this.map.removeLayer(`route-seg-${i}`);
-      if (this.map.getSource(`route-seg-${i}`)) this.map.removeSource(`route-seg-${i}`);
-    }
-    if (this.map.getSource('route-full')) this.map.removeSource('route-full');
+    this.clearMapLibreRouteLayers();
 
-    // 1. Alternative Routes (Cyan Blue lines underneath, like MapsEV & Yandex)
+    // 1. Alternative Routes (Cyan Blue lines underneath, like MapsEV & Yandex) — one source for all
     const altList = Array.isArray(alternatives) ? alternatives : (alternatives ? [{ coordinates: alternatives, index: 1 }] : []);
-    altList.forEach((alt, aIdx) => {
-      const altCoords = alt.coordinates || alt;
-      if (!altCoords || altCoords.length < 2) return;
-      const srcId = `route-alt-${aIdx}`;
-      this.map.addSource(srcId, {
+    const altFeatures = altList
+      .map((alt, aIdx) => ({ coords: alt.coordinates || alt, aIdx }))
+      .filter(a => a.coords && a.coords.length >= 2)
+      .map(a => ({
+        type: 'Feature',
+        properties: { rank: a.aIdx },
+        geometry: { type: 'LineString', coordinates: a.coords }
+      }));
+
+    if (altFeatures.length > 0) {
+      this.map.addSource('route-alt', {
         type: 'geojson',
-        data: {
-          type: 'Feature',
-          geometry: { type: 'LineString', coordinates: altCoords }
-        }
+        data: { type: 'FeatureCollection', features: altFeatures }
       });
 
       this.map.addLayer({
-        id: `route-alt-casing-${aIdx}`,
+        id: 'route-alt-casing',
         type: 'line',
-        source: srcId,
+        source: 'route-alt',
         layout: { 'line-join': 'round', 'line-cap': 'round' },
         paint: {
           'line-color': '#0f172a',
@@ -2385,17 +2426,17 @@ class TeslaMapEngine {
       });
 
       this.map.addLayer({
-        id: `route-alt-line-${aIdx}`,
+        id: 'route-alt-line',
         type: 'line',
-        source: srcId,
+        source: 'route-alt',
         layout: { 'line-join': 'round', 'line-cap': 'round' },
         paint: {
-          'line-color': aIdx === 0 ? '#0284c7' : '#0ea5e9', // Vibrant Sky/Cyan Blue
+          'line-color': ['match', ['get', 'rank'], 0, '#0284c7', '#0ea5e9'], // Vibrant Sky/Cyan Blue
           'line-width': 5.0,
           'line-opacity': 0.80
         }
       });
-    });
+    }
 
     // 2. Primary Route Dark Navy Casing
     this.map.addSource('route-full', {
@@ -2419,38 +2460,39 @@ class TeslaMapEngine {
     });
 
     // 3. Colored Traffic Segments (100% Genuine Yandex Traffic or Smooth Fallback)
+    // A single data-driven layer: long routes carry hundreds of segments, and one
+    // layer per segment both overloads the MCU and leaked ids past the cleanup range
     const segments = (trafficSegments && trafficSegments.length > 0)
       ? trafficSegments
       : this.generateTrafficSegments(coordinates);
 
-    segments.forEach((seg, i) => {
-      const sourceId = `route-seg-${i}`;
-      this.map.addSource(sourceId, {
-        type: 'geojson',
-        data: {
-          type: 'Feature',
-          geometry: { type: 'LineString', coordinates: seg.coords }
-        }
-      });
+    this.map.addSource('route-traffic', {
+      type: 'geojson',
+      data: {
+        type: 'FeatureCollection',
+        features: segments
+          .filter(seg => seg.coords && seg.coords.length >= 2)
+          .map(seg => ({
+            type: 'Feature',
+            properties: { color: seg.color || '#10b981' },
+            geometry: { type: 'LineString', coordinates: seg.coords }
+          }))
+      }
+    });
 
-      this.map.addLayer({
-        id: `route-seg-${i}`,
-        type: 'line',
-        source: sourceId,
-        layout: { 'line-join': 'round', 'line-cap': 'round' },
-        paint: {
-          'line-color': seg.color,
-          'line-width': 7.5,
-          'line-opacity': 1.0
-        }
-      });
+    this.map.addLayer({
+      id: 'route-traffic',
+      type: 'line',
+      source: 'route-traffic',
+      layout: { 'line-join': 'round', 'line-cap': 'round' },
+      paint: {
+        'line-color': ['get', 'color'],
+        'line-width': 7.5,
+        'line-opacity': 1.0
+      }
     });
 
     // 3.5. Traveled Route Line (Muted slate gray casing + solid gray line, covering driven road completely)
-    if (this.map.getLayer('route-traveled-casing')) this.map.removeLayer('route-traveled-casing');
-    if (this.map.getLayer('route-traveled-line')) this.map.removeLayer('route-traveled-line');
-    if (this.map.getSource('route-traveled')) this.map.removeSource('route-traveled');
-
     this.map.addSource('route-traveled', {
       type: 'geojson',
       data: {
@@ -2653,6 +2695,7 @@ class TeslaMapEngine {
     this.renderTrafficPoints(); // Completely removes route cameras from map
     this.lastProgressIndex = 0;
     this.routeCoordinates = [];
+    this.lastRouteRender = null;
     this.alternativeCoordinates = null;
     this.routeSteps = [];
     this.routeCameras = [];
@@ -2667,20 +2710,7 @@ class TeslaMapEngine {
     }
 
     if (this.provider === 'maplibre' && this.map) {
-      if (this.map.getLayer('route-traveled-casing')) this.map.removeLayer('route-traveled-casing');
-      if (this.map.getLayer('route-traveled-line')) this.map.removeLayer('route-traveled-line');
-      if (this.map.getSource('route-traveled')) this.map.removeSource('route-traveled');
-
-      if (this.map.getLayer('route-alt-casing')) this.map.removeLayer('route-alt-casing');
-      if (this.map.getLayer('route-alt-line')) this.map.removeLayer('route-alt-line');
-      if (this.map.getSource('route-alt')) this.map.removeSource('route-alt');
-
-      if (this.map.getLayer('route-casing')) this.map.removeLayer('route-casing');
-      if (this.map.getSource('route-full')) this.map.removeSource('route-full');
-      for (let i = 0; i < 200; i++) {
-        if (this.map.getLayer(`route-seg-${i}`)) this.map.removeLayer(`route-seg-${i}`);
-        if (this.map.getSource(`route-seg-${i}`)) this.map.removeSource(`route-seg-${i}`);
-      }
+      this.clearMapLibreRouteLayers();
       if (this.destMarker) {
         this.destMarker.remove();
         this.destMarker = null;

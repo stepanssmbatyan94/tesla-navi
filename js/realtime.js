@@ -1,5 +1,8 @@
 // Tesla Navi Realtime Communication Engine (Supabase Broadcast + Local WebSocket Fallback)
 
+const WS_RECONNECT_MIN_MS = 1000;
+const WS_RECONNECT_MAX_MS = 15000;
+
 class TeslaRealtime {
   constructor(options = {}) {
     this.code = (options.code || this.generateRoomCode()).toUpperCase();
@@ -68,20 +71,32 @@ class TeslaRealtime {
     }
 
     // 2. Initialize Local WebSocket Fallback
+    this.connectLocalWs();
+
+    // Start heartbeat monitor
+    this.startHeartbeatWatcher();
+  }
+
+  // Local WS with automatic reconnect: phones drop the socket on every cell handover
+  // or screen lock, and without a retry the fallback channel stayed dead for good
+  connectLocalWs() {
+    clearTimeout(this.wsReconnectTimer);
     try {
       const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
       const wsUrl = `${protocol}//${window.location.host}/ws?room=${this.code.toLowerCase()}`;
-      this.localWs = new WebSocket(wsUrl);
+      const ws = new WebSocket(wsUrl);
+      this.localWs = ws;
 
-      this.localWs.onopen = () => {
+      ws.onopen = () => {
         console.log('[Local WS] Connected to room:', this.code);
+        this.wsReconnectDelay = WS_RECONNECT_MIN_MS;
         if (this.role === 'phone') {
           this.setConnected(true);
         }
         this.sendPing();
       };
 
-      this.localWs.onmessage = (event) => {
+      ws.onmessage = (event) => {
         try {
           const msg = JSON.parse(event.data);
           if (msg.event === 'gps_update') this.handleGpsPacket(msg.payload);
@@ -92,15 +107,24 @@ class TeslaRealtime {
         }
       };
 
-      this.localWs.onclose = () => {
-        console.log('[Local WS] Connection closed');
+      ws.onclose = () => {
+        if (this.localWs !== ws) return; // superseded by a newer socket
+        const delay = this.wsReconnectDelay || WS_RECONNECT_MIN_MS;
+        console.log(`[Local WS] Connection closed, reconnecting in ${delay} ms`);
+        this.wsReconnectDelay = Math.min(delay * 2, WS_RECONNECT_MAX_MS);
+        this.wsReconnectTimer = setTimeout(() => this.connectLocalWs(), delay);
       };
     } catch (e) {
       console.warn('[Local WS] Fallback not reachable:', e);
     }
+  }
 
-    // Start heartbeat monitor
-    this.startHeartbeatWatcher();
+  // Reconnect right away (e.g. when the phone tab becomes visible again)
+  ensureLocalWs() {
+    if (!this.localWs || this.localWs.readyState === WebSocket.CLOSED || this.localWs.readyState === WebSocket.CLOSING) {
+      this.wsReconnectDelay = WS_RECONNECT_MIN_MS;
+      this.connectLocalWs();
+    }
   }
 
   // Send GPS packet from Phone to Tesla Display
@@ -161,15 +185,28 @@ class TeslaRealtime {
     }
   }
 
+  // Every packet travels over both Supabase and the local WS: drop the second copy
+  // (and any stale out-of-order packet) by its sender timestamp
+  isDuplicate(payload, key) {
+    const ts = payload && payload.timestamp;
+    if (!ts) return false;
+    // A much older timestamp means a new sender with a skewed clock: accept and resync
+    if (this[key] && ts <= this[key] && this[key] - ts < 30000) return true;
+    this[key] = ts;
+    return false;
+  }
+
   handleGpsPacket(payload) {
     this.lastPacketTime = Date.now();
     this.setConnected(true);
+    if (this.isDuplicate(payload, 'lastGpsTimestamp')) return;
     this.onGpsUpdate(payload);
   }
 
   handleDestinationPacket(payload) {
     this.lastPacketTime = Date.now();
     this.setConnected(true);
+    if (this.isDuplicate(payload, 'lastDestinationTimestamp')) return;
     this.onDestinationSet(payload);
   }
 

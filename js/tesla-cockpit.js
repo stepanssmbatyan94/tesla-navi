@@ -34,6 +34,17 @@ const EV_CHARGERS = [
   { name: 'Cascade Plaza EV Hub', lat: 40.191500, lng: 44.515200, power: '60 kW', stalls: '1/2 свободно', address: 'Antarayin St 160, Yerevan' }
 ];
 
+// Escape untrusted text (geocoder/Yandex/YouTube results, phone packets, saved places)
+// before interpolating it into innerHTML templates
+function escapeHtml(value) {
+  return String(value == null ? '' : value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 // Global hooks
 window.updateManeuverHud = updateManeuverHud;
 window.renderLaneGuidance = renderLaneGuidance;
@@ -458,11 +469,14 @@ function loadSavedPlaces() {
   try {
     const raw = localStorage.getItem('tesla_saved_places');
     if (raw) {
+      // Defaults only seed the very first run: once saved, a deleted home/work (null)
+      // or an emptied favorites list must stay deleted
       const parsed = JSON.parse(raw);
+      const isValidPlace = p => !!(p && p.address && p.lat != null && p.lng != null);
       return {
-        home: (parsed.home && parsed.home.address && parsed.home.lat != null) ? parsed.home : DEFAULT_SAVED_PLACES.home,
-        work: (parsed.work && parsed.work.address && parsed.work.lat != null) ? parsed.work : DEFAULT_SAVED_PLACES.work,
-        favorites: (Array.isArray(parsed.favorites) && parsed.favorites.length > 0) ? parsed.favorites : DEFAULT_SAVED_PLACES.favorites
+        home: isValidPlace(parsed.home) ? parsed.home : null,
+        work: isValidPlace(parsed.work) ? parsed.work : null,
+        favorites: Array.isArray(parsed.favorites) ? parsed.favorites : []
       };
     }
   } catch (e) {
@@ -1140,8 +1154,6 @@ function updateCommuteEtas() {
       badge.className = 'commute-eta-badge';
     }
   });
-
-  renderQuickDestChips();
 }
 
 // Authentic MapsEV Destination Chips: Home, Work & Favorites with Live GPS Distances & 1-Tap Route
@@ -1154,32 +1166,22 @@ function renderQuickDestChips() {
   const dict = I18N[lang] || I18N.ru;
   const chipsList = [];
 
-  // 1. Home
-  const homePlace = userSavedPlaces.home || DEFAULT_SAVED_PLACES.home;
-  if (homePlace) {
-    chipsList.push({
-      type: 'home',
-      icon: '🏠',
-      title: dict.home || 'Дом',
-      place: homePlace
-    });
-  }
-
-  // 2. Work
-  const workPlace = userSavedPlaces.work || DEFAULT_SAVED_PLACES.work;
-  if (workPlace) {
-    chipsList.push({
-      type: 'work',
-      icon: '💼',
-      title: dict.work || 'Работа',
-      place: workPlace
-    });
-  }
+  // 1-2. Home & Work chips are always shown: an unset one opens the address editor on tap
+  chipsList.push({
+    type: 'home',
+    icon: '🏠',
+    title: dict.home || 'Дом',
+    place: userSavedPlaces.home
+  });
+  chipsList.push({
+    type: 'work',
+    icon: '💼',
+    title: dict.work || 'Работа',
+    place: userSavedPlaces.work
+  });
 
   // 3. Favorites / Recent Places
-  const favs = (userSavedPlaces.favorites && userSavedPlaces.favorites.length > 0)
-    ? userSavedPlaces.favorites
-    : DEFAULT_SAVED_PLACES.favorites;
+  const favs = userSavedPlaces.favorites || [];
 
   favs.forEach(f => {
     chipsList.push({
@@ -1190,13 +1192,39 @@ function renderQuickDestChips() {
     });
   });
 
+  const distanceText = item => {
+    if (!cur || !item.place || item.place.lat == null || item.place.lng == null) return '';
+    return mapEngine.formatNavDistance(mapEngine.calculateDistance(cur.lat, cur.lng, item.place.lat, item.place.lng));
+  };
+
+  // This runs on every position update (~2.5 s while driving). Rebuilding the buttons
+  // then would swallow a tap whose press and release straddle the rebuild, so when the
+  // chip set is unchanged only refresh the distance labels in place.
+  const signature = JSON.stringify([dict.btnRoute, chipsList.map(item => [
+    item.type, item.icon, item.title, item.place && item.place.lat, item.place && item.place.lng
+  ])]);
+  if (container.dataset.chipsSignature === signature && container.children.length === chipsList.length) {
+    chipsList.forEach((item, idx) => {
+      const btn = container.children[idx];
+      const distStr = distanceText(item);
+      let distEl = btn.querySelector('.chip-dist');
+      if (distStr && !distEl) {
+        distEl = document.createElement('span');
+        distEl.className = 'chip-dist';
+        btn.appendChild(distEl);
+      }
+      if (distEl) {
+        if (distStr) distEl.textContent = distStr;
+        else distEl.remove();
+      }
+    });
+    return;
+  }
+  container.dataset.chipsSignature = signature;
+
   container.innerHTML = '';
   chipsList.forEach(item => {
-    let distStr = '';
-    if (cur && item.place && item.place.lat != null && item.place.lng != null) {
-      const d = mapEngine.calculateDistance(cur.lat, cur.lng, item.place.lat, item.place.lng);
-      distStr = mapEngine.formatNavDistance(d);
-    }
+    const distStr = distanceText(item);
 
     const btn = document.createElement('button');
     btn.className = 'quick-dest-chip';
@@ -1204,8 +1232,8 @@ function renderQuickDestChips() {
     btn.dataset.dest = item.type;
     btn.title = `${dict.btnRoute || 'Маршрут'}: ${item.title}`;
     btn.innerHTML = `
-      <span class="chip-ico">${item.icon}</span>
-      <span class="chip-title">${item.title}</span>
+      <span class="chip-ico">${escapeHtml(item.icon)}</span>
+      <span class="chip-title">${escapeHtml(item.title)}</span>
       ${distStr ? `<span class="chip-dist">${distStr}</span>` : ''}
     `;
 
@@ -1405,8 +1433,8 @@ function renderFavoritesList() {
       <div class="my-place-left">
         <div class="my-place-icon-box star-box">⭐</div>
         <div class="my-place-info">
-          <div class="my-place-name">${fav.name}</div>
-          <div class="my-place-sub">${fav.address || ''}${distStr ? ' • ' + distStr : ''}</div>
+          <div class="my-place-name">${escapeHtml(fav.name)}</div>
+          <div class="my-place-sub">${escapeHtml(fav.address || '')}${distStr ? ' • ' + distStr : ''}</div>
         </div>
       </div>
       <div class="my-place-actions">
@@ -1568,8 +1596,8 @@ function initEditPlaceModalHandlers() {
                   <div class="item-left">
                     <div class="item-icon">📍</div>
                     <div>
-                      <div class="item-title">${title}</div>
-                      <div class="item-subtitle">${subtitle}</div>
+                      <div class="item-title">${escapeHtml(title)}</div>
+                      <div class="item-subtitle">${escapeHtml(subtitle)}</div>
                     </div>
                   </div>
                 `;
@@ -1632,9 +1660,6 @@ function initEditPlaceModalHandlers() {
           lat: loc.lat,
           lng: loc.lng
         };
-        if (!userSavedPlaces.work) {
-          userSavedPlaces.work = DEFAULT_SAVED_PLACES.work;
-        }
       } else if (currentEditTarget.type === 'work') {
         userSavedPlaces.work = {
           name: 'Работа',
@@ -1642,9 +1667,6 @@ function initEditPlaceModalHandlers() {
           lat: loc.lat,
           lng: loc.lng
         };
-        if (!userSavedPlaces.home) {
-          userSavedPlaces.home = DEFAULT_SAVED_PLACES.home;
-        }
       } else if (currentEditTarget.type === 'favorite') {
         const customName = nameInput.value.trim() || addrVal.split(',')[0] || 'Избранное';
         if (currentEditTarget.place) {
@@ -1781,8 +1803,8 @@ function renderSearchHistory() {
       <div class="item-left">
         <div class="item-icon">📍</div>
         <div>
-          <div class="item-title">${h.name}</div>
-          <div class="item-subtitle">${h.address || 'Yerevan, Armenia'}</div>
+          <div class="item-title">${escapeHtml(h.name)}</div>
+          <div class="item-subtitle">${escapeHtml(h.address || 'Yerevan, Armenia')}</div>
         </div>
       </div>
       <div style="display: flex; align-items: center; gap: 6px;">
@@ -1881,8 +1903,8 @@ function initSearchHandlers() {
               <div class="item-left">
                 <div class="item-icon">📍</div>
                 <div>
-                  <div class="item-title">${title}</div>
-                  <div class="item-subtitle">${subtitle}</div>
+                  <div class="item-title">${escapeHtml(title)}</div>
+                  <div class="item-subtitle">${escapeHtml(subtitle)}</div>
                 </div>
               </div>
               <div style="display: flex; align-items: center; gap: 8px;">
@@ -1957,8 +1979,16 @@ async function startNavigationTo(destination) {
 }
 
 function handleIncomingDestination(destination) {
-  console.log('📍 Destination received from Phone:', destination);
-  startNavigationTo(destination);
+  // Anyone who knows the 6-char room code can publish on the channel: accept only a sane payload
+  const lat = Number(destination && destination.lat);
+  const lng = Number(destination && destination.lng);
+  if (!Number.isFinite(lat) || !Number.isFinite(lng) || Math.abs(lat) > 90 || Math.abs(lng) > 180) {
+    console.warn('📍 Ignored malformed destination packet from Phone');
+    return;
+  }
+  const name = String((destination && destination.name) || 'Destination').slice(0, 120);
+  console.log('📍 Destination received from Phone:', name, lat, lng);
+  startNavigationTo({ name, lat, lng });
 }
 
 // Route Alternatives & Turn Details Drawer (Mapsev IMG_3693)
@@ -2059,7 +2089,7 @@ function showRouteAlternativesDrawer(route) {
       item.innerHTML = `
         <div class="turn-step-icon">${icon}</div>
         <div class="turn-step-info">
-          <div class="turn-step-street">${localizedInstruction}</div>
+          <div class="turn-step-street">${escapeHtml(localizedInstruction)}</div>
         </div>
         <div class="turn-step-dist">${distStr}</div>
       `;
@@ -2073,9 +2103,9 @@ function showRouteAlternativesDrawer(route) {
   arrivalItem.innerHTML = `
     <div class="turn-step-icon" style="color: #10b981;">🏁</div>
     <div class="turn-step-info">
-      <div class="turn-step-street">${route.name}</div>
+      <div class="turn-step-street">${escapeHtml(route.name)}</div>
     </div>
-    <div class="turn-step-dist">${route.eta}</div>
+    <div class="turn-step-dist">${escapeHtml(route.eta)}</div>
   `;
   listEl.appendChild(arrivalItem);
 
@@ -2118,9 +2148,11 @@ function showNavigationHud(route) {
   document.getElementById('lane-guidance-pill').classList.add('hidden');
 
   // Initial step details from route steps
+  // The first maneuver happens at the end of step 0 and belongs to step 1 (maneuvers sit at step starts)
   const firstStep = (route.steps && route.steps[0]) ? route.steps[0] : null;
+  const firstManeuver = (route.steps && route.steps[1]) ? route.steps[1] : null;
   document.getElementById('maneuver-dist').textContent = firstStep ? (mapEngine ? mapEngine.formatNavDistance(firstStep.distance) : `${Math.round(firstStep.distance)} м`) : route.distance;
-  document.getElementById('maneuver-street').textContent = firstStep ? (firstStep.name || firstStep.instruction) : route.name;
+  document.getElementById('maneuver-street').textContent = firstManeuver ? (firstManeuver.name || firstManeuver.instruction) : route.name;
 
   document.getElementById('nav-duration').textContent = route.duration;
   document.getElementById('nav-distance').textContent = route.distance;
@@ -2554,10 +2586,10 @@ function renderChargingStationsList() {
     card.className = 'ev-charger-card';
     card.innerHTML = `
       <div class="ev-charger-top">
-        <div class="ev-charger-name">⚡ ${charger.name}</div>
+        <div class="ev-charger-name">⚡ ${escapeHtml(charger.name)}</div>
         <span class="ev-charger-power">${charger.power}</span>
       </div>
-      <div style="font-size: 12px; color: #64748b; line-height: 1.3;">${charger.address}</div>
+      <div style="font-size: 12px; color: #64748b; line-height: 1.3;">${escapeHtml(charger.address)}</div>
       <div class="ev-charger-meta">
         <span class="ev-stalls-free">● ${charger.stalls}</span>
         <div style="display: flex; align-items: center; gap: 8px;">
@@ -3062,12 +3094,12 @@ function initWeatherAndMusic() {
 
     item.innerHTML = `
       <div class="yt-thumb-wrap">
-        <img class="yt-thumb-img" src="${thumbUrl}" alt="" loading="lazy" />
-        <span class="yt-duration-badge">${track.duration || '3:30'}</span>
+        <img class="yt-thumb-img" src="${escapeHtml(thumbUrl)}" alt="" loading="lazy" />
+        <span class="yt-duration-badge">${escapeHtml(track.duration || '3:30')}</span>
       </div>
       <div class="yt-info-wrap">
-        <div class="yt-item-title">${track.title}</div>
-        <div class="yt-item-meta">${metaText}</div>
+        <div class="yt-item-title">${escapeHtml(track.title)}</div>
+        <div class="yt-item-meta">${escapeHtml(metaText)}</div>
       </div>
     `;
 
@@ -3323,7 +3355,7 @@ function initWeatherAndMusic() {
       item.className = 'yt-suggestion-item';
       item.innerHTML = `
         <svg class="yt-suggest-icon" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-        <span>${s}</span>
+        <span>${escapeHtml(s)}</span>
       `;
       item.addEventListener('click', () => {
         if (ytSearchInput) ytSearchInput.value = s;
@@ -3507,6 +3539,8 @@ async function loadLiveYerevanWeather() {
 }
 
 // 10. Developer Mode & In-Car Road Simulator (?mode=dev)
+const DEV_LOG_MAX_LINES = 400;
+
 function initDevMode() {
   const urlParams = new URLSearchParams(window.location.search);
   const isDev = urlParams.get('mode') === 'dev';
@@ -3528,32 +3562,50 @@ function initDevMode() {
     if (!logBox) return;
     const now = new Date();
     const timeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`;
-    const text = args.map(a => (typeof a === 'object' ? JSON.stringify(a) : String(a))).join(' ');
+    const text = args.map(stringifyLogArg).join(' ');
 
     const line = document.createElement('div');
     line.className = `dev-log-line ${level}`;
-    line.innerHTML = `<span>[${timeStr}]</span> <strong>[${level.toUpperCase()}]</strong> ${text}`;
+    line.innerHTML = `<span>[${timeStr}]</span> <strong>[${level.toUpperCase()}]</strong> ${escapeHtml(text)}`;
     logBox.appendChild(line);
+    while (logBox.childElementCount > DEV_LOG_MAX_LINES) {
+      logBox.firstElementChild.remove();
+    }
     logBox.scrollTop = logBox.scrollHeight;
   }
 
-  // Hook into browser console
-  const origLog = console.log;
-  const origWarn = console.warn;
-  const origError = console.error;
+  // Logging must never throw into the caller: MapLibre events, maps and errors are
+  // circular or don't serialize, so fall back to a short description
+  function stringifyLogArg(a) {
+    if (a instanceof Error) return `${a.name}: ${a.message}`;
+    if (a === null || typeof a !== 'object') return String(a);
+    try {
+      return JSON.stringify(a);
+    } catch (e) {
+      return `[${(a.constructor && a.constructor.name) || 'Object'}${a.type ? ' ' + a.type : ''}]`;
+    }
+  }
 
-  console.log = function(...args) {
-    origLog.apply(console, args);
-    appendDevLog('log', ...args);
-  };
-  console.warn = function(...args) {
-    origWarn.apply(console, args);
-    appendDevLog('warn', ...args);
-  };
-  console.error = function(...args) {
-    origError.apply(console, args);
-    appendDevLog('error', ...args);
-  };
+  // Hook into browser console (dev mode only: in production nobody sees the panel
+  // and the hidden log box would grow forever)
+  function hookConsoleIntoDevLog() {
+    const origLog = console.log;
+    const origWarn = console.warn;
+    const origError = console.error;
+
+    console.log = function(...args) {
+      origLog.apply(console, args);
+      appendDevLog('log', ...args);
+    };
+    console.warn = function(...args) {
+      origWarn.apply(console, args);
+      appendDevLog('warn', ...args);
+    };
+    console.error = function(...args) {
+      origError.apply(console, args);
+      appendDevLog('error', ...args);
+    };
+  }
 
   // Voice Search Button in Search Drawer (#btn-voice-search)
   const btnVoiceSearch = document.getElementById('btn-voice-search');
@@ -3612,6 +3664,8 @@ function initDevMode() {
     if (devPanel) devPanel.classList.add('hidden');
     return;
   }
+
+  hookConsoleIntoDevLog();
 
   // Show Dev Mode UI
   if (devPill) devPill.classList.remove('hidden');

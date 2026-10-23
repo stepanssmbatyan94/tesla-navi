@@ -12,8 +12,10 @@ try {
   console.warn('msedge-tts not loaded:', e.message);
 }
 
-// In-memory cache for synthesized neural audio (fast 0ms repeats)
+// In-memory LRU cache for synthesized neural audio (fast 0ms repeats)
 const ttsAudioCache = new Map();
+const TTS_CACHE_MAX_ENTRIES = 300;
+const TTS_MAX_TEXT_LENGTH = 300;
 const voiceClients = new Map();
 
 async function getOrCreateVoiceClient(voice) {
@@ -38,7 +40,11 @@ async function synthesizeNeuralSpeech(text, voiceChoice = 'auto', lang = 'ru') {
   }
   const cacheKey = `${voice}:${text}`;
   if (ttsAudioCache.has(cacheKey)) {
-    return ttsAudioCache.get(cacheKey);
+    // Re-insert to mark as recently used (Map keeps insertion order)
+    const cached = ttsAudioCache.get(cacheKey);
+    ttsAudioCache.delete(cacheKey);
+    ttsAudioCache.set(cacheKey, cached);
+    return cached;
   }
 
   const tts = await getOrCreateVoiceClient(voice);
@@ -57,6 +63,10 @@ async function synthesizeNeuralSpeech(text, voiceChoice = 'auto', lang = 'ru') {
       const buffer = Buffer.concat(chunks);
       if (buffer.length > 0) {
         ttsAudioCache.set(cacheKey, buffer);
+        // Bounded cache: /api/tts takes arbitrary text, so evict the oldest entries
+        while (ttsAudioCache.size > TTS_CACHE_MAX_ENTRIES) {
+          ttsAudioCache.delete(ttsAudioCache.keys().next().value);
+        }
       }
       resolve(buffer);
     });
@@ -100,6 +110,45 @@ const MIME_TYPES = {
   '.mp3': 'audio/mpeg',
   '.ogg': 'audio/ogg'
 };
+
+// Static files reachable over HTTP (everything else in the repo stays private)
+const PUBLIC_FILES = new Set(['index.html', 'phone.html']);
+const PUBLIC_DIRS = new Set(['css', 'js', 'styles', 'sounds']);
+
+// Hosts /api/resolve-location may fetch (map share links only), so the endpoint
+// can't be used to reach internal or arbitrary addresses (SSRF)
+const MAP_LINK_HOSTS = ['goo.gl', 'google.com', 'google.am', 'google.ge', 'google.ru', 'yandex.ru', 'yandex.com', 'yandex.am', 'ya.ru', 'maps.apple.com', '2gis.ru', '2gis.am'];
+
+function isAllowedMapLink(urlString) {
+  try {
+    const u = new URL(urlString);
+    if (u.protocol !== 'https:' && u.protocol !== 'http:') return false;
+    const host = u.hostname.toLowerCase();
+    return MAP_LINK_HOSTS.some(h => host === h || host.endsWith('.' + h));
+  } catch (e) {
+    return false;
+  }
+}
+
+// Follow share-link redirects manually so every hop is re-checked against the allowlist
+async function resolveMapLinkRedirects(startUrl, maxHops = 5) {
+  let current = startUrl;
+  for (let hop = 0; hop <= maxHops; hop++) {
+    if (!isAllowedMapLink(current)) return null;
+    const res = await fetch(current, {
+      redirect: 'manual',
+      signal: AbortSignal.timeout(8000),
+      headers: { 'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X)' }
+    });
+    const location = res.headers.get('location');
+    if (res.status >= 300 && res.status < 400 && location) {
+      current = new URL(location, current).toString();
+      continue;
+    }
+    return current;
+  }
+  return null;
+}
 
 // Cache for live Yandex traffic data in Yerevan
 let trafficCache = { time: 0, data: null };
@@ -255,11 +304,8 @@ async function fetchYandexSuggestResults(q, userLng = 44.5125, userLat = 40.1776
       // Follow redirect if short URL
       if (!coords && (input.startsWith('http://') || input.startsWith('https://'))) {
         try {
-          const redirectRes = await fetch(input, {
-            redirect: 'follow',
-            headers: { 'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X)' }
-          });
-          coords = extractCoords(redirectRes.url);
+          const finalUrl = await resolveMapLinkRedirects(input);
+          coords = finalUrl ? extractCoords(finalUrl) : null;
         } catch (e) {
           console.warn('Redirect resolve warning:', e.message);
         }
@@ -344,10 +390,20 @@ function getArmenianAudio(text, voiceChoice = 'gor') {
   const v = (voiceChoice || '').toLowerCase();
   const folder = (v === 'suzie' || v === 'female' || v === 'svetlana' || v === 'ava') ? 'suzie' : 'gor';
 
-  let file = 'welcome.mp3';
+  // Unknown phrases get no clip (the caller answers 404) instead of replaying the greeting
+  let file = null;
+  const is250 = t.includes('250') || t.includes('հիսուն');
 
   if (t.includes('կառուցված') || t.includes('գնացինք') || t === 'route_start') {
     file = 'route_start.mp3';
+  } else if ((t.includes('հետադարձ') && is250) || t === 'dist_250_uturn') {
+    file = 'dist_250_uturn.mp3';
+  } else if (t.includes('հետադարձ') || t === 'uturn') {
+    file = 'uturn.mp3';
+  } else if ((t.includes('պահեք ձախ') && is250) || t === 'dist_250_keep_left') {
+    file = 'dist_250_keep_left.mp3';
+  } else if ((t.includes('պահեք աջ') && is250) || t === 'dist_250_keep_right') {
+    file = 'dist_250_keep_right.mp3';
   } else if ((t.includes('ձախ') && (t.includes('250') || t.includes('հիսուն'))) || t === 'dist_250_left') {
     file = 'dist_250_left.mp3';
   } else if ((t.includes('աջ') && (t.includes('250') || t.includes('հիսուն'))) || t === 'dist_250_right') {
@@ -382,6 +438,8 @@ function getArmenianAudio(text, voiceChoice = 'gor') {
     file = 'welcome.mp3';
   }
 
+  if (!file) return null;
+
   let filePath = path.join(__dirname, 'sounds', 'hy', folder, file);
   if (!fs.existsSync(filePath)) {
     filePath = path.join(__dirname, 'sounds', 'hy', 'gor', file);
@@ -400,9 +458,9 @@ function getArmenianAudio(text, voiceChoice = 'gor') {
     const text = (parsedUrl.searchParams.get('text') || '').trim();
     const lang = (parsedUrl.searchParams.get('lang') || 'ru').trim().toLowerCase();
     const voice = (parsedUrl.searchParams.get('voice') || 'auto').trim();
-    if (!text) {
+    if (!text || text.length > TTS_MAX_TEXT_LENGTH) {
       res.writeHead(400, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ error: 'Text required' }));
+      res.end(JSON.stringify({ error: `Text required (max ${TTS_MAX_TEXT_LENGTH} chars)` }));
       return;
     }
 
@@ -419,6 +477,10 @@ function getArmenianAudio(text, voiceChoice = 'gor') {
         res.end(armenianBuf);
         return;
       }
+      // No recorded clip: the Russian/English neural voices can't read Armenian text
+      res.writeHead(404, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'No Armenian clip for this phrase' }));
+      return;
     }
 
     try {
@@ -550,6 +612,9 @@ function getArmenianAudio(text, voiceChoice = 'gor') {
             if (inter.lanes && inter.lanes.length > 0) {
               laneIntersections.push({
                 location: inter.location, // [lng, lat]
+                // Direction OSRM leaves the junction in: lets the client drop lanes where
+                // the OSRM path diverges from the Yandex route it gets overlaid on
+                outBearing: (Array.isArray(inter.bearings) && inter.out != null) ? inter.bearings[inter.out] : null,
                 lanes: inter.lanes,
                 name: s.name || '',
                 modifier: s.maneuver?.modifier || 'straight',
@@ -650,8 +715,8 @@ function getArmenianAudio(text, voiceChoice = 'gor') {
               const isNorthSouthExp = /север-юг|north-south|\bm-1\b|\bm-2\b/i.test(streetLower);
               const isHwy = /highway|трасса|шоссе|\bh-\d+|\bm-\d+/i.test(streetLower);
               const isFastAvenue = /исаков|isakov|сараландж|saralanj|багреванд|bagrevand|давиташен|davitashen/i.test(streetLower);
-              // Maneuver location is the junction at the end of the section (or start if last)
-              const loc = (sec.edgePoints && sec.edgePoints[1]) ? sec.edgePoints[1] : ((sec.edgePoints && sec.edgePoints[0]) ? sec.edgePoints[0] : null);
+              // The section's action is performed where the section STARTS (edgePoints[0])
+              const loc = (sec.edgePoints && sec.edgePoints[0]) ? sec.edgePoints[0] : ((sec.edgePoints && sec.edgePoints[1]) ? sec.edgePoints[1] : null);
 
               if (isNorthSouthExp) {
                 speedLimit = 110; // Скоростная автомагистраль Север-Юг (Севан, Арташат)
@@ -1023,7 +1088,26 @@ function getArmenianAudio(text, voiceChoice = 'gor') {
     pathname = '/index.html';
   }
 
-  const filePath = path.join(__dirname, pathname);
+  // Serve only the public front-end: never .git, server code, node_modules, refs/, models/...
+  let decodedPath;
+  try {
+    decodedPath = decodeURIComponent(pathname);
+  } catch (e) {
+    res.writeHead(400, { 'Content-Type': 'text/plain; charset=utf-8' });
+    res.end('400 Bad Request');
+    return;
+  }
+  const filePath = path.resolve(__dirname, '.' + decodedPath);
+  const relPath = path.relative(__dirname, filePath);
+  const relParts = relPath.split(path.sep);
+  const isPublic = !relPath.startsWith('..') && !path.isAbsolute(relPath) &&
+    !relParts.some(part => part.startsWith('.')) &&
+    (PUBLIC_FILES.has(relPath) || PUBLIC_DIRS.has(relParts[0]));
+  if (!isPublic) {
+    res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
+    res.end('404 Not Found');
+    return;
+  }
 
   fs.stat(filePath, (err, stats) => {
     if (err || !stats.isFile()) {
@@ -1060,10 +1144,12 @@ wss.on('connection', (ws, req) => {
   const clientSet = rooms.get(room);
   clientSet.add(ws);
 
-  ws.on('message', (data) => {
+  ws.on('message', (data, isBinary) => {
+    // ws v8 hands text frames over as Buffers: preserve the frame type, otherwise
+    // browsers receive a Blob and JSON.parse fails on "[object Blob]"
     for (const peer of clientSet) {
       if (peer !== ws && peer.readyState === ws.OPEN) {
-        peer.send(data);
+        peer.send(data, { binary: isBinary });
       }
     }
   });

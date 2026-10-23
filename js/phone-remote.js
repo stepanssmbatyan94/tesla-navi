@@ -5,7 +5,8 @@ let realtimeClient = null;
 let isSharingGps = false;
 let watchId = null;
 let wakeLock = null;
-let currentLang = 'ru';
+let gpsPermissionDenied = false;
+let lastPhonePos = null;
 
 document.addEventListener('DOMContentLoaded', () => {
   initParams();
@@ -19,12 +20,18 @@ document.addEventListener('DOMContentLoaded', () => {
     console.log('[Phone Remote] Auto GPS start deferred for user gesture:', err);
   });
 
-  // Re-acquire GPS & send ping when phone tab becomes visible again
+  // Re-acquire GPS, wake lock & the socket when phone tab becomes visible again
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible') {
-      if (realtimeClient) realtimeClient.sendPing();
+      if (realtimeClient) {
+        realtimeClient.ensureLocalWs();
+        realtimeClient.sendPing();
+      }
       if (!isSharingGps) {
-        startGpsSharing();
+        if (!gpsPermissionDenied) startGpsSharing();
+      } else if (!wakeLock) {
+        // The browser releases the screen wake lock whenever the tab is hidden
+        requestWakeLock();
       }
     }
   });
@@ -74,35 +81,21 @@ function initGpsToggle() {
   });
 }
 
-async function startGpsSharing() {
-  if (!navigator.geolocation) {
-    alert('Геолокация не поддерживается вашим браузером');
-    return;
-  }
-
-  const btn = document.getElementById('btn-share-gps');
-  btn.classList.add('active');
-  btn.innerHTML = `
-    <svg class="satellite-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-      <circle cx="12" cy="12" r="2"></circle>
-      <path d="M16.24 7.76a6 6 0 0 1 0 8.49m-8.48-.01a6 6 0 0 1 0-8.49m11.31-2.82a10 10 0 0 1 0 14.14m-14.14 0a10 10 0 0 1 0-14.14"></path>
-    </svg>
-    <span>Остановить передачу GPS</span>
-  `;
-
-  // Request Screen Wake Lock so phone doesn't sleep while driving
+// Request Screen Wake Lock so phone doesn't sleep while driving
+async function requestWakeLock() {
+  if (!('wakeLock' in navigator) || wakeLock) return;
   try {
-    if ('wakeLock' in navigator) {
-      wakeLock = await navigator.wakeLock.request('screen');
-      document.getElementById('wake-status').textContent = '• Экран бодрствует';
-    }
+    const lock = await navigator.wakeLock.request('screen');
+    wakeLock = lock;
+    lock.addEventListener('release', () => {
+      if (wakeLock === lock) wakeLock = null;
+      document.getElementById('wake-status').textContent = '';
+    });
+    document.getElementById('wake-status').textContent = '• Экран бодрствует';
   } catch (err) {
     console.warn('Wake Lock error:', err);
   }
-
-  isSharingGps = true;
-
-let lastPhonePos = null;
+}
 
 function calculatePhoneBearing(lat1, lon1, lat2, lon2) {
   const dLon = ((lon2 - lon1) * Math.PI) / 180;
@@ -114,7 +107,30 @@ function calculatePhoneBearing(lat1, lon1, lat2, lon2) {
   return (brng + 360) % 360;
 }
 
+async function startGpsSharing() {
+  if (!navigator.geolocation) {
+    alert('Геолокация не поддерживается вашим браузером');
+    return;
+  }
+  // Auto-start, the button and visibilitychange can all fire: never stack watchers
+  if (isSharingGps) return;
+  isSharingGps = true;
+  gpsPermissionDenied = false;
+
+  const btn = document.getElementById('btn-share-gps');
+  btn.classList.add('active');
+  btn.innerHTML = `
+    <svg class="satellite-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <circle cx="12" cy="12" r="2"></circle>
+      <path d="M16.24 7.76a6 6 0 0 1 0 8.49m-8.48-.01a6 6 0 0 1 0-8.49m11.31-2.82a10 10 0 0 1 0 14.14m-14.14 0a10 10 0 0 1 0-14.14"></path>
+    </svg>
+    <span>Остановить передачу GPS</span>
+  `;
+
+  requestWakeLock();
+
   // Start continuous watchPosition
+  if (watchId !== null) navigator.geolocation.clearWatch(watchId);
   watchId = navigator.geolocation.watchPosition(
     (position) => {
       const coords = position.coords;
@@ -145,8 +161,10 @@ function calculatePhoneBearing(lat1, lon1, lat2, lon2) {
     (error) => {
       console.error('GPS error:', error);
       if (error.code === error.PERMISSION_DENIED) {
-        alert('Пожалуйста, разрешите доступ к геопозиции в настройках браузера');
         stopGpsSharing();
+        // Don't re-prompt on every tab switch: retry only from the button
+        gpsPermissionDenied = true;
+        alert('Пожалуйста, разрешите доступ к геопозиции в настройках браузера');
       }
     },
     {
