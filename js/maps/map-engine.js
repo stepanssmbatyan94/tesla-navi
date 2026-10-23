@@ -1,5 +1,10 @@
 // Tesla Navi Advanced Map Engine (MapLibre GL Clean 2D/Heading-Up + Yandex Navigator Styling)
 
+// OSRM lane junctions further than this from the Yandex polyline, or leaving in a
+// different direction, belong to another path and are dropped
+const LANE_MATCH_MAX_DIST_M = 20;
+const LANE_MATCH_MAX_BEARING_DIFF = 35;
+
 class TeslaMapEngine {
   constructor(containerId, options = {}) {
     this.containerId = containerId;
@@ -1706,9 +1711,9 @@ class TeslaMapEngine {
         ? upcomingLaneDist
         : activeDist;
 
-      const activeModifier = (upcomingLaneInter && upcomingLaneDist <= 220 && upcomingLaneInter.modifier)
-        ? upcomingLaneInter.modifier
-        : maneuverModifier;
+      // The Yandex maneuver stays authoritative: OSRM only contributes lane arrows. Its step
+      // modifier is repeated on every pass-through junction, which made the HUD flip left/right
+      const activeModifier = maneuverModifier;
 
       const stepInstruction = this.formatStepInstruction(activeModifier, maneuverStreet);
 
@@ -2159,8 +2164,11 @@ class TeslaMapEngine {
     this.activeRoute = { destination, durationSec, distanceMeters };
     this.laneIntersections = primaryRoute.laneIntersections || [];
 
-    // Pre-calculate route distance for each lane intersection along routeCoordinates
+    // Pre-calculate route distance for each lane intersection along routeCoordinates.
+    // Lanes come from a separate OSRM route: keep only junctions that lie on this route
+    // and that OSRM leaves in the same direction, otherwise the arrows describe another path
     if (this.laneIntersections.length > 0 && this.routeCoordinates && this.routeCumulativeDistances) {
+      const keptLanes = [];
       this.laneIntersections.forEach(li => {
         let bestDist = 0;
         let minD = Infinity;
@@ -2177,8 +2185,19 @@ class TeslaMapEngine {
           }
         }
         li.routeDist = bestDist;
+        if (minD > LANE_MATCH_MAX_DIST_M) return;
+        if (li.outBearing != null) {
+          const here = this.getPositionAtDistance(bestDist, 0);
+          const ahead = this.getPositionAtDistance(bestDist + 15, 0);
+          if (here && ahead) {
+            const routeBearing = this.calculateBearing(here.lat, here.lng, ahead.lat, ahead.lng);
+            const diff = Math.abs(((li.outBearing - routeBearing) % 360 + 540) % 360 - 180);
+            if (diff > LANE_MATCH_MAX_BEARING_DIFF) return;
+          }
+        }
+        keptLanes.push(li);
       });
-      this.laneIntersections.sort((a, b) => a.routeDist - b.routeDist);
+      this.laneIntersections = keptLanes.sort((a, b) => a.routeDist - b.routeDist);
     }
 
     if (primaryRoute.steps && primaryRoute.steps.length > 0) {

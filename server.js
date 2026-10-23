@@ -612,6 +612,9 @@ function getArmenianAudio(text, voiceChoice = 'gor') {
             if (inter.lanes && inter.lanes.length > 0) {
               laneIntersections.push({
                 location: inter.location, // [lng, lat]
+                // Direction OSRM leaves the junction in: lets the client drop lanes where
+                // the OSRM path diverges from the Yandex route it gets overlaid on
+                outBearing: (Array.isArray(inter.bearings) && inter.out != null) ? inter.bearings[inter.out] : null,
                 lanes: inter.lanes,
                 name: s.name || '',
                 modifier: s.maneuver?.modifier || 'straight',
