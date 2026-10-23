@@ -317,6 +317,12 @@ function updateSpeedometerDisplay(speedKmh) {
   }
 }
 
+// Age of a GPS fix for the telemetry panel ('—' when the clocks disagree or it's stale)
+function formatFixAge(ms) {
+  if (!Number.isFinite(ms) || ms < 0 || ms > 60000) return '—';
+  return ms < 1000 ? `${Math.round(ms)} ms` : `${(ms / 1000).toFixed(1)} s`;
+}
+
 function updateGpsStatusUI() {
   const banner = document.getElementById('gps-status-banner');
   if (!banner) return;
@@ -364,7 +370,7 @@ function initTeslaCarGps() {
       if (telLat) telLat.textContent = Number(coords.latitude).toFixed(4);
       if (telLng) telLng.textContent = Number(coords.longitude).toFixed(4);
       if (telAcc) telAcc.textContent = `±${Math.round(coords.accuracy || 3)} м`;
-      if (telAge) telAge.textContent = `4 мс`;
+      if (telAge) telAge.textContent = formatFixAge(Date.now() - pos.timestamp);
 
       // Pass directly to Map Engine
       if (mapEngine) {
@@ -448,7 +454,8 @@ function handleIncomingGps(gps) {
   if (telLat) telLat.textContent = Number(gps.lat).toFixed(4);
   if (telLng) telLng.textContent = Number(gps.lng).toFixed(4);
   if (telAcc) telAcc.textContent = `±${Math.round(gps.accuracy || 3)} м`;
-  if (telAge) telAge.textContent = `12 мс`;
+  // Phone clock vs car clock: only meaningful when both are roughly in sync
+  if (telAge) telAge.textContent = gps.timestamp ? formatFixAge(Date.now() - gps.timestamp) : '—';
 
   if (mapEngine) {
     const rawHeading = (gps.heading != null && !isNaN(gps.heading) && gps.heading > 0) ? gps.heading : null;
@@ -2812,8 +2819,8 @@ function initWeatherAndMusic() {
     }, 1000);
   }
 
-  // Account Identity (Stepan Smbatyan - Screenshot 5)
-  let ytUser = localStorage.getItem('tesla_yt_user') || 'Stepan Smbatyan';
+  // YouTube account label (a display name only: nothing is signed in)
+  let ytUser = localStorage.getItem('tesla_yt_user') || '';
 
   function updateAccountUI() {
     if (ytUserNameText) ytUserNameText.textContent = ytUser || 'Войти в YouTube';
@@ -2834,7 +2841,7 @@ function initWeatherAndMusic() {
           updateAccountUI();
         }
       } else {
-        const name = prompt('Введите имя вашего аккаунта YouTube:', 'Stepan Smbatyan');
+        const name = prompt('Введите имя вашего аккаунта YouTube:', '');
         if (name && name.trim()) {
           ytUser = name.trim();
           localStorage.setItem('tesla_yt_user', ytUser);
@@ -2963,106 +2970,88 @@ function initWeatherAndMusic() {
       id: '6CZLCZZNc90',
       title: 'Джем – Garik - indz el tar (official lyrics video)',
       channel: 'Garik Papoyan',
-      duration: '3:10',
-      meta: 'Джем • 185 тыс. просмотров'
+      duration: '3:10'
     },
     {
       id: 'OLqjgBoPV9E',
       title: 'ArmComedy 1439 - COP 17, Էփշթեյն և Ամուլսար',
       channel: 'ArmComedy',
-      duration: '30:13',
-      meta: '10 тыс. просмотров • 2 ч назад'
+      duration: '30:13'
     },
     {
       id: '04HS6MkhOr4',
       title: 'Պարոդիա - Լիլի Հովեր',
       channel: 'HD Production',
-      duration: '3:52',
-      meta: '14 тыс. просмотров • 2 ч назад'
+      duration: '3:52'
     },
     {
       id: 'vPNsZM2y7bw',
       title: '🚨Նոր ավտոյիս վրա ԱՎՏՈԲՈՒՍԻ մատոռ⚡The Long Drive #104',
       channel: 'Saint-Hov 🇦🇲',
-      duration: '13:51',
-      meta: '114 тыс. просмотров • 4 мес. назад'
+      duration: '13:51'
     },
     {
       id: '5bFiccd8lCI',
       title: 'When Young Lionel Messi Substituted & SHOCKED Pep Guardiola',
       channel: 'VALENTINO PRODUCTIONS',
-      duration: '12:44',
-      meta: '1.2 млн просмотров • 1 мес. назад'
+      duration: '12:44'
     },
     {
       id: 'mFRh6wVyMaE',
       title: 'Brunette - Bac kapuyt achqerd',
       channel: 'Brunette',
-      duration: '3:36',
-      meta: '2.4 млн просмотров'
+      duration: '3:36'
     },
     {
       id: 'TPjN6N8TgNI',
       title: 'Super Sako - Mi Gna ft. Hayko (Official Audio)',
       channel: 'Super Sako',
-      duration: '3:22',
-      meta: '320 млн просмотров'
+      duration: '3:22'
     },
     {
       id: 'z3wqyffIosw',
       title: 'Сделал 1 кг филамента для 3D-принтера из мусорных бутылок ♻️',
       channel: 'Modelmen Life',
-      duration: '9:12',
-      meta: '145 тыс. просмотров • 10 дн. назад'
+      duration: '9:12'
     },
     {
       id: 'ayMA_IeEp2Q',
       title: '#Corner Mundial #1. Աշխարհի առաջնությունը՝ Օգնյեն Չանչարևիչի հետ',
       channel: 'Corner Football Armenia',
-      duration: '53:43',
-      meta: '38 тыс. просмотров'
+      duration: '53:43'
     },
     {
       id: 'rOgehCKt-VA',
       title: 'Ռոմանոս Պետրոսյանի հանձնարարականով Երևանի Քրիստափորի փողոցի փտած ...',
       channel: 'Shamshyan.com',
-      duration: '8:36',
-      meta: '1.1 тыс. просмотров • 6 ч назад'
+      duration: '8:36'
     }
   ];
 
   const CATEGORY_FEEDS = {
     all: HOME_RECOMMENDATIONS,
     music: [
-      { id: '6CZLCZZNc90', title: 'Джем – Garik - indz el tar', channel: 'Garik Papoyan', duration: '3:10', meta: 'Джем • 185 тыс.' },
-      { id: 'mFRh6wVyMaE', title: 'Brunette - Bac kapuyt achqerd', channel: 'Brunette', duration: '3:36', meta: '2.4 млн просмотров' },
-      { id: 'TPjN6N8TgNI', title: 'Super Sako - Mi Gna ft. Hayko', channel: 'Super Sako', duration: '3:22', meta: '320 млн просмотров' },
-      { id: 'Z1bS3aT_r24', title: 'Garik & Sona - Lusi', channel: 'Garik & Sona', duration: '4:12', meta: '5.1 млн просмотров' },
-      { id: 'kLp_Hh684HQ', title: 'Aram MP3 - Not Alone', channel: 'Aram MP3', duration: '3:02', meta: '12 млн просмотров' }
+      { id: '6CZLCZZNc90', title: 'Джем – Garik - indz el tar', channel: 'Garik Papoyan', duration: '3:10' },
+      { id: 'mFRh6wVyMaE', title: 'Brunette - Bac kapuyt achqerd', channel: 'Brunette', duration: '3:36' },
+      { id: 'TPjN6N8TgNI', title: 'Super Sako - Mi Gna ft. Hayko', channel: 'Super Sako', duration: '3:22' }
     ],
     jams: [
-      { id: '6CZLCZZNc90', title: 'Джем – Garik - indz el tar (official lyrics video)', channel: 'Garik Papoyan', duration: '3:10', meta: 'Джем • 185 тыс.' },
-      { id: '1QnCj2g8g_g', title: 'Garik Papoyan - Jam Session Live Acoustic', channel: 'Garik Papoyan', duration: '24:15', meta: 'Акустический джем' },
-      { id: '8JkL99qX1rU', title: 'Armenian Street Music & Jam Acoustic', channel: 'Yerevan Jam', duration: '18:40', meta: 'Live Session' }
+      { id: '6CZLCZZNc90', title: 'Джем – Garik - indz el tar (official lyrics video)', channel: 'Garik Papoyan', duration: '3:10' }
     ],
     armcomedy: [
-      { id: 'OLqjgBoPV9E', title: 'ArmComedy 1439 - COP 17, Էփշթեյն և Ամուլսար', channel: 'ArmComedy', duration: '30:13', meta: '10 тыс. • 2 ч назад' },
-      { id: '04HS6MkhOr4', title: 'Պարոդիա - Լիլի Հովեր', channel: 'HD Production', duration: '3:52', meta: '14 тыс. • 2 ч назад' },
-      { id: 'Kq06w4ZkEeo', title: 'ArmComedy 1438', channel: 'ArmComedy', duration: '28:40', meta: '52 тыс. просмотров' },
-      { id: 'a4Xp_BfX9aI', title: 'Ruben Yesayan - Stand Up Yerevan', channel: 'Ruben Yesayan', duration: '16:22', meta: '85 тыс. просмотров' }
+      { id: 'OLqjgBoPV9E', title: 'ArmComedy 1439 - COP 17, Էփշթեյն և Ամուլսար', channel: 'ArmComedy', duration: '30:13' },
+      { id: '04HS6MkhOr4', title: 'Պարոդիա - Լիլի Հովեր', channel: 'HD Production', duration: '3:52' }
     ],
     auto: [
-      { id: 'vPNsZM2y7bw', title: '🚨Նոր ավտոյիս վրա ԱՎՏՈԲՈՒՍԻ մատոռ⚡The Long Drive #104', channel: 'Saint-Hov 🇦🇲', duration: '13:51', meta: '114 тыс. • 4 мес. назад' },
-      { id: 'z3wqyffIosw', title: 'Сделал 1 кг филамента для 3D-принтера из мусорных бутылок ♻️', channel: 'Modelmen Life', duration: '9:12', meta: '145 тыс. • 10 дн. назад' },
-      { id: 'K7nFz2u5RkQ', title: 'Tesla Model 3 / Model Y Hidden Tricks & Tips', channel: 'Tesla Drivers', duration: '14:20', meta: '220 тыс. просмотров' }
+      { id: 'vPNsZM2y7bw', title: '🚨Նոր ավտոյիս վրա ԱՎՏՈԲՈՒՍԻ մատոռ⚡The Long Drive #104', channel: 'Saint-Hov 🇦🇲', duration: '13:51' },
+      { id: 'z3wqyffIosw', title: 'Сделал 1 кг филамента для 3D-принтера из мусорных бутылок ♻️', channel: 'Modelmen Life', duration: '9:12' }
     ],
     football: [
-      { id: '5bFiccd8lCI', title: 'When Young Lionel Messi Substituted & SHOCKED Pep Guardiola', channel: 'VALENTINO PRODUCTIONS', duration: '12:44', meta: '1.2 млн • 1 мес. назад' },
-      { id: 'ayMA_IeEp2Q', title: '#Corner Mundial #1. Աշխարհի առաջնությունը՝ Օգնյեն Չանչարևիչի հետ', channel: 'Corner Football Armenia', duration: '53:43', meta: '38 тыс. просмотров' }
+      { id: '5bFiccd8lCI', title: 'When Young Lionel Messi Substituted & SHOCKED Pep Guardiola', channel: 'VALENTINO PRODUCTIONS', duration: '12:44' },
+      { id: 'ayMA_IeEp2Q', title: '#Corner Mundial #1. Աշխարհի առաջնությունը՝ Օգնյեն Չանչարևիչի հետ', channel: 'Corner Football Armenia', duration: '53:43' }
     ],
     news: [
-      { id: 'rOgehCKt-VA', title: 'Երևանի Քրիստափորի փողոցի փտած ...', channel: 'Shamshyan.com', duration: '8:36', meta: '1.1 тыс. • 6 ч назад' },
-      { id: '9QvH0rWwL8M', title: 'PanArmenian News Today Highlights', channel: 'PanArmenian TV', duration: '15:10', meta: 'Новости дня' }
+      { id: 'rOgehCKt-VA', title: 'Երևանի Քրիստափորի փողոցի փտած ...', channel: 'Shamshyan.com', duration: '8:36' }
     ]
   };
 

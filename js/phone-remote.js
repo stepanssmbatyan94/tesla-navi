@@ -7,6 +7,7 @@ let watchId = null;
 let wakeLock = null;
 let gpsPermissionDenied = false;
 let lastPhonePos = null;
+let lastFixAt = 0;
 
 document.addEventListener('DOMContentLoaded', () => {
   initParams();
@@ -144,6 +145,8 @@ async function startGpsSharing() {
         }
       }
       lastPhonePos = { lat: coords.latitude, lng: coords.longitude };
+      lastFixAt = Date.now();
+      updateFixAge();
 
       // Update phone UI
       document.getElementById('phone-speed-val').textContent = speedKmh;
@@ -174,6 +177,17 @@ async function startGpsSharing() {
     }
   );
 }
+
+// How long ago the phone got its last GPS fix (replaces the old fixed '18 satellites / 12 ms')
+function updateFixAge() {
+  const el = document.getElementById('phone-fix-age');
+  if (!el) return;
+  if (!lastFixAt) { el.textContent = '—'; return; }
+  const sec = Math.round((Date.now() - lastFixAt) / 1000);
+  el.textContent = sec <= 1 ? 'сейчас' : `${sec} с назад`;
+  el.style.color = sec > 10 ? 'var(--accent-red, #ef4444)' : '';
+}
+setInterval(updateFixAge, 1000);
 
 function stopGpsSharing() {
   if (watchId !== null) {
