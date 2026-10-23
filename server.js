@@ -887,35 +887,15 @@ function getArmenianAudio(text, voiceChoice = 'gor') {
         }
       }
 
-      if (!currentCity) {
-        // Outside known cities -> Highway
+      if (!currentCity || !currentCity.isYerevan) {
+        // Yandex publishes a traffic score only for Yerevan (region 10262). Elsewhere we have
+        // no data, so say so instead of claiming the roads are free.
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({
           success: true,
-          outsideCity: true,
-          city: 'Трасса',
-          score: '🛣️',
-          icon: 'green',
-          color: '#22c55e',
-          hint: 'Трасса свободна',
-          time: '',
-          source: 'highway'
-        }));
-        return;
-      } else if (!currentCity.isYerevan) {
-        // Other Armenian city: Yandex publishes 1-10 numerical traffic index only for Yerevan (10262).
-        // For other cities, motion is fluid and free-flowing.
-        res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({
-          success: true,
-          outsideCity: false,
-          city: currentCity.name,
-          score: 'OK',
-          icon: 'green',
-          color: '#22c55e',
-          hint: `${currentCity.name}: дороги свободны`,
-          time: '',
-          source: 'regional'
+          available: false,
+          city: currentCity ? currentCity.name : null,
+          source: 'none'
         }));
         return;
       }

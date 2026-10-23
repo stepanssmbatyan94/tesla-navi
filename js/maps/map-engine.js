@@ -13,6 +13,9 @@ const MAP_LIBRARIES = {
 };
 const MAP_LIBRARY_TIMEOUT_MS = 10000;
 
+// Route/progress color when there is no traffic information
+const NO_TRAFFIC_COLOR = '#3b82f6';
+
 // Window around a route speed camera in which its limit counts as the verified limit
 const CAMERA_LIMIT_AHEAD_M = 400;
 const CAMERA_LIMIT_BEHIND_M = 50;
@@ -2055,43 +2058,10 @@ class TeslaMapEngine {
     }
   }
 
-  // Generate Vibrant Traffic Colored Segments (Exact Mapsev & Yandex Navigator: Green #10b981, Amber #f59e0b, Red #ef4444)
+  // Route coloring when no live traffic exists (OSRM fallback): one neutral segment.
+  // An invented green/amber/red pattern would show jams that aren't there.
   generateTrafficSegments(coordinates) {
-    const total = coordinates.length;
-    if (total < 4) {
-      return [{ coords: coordinates, color: '#10b981' }];
-    }
-
-    const segments = [];
-    const p1 = Math.floor(total * 0.38);
-    const p2 = Math.floor(total * 0.60);
-    const p3 = Math.floor(total * 0.78);
-
-    // Initial section: Free flow green
-    segments.push({
-      coords: coordinates.slice(0, p1 + 1),
-      color: '#10b981'
-    });
-
-    // Moderate slow section: Amber/yellow
-    segments.push({
-      coords: coordinates.slice(p1, p2 + 1),
-      color: '#f59e0b'
-    });
-
-    // Congestion jam section: Red
-    segments.push({
-      coords: coordinates.slice(p2, p3 + 1),
-      color: '#ef4444'
-    });
-
-    // Final arrival section: Free flow green
-    segments.push({
-      coords: coordinates.slice(p3),
-      color: '#10b981'
-    });
-
-    return segments.filter(s => s.coords.length >= 2);
+    return [{ coords: coordinates, color: NO_TRAFFIC_COLOR }];
   }
 
   // Dynamic Route Framing: Mathematically fits entire route (start to finish) inside screen

@@ -557,81 +557,38 @@ function toggleFavoritePlace(place) {
 
 let currentRouteInfo = null;
 
-// Dynamic Yerevan Traffic Score Calculation (UTC+4)
-function getLiveTrafficScore() {
-  const now = new Date();
-  const utcHours = now.getUTCHours();
-  const utcMinutes = now.getUTCMinutes();
-  const yerevanHour = (utcHours + 4 + (utcMinutes / 60)) % 24;
-
-  let score = 2;
-  let color = '#22c55e'; // Vibrant Green
-  let label = 'Дороги свободны';
-
-  if (yerevanHour >= 8.5 && yerevanHour < 10.5) {
-    score = 7;
-    color = '#ef4444'; // Red
-    label = 'Утренний час пик';
-  } else if (yerevanHour >= 17.0 && yerevanHour < 19.75) {
-    score = 8;
-    color = '#ef4444'; // Red
-    label = 'Вечерний час пик';
-  } else if (yerevanHour >= 13.0 && yerevanHour < 15.0) {
-    score = 5;
-    color = '#f59e0b'; // Amber
-    label = 'Умеренное движение';
-  } else if (yerevanHour >= 10.5 && yerevanHour < 17.0) {
-    score = 4;
-    color = '#eab308'; // Yellow
-    label = 'Обычный трафик';
-  } else if (yerevanHour >= 19.75 && yerevanHour < 21.0) {
-    score = 4;
-    color = '#eab308';
-    label = 'Трафик спадает';
-  } else {
-    // 21:00 - 08:30 (Matches 21:28 user drive photo!)
-    score = 2;
-    color = '#22c55e';
-    label = 'Свободно';
-  }
-
-  return { score, color, label };
-}
-
 let liveTrafficData = null;
 
 async function updateLiveTrafficBadge() {
   const badge = document.getElementById('traffic-score-badge');
   if (!badge) return;
+  const dict = I18N[window.CURRENT_LANG || 'ru'] || I18N.ru;
 
   const curLat = mapEngine?.currentPosition?.lat;
   const curLng = mapEngine?.currentPosition?.lng;
   const query = (curLat && curLng) ? `?lat=${curLat}&lng=${curLng}` : '';
 
+  liveTrafficData = null;
   try {
     const res = await fetch(`/api/traffic-yerevan${query}`);
     const data = await res.json();
-    if (data && data.success) {
+    if (data && data.success && data.available !== false && data.score != null) {
       liveTrafficData = data;
-      badge.textContent = data.outsideCity ? '🛣️' : data.score;
+      badge.textContent = data.score;
       badge.style.background = data.color;
       badge.style.boxShadow = `0 4px 14px ${data.color}90`;
-      if (data.outsideCity) {
-        badge.title = `Трасса / За городом: ${data.hint}`;
-      } else if (data.city && data.city !== 'Ереван') {
-        badge.title = `${data.city}: ${data.hint}`;
-      } else {
-        badge.title = `Пробки в Ереване: ${data.score} из 10 (${data.hint}) · Яндекс`;
-      }
+      badge.title = `${dict.trafficScoreTitle}: ${data.score}/10 (${data.hint}) · Yandex`;
       return;
     }
-  } catch (e) {}
+  } catch (e) {
+    console.warn('Traffic score fetch error:', e);
+  }
 
-  const traffic = getLiveTrafficScore();
-  badge.textContent = traffic.score;
-  badge.style.background = traffic.color;
-  badge.style.boxShadow = `0 4px 14px ${traffic.color}90`;
-  badge.title = `Пробки в Ереване: ${traffic.score} из 10 баллов (${traffic.label})`;
+  // No live score here (outside Yerevan or Yandex unavailable): show that, never a guess
+  badge.textContent = '—';
+  badge.style.background = '#94a3b8';
+  badge.style.boxShadow = 'none';
+  badge.title = dict.trafficUnavailable;
 }
 
 // 4. Map Engine Initialization
@@ -829,11 +786,11 @@ function initToolbarHandlers() {
   const trafficBadge = document.getElementById('traffic-score-badge');
   if (trafficBadge) {
     trafficBadge.addEventListener('click', () => {
-      if (liveTrafficData && liveTrafficData.success) {
-        alert(`🚦 Яндекс.Пробки Ереван\nБалл: ${liveTrafficData.score} из 10\nСитуация: ${liveTrafficData.hint}\nВремя обновления: ${liveTrafficData.time || 'сейчас'}\nИсточник: Официальный информер Яндекс`);
+      const dict = I18N[window.CURRENT_LANG || 'ru'] || I18N.ru;
+      if (liveTrafficData) {
+        alert(`🚦 ${dict.trafficScoreTitle}: ${liveTrafficData.score}/10\n${liveTrafficData.hint}\n${liveTrafficData.time || ''} · Yandex`);
       } else {
-        const traffic = getLiveTrafficScore();
-        alert(`🚦 Пробки в Ереване: ${traffic.score} из 10 баллов\n${traffic.label}\nВремя: UTC+4 (Ереван)`);
+        alert(`🚦 ${dict.trafficUnavailable}`);
       }
     });
   }
@@ -2160,12 +2117,8 @@ function renderTrafficProgressBar(segments) {
   if (!barContainer) return;
   barContainer.innerHTML = '';
 
-  const segs = (segments && segments.length > 0) ? segments : [
-    { coords: new Array(40), color: '#10b981' },
-    { coords: new Array(25), color: '#f59e0b' },
-    { coords: new Array(15), color: '#ef4444' },
-    { coords: new Array(20), color: '#10b981' }
-  ];
+  // Without traffic data the bar is one neutral segment (never an invented jam pattern)
+  const segs = (segments && segments.length > 0) ? segments : [{ coords: [0, 1], color: NO_TRAFFIC_COLOR }];
 
   const totalPoints = segs.reduce((sum, s) => sum + (s.coords ? s.coords.length : 1), 0);
 
