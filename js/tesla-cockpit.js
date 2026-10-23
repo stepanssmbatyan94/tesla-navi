@@ -469,11 +469,14 @@ function loadSavedPlaces() {
   try {
     const raw = localStorage.getItem('tesla_saved_places');
     if (raw) {
+      // Defaults only seed the very first run: once saved, a deleted home/work (null)
+      // or an emptied favorites list must stay deleted
       const parsed = JSON.parse(raw);
+      const isValidPlace = p => !!(p && p.address && p.lat != null && p.lng != null);
       return {
-        home: (parsed.home && parsed.home.address && parsed.home.lat != null) ? parsed.home : DEFAULT_SAVED_PLACES.home,
-        work: (parsed.work && parsed.work.address && parsed.work.lat != null) ? parsed.work : DEFAULT_SAVED_PLACES.work,
-        favorites: (Array.isArray(parsed.favorites) && parsed.favorites.length > 0) ? parsed.favorites : DEFAULT_SAVED_PLACES.favorites
+        home: isValidPlace(parsed.home) ? parsed.home : null,
+        work: isValidPlace(parsed.work) ? parsed.work : null,
+        favorites: Array.isArray(parsed.favorites) ? parsed.favorites : []
       };
     }
   } catch (e) {
@@ -1165,32 +1168,22 @@ function renderQuickDestChips() {
   const dict = I18N[lang] || I18N.ru;
   const chipsList = [];
 
-  // 1. Home
-  const homePlace = userSavedPlaces.home || DEFAULT_SAVED_PLACES.home;
-  if (homePlace) {
-    chipsList.push({
-      type: 'home',
-      icon: '🏠',
-      title: dict.home || 'Дом',
-      place: homePlace
-    });
-  }
-
-  // 2. Work
-  const workPlace = userSavedPlaces.work || DEFAULT_SAVED_PLACES.work;
-  if (workPlace) {
-    chipsList.push({
-      type: 'work',
-      icon: '💼',
-      title: dict.work || 'Работа',
-      place: workPlace
-    });
-  }
+  // 1-2. Home & Work chips are always shown: an unset one opens the address editor on tap
+  chipsList.push({
+    type: 'home',
+    icon: '🏠',
+    title: dict.home || 'Дом',
+    place: userSavedPlaces.home
+  });
+  chipsList.push({
+    type: 'work',
+    icon: '💼',
+    title: dict.work || 'Работа',
+    place: userSavedPlaces.work
+  });
 
   // 3. Favorites / Recent Places
-  const favs = (userSavedPlaces.favorites && userSavedPlaces.favorites.length > 0)
-    ? userSavedPlaces.favorites
-    : DEFAULT_SAVED_PLACES.favorites;
+  const favs = userSavedPlaces.favorites || [];
 
   favs.forEach(f => {
     chipsList.push({
@@ -1643,9 +1636,6 @@ function initEditPlaceModalHandlers() {
           lat: loc.lat,
           lng: loc.lng
         };
-        if (!userSavedPlaces.work) {
-          userSavedPlaces.work = DEFAULT_SAVED_PLACES.work;
-        }
       } else if (currentEditTarget.type === 'work') {
         userSavedPlaces.work = {
           name: 'Работа',
@@ -1653,9 +1643,6 @@ function initEditPlaceModalHandlers() {
           lat: loc.lat,
           lng: loc.lng
         };
-        if (!userSavedPlaces.home) {
-          userSavedPlaces.home = DEFAULT_SAVED_PLACES.home;
-        }
       } else if (currentEditTarget.type === 'favorite') {
         const customName = nameInput.value.trim() || addrVal.split(',')[0] || 'Избранное';
         if (currentEditTarget.place) {
