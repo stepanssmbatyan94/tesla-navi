@@ -20,7 +20,7 @@
   <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.118.0"></script>
 
   <!-- Tesla Cockpit CSS -->
-  <link rel="stylesheet" href="css/tesla-display.css?v=40">
+  <link rel="stylesheet" href="css/tesla-display.css?v=41">
 </head>
 <body>
 
@@ -60,14 +60,10 @@
       </svg>
     </button>
 
-    <!-- Attached Battery Pill (Anchored to centered dock) -->
-    <div id="dock-battery-badge" class="dock-battery-pill" data-i18n-title="battery" title="Заряд батареи Tesla">
-      <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="#16a34a" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
-        <rect x="2" y="7" width="16" height="10" rx="2" ry="2"></rect>
-        <line x1="20" y1="11" x2="20" y2="13"></line>
-        <rect x="4" y="9" width="10" height="6" fill="#16a34a" rx="1"></rect>
-      </svg>
-      <span id="dock-battery-val">80%</span>
+    <!-- Charging stations shortcut (the browser can't read the car's battery, so no charge % here) -->
+    <div id="dock-battery-badge" class="dock-battery-pill" data-i18n-title="chargingStations" title="Зарядные станции">
+      <span aria-hidden="true">⚡</span>
+      <span data-i18n="charging">Зарядки</span>
     </div>
   </nav>
 
@@ -357,24 +353,6 @@
       </div>
 
       <!-- Battery Quick Info Card -->
-      <div style="padding: 0 16px 12px 16px;">
-        <div class="ev-battery-status-card">
-          <div class="ev-battery-top">
-            <div style="display: flex; align-items: center; gap: 8px;">
-              <span style="font-size: 22px;">🔋</span>
-              <div>
-                <div style="font-weight: 700; font-size: 15px; color: #111827;">Tesla Model 3 / Y</div>
-                <div style="font-size: 12px; color: #16a34a; font-weight: 600;">Заряд: 80% · Запас хода ~380 км</div>
-              </div>
-            </div>
-            <span class="ev-soc-badge">80%</span>
-          </div>
-          <div class="ev-progress-bar">
-            <div class="ev-progress-fill" style="width: 80%;"></div>
-          </div>
-        </div>
-      </div>
-
       <!-- Stations List Container -->
       <div id="charging-stations-list" class="my-places-list" style="padding-top: 0;">
         <!-- Dynamically rendered EV stations with live distance, kW and 1-tap route button -->
@@ -401,7 +379,6 @@
           <span id="route-0-dist" class="card-dist">2.4 км</span>
         </div>
         <div class="card-details-row">
-          <span class="card-battery">🔋 80%</span>
           <span class="card-tag">8 светофоров</span>
         </div>
       </div>
@@ -414,7 +391,6 @@
           <span id="route-1-dist" class="card-dist">3.2 км · +1 мин</span>
         </div>
         <div class="card-details-row">
-          <span class="card-battery">🔋 80%</span>
           <span class="card-tag">Альтернатива 1</span>
         </div>
       </div>
@@ -427,7 +403,6 @@
           <span id="route-2-dist" class="card-dist">4.1 км · +3 мин</span>
         </div>
         <div class="card-details-row">
-          <span class="card-battery">🔋 79%</span>
           <span class="card-tag">Альтернатива 2</span>
         </div>
       </div>
@@ -523,10 +498,6 @@
           <span id="nav-duration" class="nav-metric-duration">0 мин</span>
           <span id="nav-distance" class="nav-metric-dist">0 км</span>
           <span id="nav-eta" class="nav-metric-eta">--:--</span>
-          <span class="nav-battery-pill" data-i18n-title="batteryAtArrival" title="Запас батареи по прибытию">
-            <span class="nav-battery-outline"><span id="nav-battery-level-bar" class="nav-battery-level" style="width: 78%;"></span></span>
-            <span id="nav-battery-val">78%</span>
-          </span>
         </div>
 
         <div class="nav-route-progress-wrap">
@@ -960,9 +931,9 @@
   </div>
 
   <!-- Scripts -->
-  <script src="js/config.js?v=40"></script>
-  <script src="js/realtime.js?v=40"></script>
-  <script src="js/maps/map-engine.js?v=40"></script>
-  <script src="js/tesla-cockpit.js?v=40"></script>
+  <script src="js/config.js?v=41"></script>
+  <script src="js/realtime.js?v=41"></script>
+  <script src="js/maps/map-engine.js?v=41"></script>
+  <script src="js/tesla-cockpit.js?v=41"></script>
 </body>
 </html>
