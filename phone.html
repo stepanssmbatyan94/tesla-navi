@@ -25,14 +25,12 @@
 
   <!-- Pairing Card -->
   <section class="phone-card">
-    <div class="pairing-title">Код подключения</div>
+    <div class="pairing-title" data-i18n="phoneCodeTitle">Код подключения</div>
     <div id="pairing-code-display" class="pairing-code-display">------</div>
-    <p style="font-size: 13px; color: var(--text-med); line-height: 1.4;">
-      Ваш телефон передает высокоточный GPS и маршруты на экран Tesla. Не закрывайте эту вкладку.
-    </p>
+    <p style="font-size: 13px; color: var(--text-med); line-height: 1.4;" data-i18n="phoneIntro">Телефон передаёт точный GPS и пункты назначения на экран Tesla. Не закрывайте эту вкладку.</p>
     <div id="connection-pill" class="connection-pill disconnected">
       <span class="pill-dot"></span>
-      <span id="connection-label">Ожидание автомобиля...</span>
+      <span id="connection-label" data-i18n="waitingCar">Ожидание автомобиля...</span>
     </div>
   </section>
 
@@ -42,12 +40,12 @@
       <circle cx="12" cy="12" r="2"></circle>
       <path d="M16.24 7.76a6 6 0 0 1 0 8.49m-8.48-.01a6 6 0 0 1 0-8.49m11.31-2.82a10 10 0 0 1 0 14.14m-14.14 0a10 10 0 0 1 0-14.14"></path>
     </svg>
-    <span>Включить передачу GPS</span>
+    <span data-i18n="startGps">Включить передачу GPS</span>
   </button>
 
   <!-- Search & Destination Card -->
   <section class="phone-card">
-    <div class="card-section-title">Куда едем?</div>
+    <div class="card-section-title" data-i18n="whereTo">Куда едем?</div>
     <div class="input-group">
       <!-- Search Input -->
       <div class="search-input-wrap">
@@ -55,13 +53,13 @@
           <circle cx="11" cy="11" r="8"></circle>
           <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
         </svg>
-        <input id="input-address" type="text" placeholder="Найти улицу или место..." />
+        <input id="input-address" type="text" data-i18n-placeholder="phoneSearchPlaceholder" placeholder="Найти улицу или место..." />
       </div>
 
       <!-- Coordinates / Link Input with Mic -->
       <div class="search-input-wrap">
-        <input id="input-maps-link" type="text" placeholder="Ссылка Google Maps или координаты" />
-        <button id="btn-mic" class="icon-btn" title="Голосовой поиск">
+        <input id="input-maps-link" type="text" data-i18n-placeholder="linkPlaceholder" placeholder="Ссылка Google Maps или координаты" />
+        <button id="btn-mic" class="icon-btn" data-i18n-title="voiceSearch" title="Голосовой поиск">
           <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
             <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
@@ -73,8 +71,8 @@
 
       <!-- Action Row -->
       <div class="action-row">
-        <button id="btn-paste-clip" class="btn-secondary">Вставить из буфера</button>
-        <button id="btn-send-tesla" class="btn-primary-action">Отправить в Tesla</button>
+        <button id="btn-paste-clip" class="btn-secondary" data-i18n="pasteClipboard">Вставить из буфера</button>
+        <button id="btn-send-tesla" class="btn-primary-action" data-i18n="sendToTesla">Отправить в Tesla</button>
       </div>
     </div>
   </section>
@@ -83,22 +81,20 @@
   <section class="speedometer-card">
     <div class="speed-display">
       <div id="phone-speed-val" class="phone-speed-val">0</div>
-      <div class="phone-speed-unit">км/ч</div>
+      <div class="phone-speed-unit" data-i18n="kmh">км/ч</div>
     </div>
     <div class="telemetry-stats">
-      <div>Точность: <strong id="phone-accuracy-val" style="color: var(--primary-cyan);">±--м</strong></div>
-      <div>Последний фикс: <strong id="phone-fix-age">—</strong></div>
+      <div><span data-i18n="accuracy">Точность</span>: <strong id="phone-accuracy-val" style="color: var(--primary-cyan);">—</strong></div>
+      <div><span data-i18n="lastFix">Последний фикс</span>: <strong id="phone-fix-age">—</strong></div>
     </div>
   </section>
 
   <!-- Guidance Notice -->
-  <footer class="guidance-box">
-    Если экран телефона заблокируется, передача GPS в iOS/Android может приостановиться. Функция WakeLock автоматически поддерживает активность экрана.
-  </footer>
+  <footer class="guidance-box" data-i18n="lockNotice">Если экран телефона заблокируется, iOS/Android может приостановить передачу GPS. Wake Lock держит экран включённым.</footer>
 
   <!-- Scripts -->
-  <script src="js/config.js?v=49"></script>
-  <script src="js/realtime.js?v=49"></script>
-  <script src="js/phone-remote.js?v=49"></script>
+  <script src="js/config.js?v=50"></script>
+  <script src="js/realtime.js?v=50"></script>
+  <script src="js/phone-remote.js?v=50"></script>
 </body>
 </html>

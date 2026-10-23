@@ -56,6 +56,12 @@ function escapeHtml(value) {
     .replace(/'/g, '&#39;');
 }
 
+// Translate a UI string for the current language (falls back to Russian, then the key)
+function tr(key) {
+  const dict = I18N[window.CURRENT_LANG || 'ru'] || I18N.ru;
+  return dict[key] || I18N.ru[key] || key;
+}
+
 // Global hooks
 window.updateManeuverHud = updateManeuverHud;
 window.renderLaneGuidance = renderLaneGuidance;
@@ -207,6 +213,14 @@ function applyLanguage(lang) {
 
   // 11. Recalculate Live Commute ETAs & Destination Chips
   updateCommuteEtas();
+
+  // 12. Phone remote QR follows the UI language
+  buildPairingQr();
+
+  // 13. Lists and labels rendered earlier in the previous language
+  const searchInputEl = document.getElementById('drawer-search-input');
+  if (!searchInputEl || !searchInputEl.value.trim()) renderSearchHistory();
+  if (typeof window.refreshYouTubeAccountUI === 'function') window.refreshYouTubeAccountUI();
 }
 
 // 1.5 Voice Management (Female 👩 / Male 👨 across RU, HY, EN)
@@ -369,7 +383,7 @@ function initTeslaCarGps() {
       const telAge = document.getElementById('tel-age');
       if (telLat) telLat.textContent = Number(coords.latitude).toFixed(4);
       if (telLng) telLng.textContent = Number(coords.longitude).toFixed(4);
-      if (telAcc) telAcc.textContent = `±${Math.round(coords.accuracy || 3)} м`;
+      if (telAcc) telAcc.textContent = `±${Math.round(coords.accuracy || 3)} ${tr('m')}`;
       if (telAge) telAge.textContent = formatFixAge(Date.now() - pos.timestamp);
 
       // Pass directly to Map Engine
@@ -381,7 +395,7 @@ function initTeslaCarGps() {
       console.log('[In-Car GPS] Geolocation status:', err.message);
       if (!hasReceivedRealGps) {
         const telAcc = document.getElementById('tel-accuracy');
-        if (telAcc) telAcc.textContent = 'Ожидание...';
+        if (telAcc) telAcc.textContent = tr('waitingGps');
         updateGpsStatusUI();
       }
     },
@@ -400,12 +414,7 @@ function initPairing() {
 
   document.getElementById('pairing-code-display').textContent = currentCode;
 
-  // Build QR code URL pointing to phone remote
-  const basePath = window.location.pathname.replace(/\/index\.html$/, '').replace(/\/$/, '');
-  const phoneUrl = `${window.location.origin}${basePath}/phone.html?code=${currentCode}`;
-
-  const qrImg = document.getElementById('qr-image');
-  qrImg.src = `https://api.qrserver.com/v1/create-qr-code/?size=180x180&margin=0&color=0b0f17&bgcolor=ffffff&data=${encodeURIComponent(phoneUrl)}`;
+  buildPairingQr();
 
   realtimeClient = new TeslaRealtime({
     code: currentCode,
@@ -424,6 +433,16 @@ function initPairing() {
   realtimeClient.init();
 }
 
+
+// QR code for the phone remote; carries the car's UI language so the phone matches it
+function buildPairingQr() {
+  const qrImg = document.getElementById('qr-image');
+  if (!qrImg || !currentCode) return;
+  const basePath = window.location.pathname.replace(/\/index\.html$/, '').replace(/\/$/, '');
+  const phoneUrl = `${window.location.origin}${basePath}/phone.html?code=${currentCode}&lang=${currentLang}`;
+  qrImg.src = `https://api.qrserver.com/v1/create-qr-code/?size=180x180&margin=0&color=0b0f17&bgcolor=ffffff&data=${encodeURIComponent(phoneUrl)}`;
+  qrImg.dataset.phoneUrl = phoneUrl;
+}
 
 function handleIncomingGps(gps) {
   if (!gps || isNaN(gps.lat) || isNaN(gps.lng)) return;
@@ -445,7 +464,7 @@ function handleIncomingGps(gps) {
   const telAge = document.getElementById('tel-age');
   if (telLat) telLat.textContent = Number(gps.lat).toFixed(4);
   if (telLng) telLng.textContent = Number(gps.lng).toFixed(4);
-  if (telAcc) telAcc.textContent = `±${Math.round(gps.accuracy || 3)} м`;
+  if (telAcc) telAcc.textContent = `±${Math.round(gps.accuracy || 3)} ${tr('m')}`;
   // Phone clock vs car clock: only meaningful when both are roughly in sync
   if (telAge) telAge.textContent = gps.timestamp ? formatFixAge(Date.now() - gps.timestamp) : '—';
 
@@ -545,8 +564,8 @@ function toggleFavoritePlace(place) {
   } else {
     userSavedPlaces.favorites.push({
       id: 'fav_' + Date.now(),
-      name: place.name || place.title || 'Избранное',
-      address: place.address || place.subtitle || 'Ереван',
+      name: place.name || place.title || tr('favorites'),
+      address: place.address || place.subtitle || '',
       lat: place.lat,
       lng: place.lng
     });
@@ -750,7 +769,7 @@ function initToolbarHandlers() {
           <path d="M19.07 4.93a10 10 0 0 1 0 14.14"></path>
         </svg>
       `;
-      btn.title = 'Звук включен';
+      btn.title = tr('soundOn');
     } else {
       btn.innerHTML = `
         <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="#0066ff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
@@ -758,7 +777,7 @@ function initToolbarHandlers() {
           <line x1="22" y1="2" x2="2" y2="22" stroke="#0066ff" stroke-width="2.6"></line>
         </svg>
       `;
-      btn.title = 'Звук выключен';
+      btn.title = tr('soundOff');
     }
   }
 
@@ -1043,8 +1062,8 @@ function initToolbarHandlers() {
   }
   if (btnToggleProvider) {
     btnToggleProvider.title = activeProv === 'yandex'
-      ? 'Карта: Яндекс (пробки). Нажмите для переключения на MapsEV MapLibre 3D'
-      : 'Карта: MapsEV MapLibre 3D. Нажмите для переключения на Яндекс';
+      ? tr('providerYandexTitle')
+      : tr('providerMaplibreTitle');
 
     btnToggleProvider.addEventListener('click', () => {
       const currentUrlProv = new URLSearchParams(window.location.search).get('provider');
@@ -1076,13 +1095,13 @@ function initToolbarHandlers() {
   if (btnToggle2D3D) {
     btnToggle2D3D.classList.toggle('is-3d', isInitial3D);
     if (btn3DModeLabel) btn3DModeLabel.textContent = isInitial3D ? '3D' : '2D';
-    btnToggle2D3D.title = isInitial3D ? 'Переключить в 2D плоский вид' : 'Переключить в 3D перспективный вид';
+    btnToggle2D3D.title = isInitial3D ? tr('switchTo2D') : tr('switchTo3D');
     btnToggle2D3D.addEventListener('click', () => {
       if (mapEngine && typeof mapEngine.toggle2D3D === 'function') {
         const is3D = mapEngine.toggle2D3D();
         btnToggle2D3D.classList.toggle('is-3d', is3D);
         if (btn3DModeLabel) btn3DModeLabel.textContent = is3D ? '3D' : '2D';
-        btnToggle2D3D.title = is3D ? 'Переключить в 2D плоский вид' : 'Переключить в 3D перспективный вид';
+        btnToggle2D3D.title = is3D ? tr('switchTo2D') : tr('switchTo3D');
       }
     });
   }
@@ -1521,13 +1540,13 @@ function openEditPlaceModal(targetType, existingPlace = null) {
   if (nameWrap) nameWrap.classList.toggle('hidden', !isFav);
 
   if (targetType === 'home') {
-    titleEl.textContent = hasExisting ? 'Настройка адреса: Дом 🏠' : 'Добавить адрес: Дом 🏠';
+    titleEl.textContent = hasExisting ? tr('placeTitleEditHome') : tr('placeTitleAddHome');
     addrInput.value = currentEditTarget.place?.address || '';
   } else if (targetType === 'work') {
-    titleEl.textContent = hasExisting ? 'Настройка адреса: Работа 💼' : 'Добавить адрес: Работа 💼';
+    titleEl.textContent = hasExisting ? tr('placeTitleEditWork') : tr('placeTitleAddWork');
     addrInput.value = currentEditTarget.place?.address || '';
   } else {
-    titleEl.textContent = hasExisting ? 'Изменить избранное ⭐' : 'Добавить в избранное ⭐';
+    titleEl.textContent = hasExisting ? tr('placeTitleEditFavorite') : tr('placeTitleAddFavorite');
     nameInput.value = currentEditTarget.place?.name || '';
     addrInput.value = currentEditTarget.place?.address || '';
   }
@@ -1617,7 +1636,7 @@ function initEditPlaceModalHandlers() {
   if (btnCurrentGps) {
     btnCurrentGps.addEventListener('click', () => {
       const cur = mapEngine ? mapEngine.currentPosition : { lat: 40.1776, lng: 44.5125 };
-      const currentAddr = `Ереван (${Number(cur.lat).toFixed(4)}, ${Number(cur.lng).toFixed(4)})`;
+      const currentAddr = `${tr('myLocation')} (${Number(cur.lat).toFixed(4)}, ${Number(cur.lng).toFixed(4)})`;
       currentEditTarget.selectedLocation = {
         lat: cur.lat,
         lng: cur.lng,
@@ -1635,7 +1654,7 @@ function initEditPlaceModalHandlers() {
 
       const addrVal = addrInput.value.trim();
       if (!addrVal) {
-        alert('Пожалуйста, введите адрес');
+        alert(tr('enterAddress'));
         return;
       }
 
@@ -1647,14 +1666,14 @@ function initEditPlaceModalHandlers() {
 
       if (currentEditTarget.type === 'home') {
         userSavedPlaces.home = {
-          name: 'Дом',
+          name: tr('home'),
           address: addrVal,
           lat: loc.lat,
           lng: loc.lng
         };
       } else if (currentEditTarget.type === 'work') {
         userSavedPlaces.work = {
-          name: 'Работа',
+          name: tr('work'),
           address: addrVal,
           lat: loc.lat,
           lng: loc.lng
@@ -1776,7 +1795,7 @@ function renderSearchHistory() {
   if (history.length === 0) {
     resultsList.innerHTML = `
       <div style="text-align: center; color: #94a3b8; padding: 28px 14px; font-size: 13px;">
-        История поиска пуста
+        ${escapeHtml(tr('historyEmpty'))}
       </div>
     `;
     return;
@@ -1786,7 +1805,7 @@ function renderSearchHistory() {
 
   history.forEach((h, idx) => {
     const distMeters = mapEngine ? mapEngine.calculateDistance(cur.lat, cur.lng, h.lat, h.lng) : 1000;
-    const distStr = distMeters >= 1000 ? `${(distMeters / 1000).toFixed(1)} км` : `${Math.round(distMeters)} м`;
+    const distStr = mapEngine ? mapEngine.formatNavDistance(distMeters) : '';
     const isStarred = isLocationInFavorites(h.lat, h.lng, h.name);
 
     const item = document.createElement('div');
@@ -1801,10 +1820,10 @@ function renderSearchHistory() {
       </div>
       <div style="display: flex; align-items: center; gap: 6px;">
         <div class="item-dist">${distStr}</div>
-        <button class="item-star-btn ${isStarred ? 'starred' : ''}" title="${isStarred ? 'Удалить из избранного' : 'Добавить в избранное'}">
+        <button class="item-star-btn ${isStarred ? 'starred' : ''}" title="${isStarred ? tr('removeFavorite') : tr('addToFavorites')}">
           ${isStarred ? '⭐' : '☆'}
         </button>
-        <button class="btn-hist-action" title="Удалить из истории" style="font-size: 12px; padding: 2px 6px;">✕</button>
+        <button class="btn-hist-action" title="${tr('removeFromHistory')}" style="font-size: 12px; padding: 2px 6px;">✕</button>
       </div>
     `;
 
@@ -1863,7 +1882,7 @@ function initSearchHandlers() {
     }
 
     if (sectionTitle) {
-      sectionTitle.textContent = 'Результаты поиска';
+      sectionTitle.textContent = tr('searchResults');
     }
 
     if (query.length < 2) return;
@@ -1886,7 +1905,7 @@ function initSearchHandlers() {
 
             // Calculate distance from current vehicle location
             const distMeters = mapEngine ? mapEngine.calculateDistance(cur.lat, cur.lng, lat, lng) : 1000;
-            const distStr = distMeters >= 1000 ? `${(distMeters / 1000).toFixed(1)} км` : `${Math.round(distMeters)} м`;
+            const distStr = mapEngine ? mapEngine.formatNavDistance(distMeters) : '';
 
             const isStarred = isLocationInFavorites(lat, lng, title);
             const item = document.createElement('div');
@@ -1901,7 +1920,7 @@ function initSearchHandlers() {
               </div>
               <div style="display: flex; align-items: center; gap: 8px;">
                 <div class="item-dist">${distStr}</div>
-                <button class="item-star-btn ${isStarred ? 'starred' : ''}" title="${isStarred ? 'Удалить из избранного' : 'Добавить в избранное'}">
+                <button class="item-star-btn ${isStarred ? 'starred' : ''}" title="${isStarred ? tr('removeFavorite') : tr('addToFavorites')}">
                   ${isStarred ? '⭐' : '☆'}
                 </button>
               </div>
@@ -2310,7 +2329,7 @@ function getLaneColumnsHtml(lanesOrModifier) {
       const stateClass = isActive ? 'is-active' : 'is-faded';
       const svg = getSingleLaneSvg(lane.indications, isActive);
       const dot = isActive ? '<span class="lane-active-dot"></span>' : '';
-      return `<div class="lane-col-item ${stateClass}" title="Полоса ${idx + 1}">${svg}${dot}</div>`;
+      return `<div class="lane-col-item ${stateClass}" title="${tr('lane')} ${idx + 1}">${svg}${dot}</div>`;
     }).join('');
   }
 
@@ -2324,60 +2343,60 @@ function getLaneColumnsHtml(lanesOrModifier) {
 
   if (isSlightLeft) {
     return `
-      <div class="lane-col-item is-active" title="Ваша полоса: Держитесь левее">
+      <div class="lane-col-item is-active">
         ${getSingleLaneSvg(['slight left'], true)}
         <span class="lane-active-dot"></span>
       </div>
-      <div class="lane-col-item is-faded" title="Другая полоса: Прямо">
+      <div class="lane-col-item is-faded">
         ${getSingleLaneSvg(['straight'], false)}
       </div>
     `;
   } else if (isSlightRight) {
     return `
-      <div class="lane-col-item is-faded" title="Другая полоса: Прямо">
+      <div class="lane-col-item is-faded">
         ${getSingleLaneSvg(['straight'], false)}
       </div>
-      <div class="lane-col-item is-active" title="Ваша полоса: Держитесь правее">
+      <div class="lane-col-item is-active">
         ${getSingleLaneSvg(['slight right'], true)}
         <span class="lane-active-dot"></span>
       </div>
     `;
   } else if (isLeft) {
     return `
-      <div class="lane-col-item is-active" title="Ваша полоса: Поворот налево">
+      <div class="lane-col-item is-active">
         ${getSingleLaneSvg(['left'], true)}
         <span class="lane-active-dot"></span>
       </div>
-      <div class="lane-col-item is-faded" title="Другая полоса: Прямо">
+      <div class="lane-col-item is-faded">
         ${getSingleLaneSvg(['straight'], false)}
       </div>
     `;
   } else if (isRight) {
     return `
-      <div class="lane-col-item is-faded" title="Другая полоса: Прямо">
+      <div class="lane-col-item is-faded">
         ${getSingleLaneSvg(['straight'], false)}
       </div>
-      <div class="lane-col-item is-active" title="Ваша полоса: Поворот направо">
+      <div class="lane-col-item is-active">
         ${getSingleLaneSvg(['right'], true)}
         <span class="lane-active-dot"></span>
       </div>
     `;
   } else if (isUTurn) {
     return `
-      <div class="lane-col-item is-active" title="Ваша полоса: Разворот">
+      <div class="lane-col-item is-active">
         ${getSingleLaneSvg(['uturn'], true)}
         <span class="lane-active-dot"></span>
       </div>
-      <div class="lane-col-item is-faded" title="Другая полоса: Прямо">
+      <div class="lane-col-item is-faded">
         ${getSingleLaneSvg(['straight'], false)}
       </div>
     `;
   } else {
     return `
-      <div class="lane-col-item is-active" title="Полоса 1: Прямо">
+      <div class="lane-col-item is-active">
         ${getSingleLaneSvg(['straight'], true)}
       </div>
-      <div class="lane-col-item is-active" title="Полоса 2: Прямо">
+      <div class="lane-col-item is-active">
         ${getSingleLaneSvg(['straight'], true)}
       </div>
     `;
@@ -2815,25 +2834,26 @@ function initWeatherAndMusic() {
   let ytUser = localStorage.getItem('tesla_yt_user') || '';
 
   function updateAccountUI() {
-    if (ytUserNameText) ytUserNameText.textContent = ytUser || 'Войти в YouTube';
+    if (ytUserNameText) ytUserNameText.textContent = ytUser || tr('ytSignIn');
     if (btnYtAccountToggle) {
       btnYtAccountToggle.textContent = ytUser
-        ? `Disconnect YouTube · ${ytUser}`
-        : 'Connect YouTube Account';
+        ? `${tr('ytDisconnect')} · ${ytUser}`
+        : tr('ytConnect');
     }
   }
   updateAccountUI();
+  window.refreshYouTubeAccountUI = updateAccountUI;
 
   if (btnYtAccountToggle) {
     btnYtAccountToggle.addEventListener('click', () => {
       if (ytUser) {
-        if (confirm(`Отключить аккаунт YouTube (${ytUser})?`)) {
+        if (confirm(`${tr('ytDisconnectConfirm')} (${ytUser})?`)) {
           ytUser = '';
           localStorage.removeItem('tesla_yt_user');
           updateAccountUI();
         }
       } else {
-        const name = prompt('Введите имя вашего аккаунта YouTube:', '');
+        const name = prompt(tr('ytEnterName'), '');
         if (name && name.trim()) {
           ytUser = name.trim();
           localStorage.setItem('tesla_yt_user', ytUser);
@@ -3115,7 +3135,7 @@ function initWeatherAndMusic() {
     if (!ytResultsList) return;
     ytResultsList.innerHTML = '';
     if (!tracks || tracks.length === 0) {
-      ytResultsList.innerHTML = '<div style="text-align: center; color: #94a3b8; padding: 24px 10px; font-size: 13px;">Ничего не найдено</div>';
+      ytResultsList.innerHTML = '<div style="text-align: center; color: #94a3b8; padding: 24px 10px; font-size: 13px;">' + escapeHtml(tr('nothingFound')) + '</div>';
       return;
     }
     appendRecommendations(tracks, 0);
@@ -3130,8 +3150,8 @@ function initWeatherAndMusic() {
       const histSec = document.createElement('div');
       histSec.className = 'yt-section-header';
       histSec.innerHTML = `
-        <span>Недавно прослушано</span>
-        <button class="yt-clear-history-btn" id="btn-clear-yt-hist">Очистить</button>
+        <span>${escapeHtml(tr('recentlyPlayed'))}</span>
+        <button class="yt-clear-history-btn" id="btn-clear-yt-hist">${escapeHtml(tr('clear'))}</button>
       `;
       ytResultsList.appendChild(histSec);
 
@@ -3143,7 +3163,7 @@ function initWeatherAndMusic() {
       const recSec = document.createElement('div');
       recSec.className = 'yt-section-header';
       recSec.style.marginTop = '8px';
-      recSec.innerHTML = `<span>Рекомендовано для вас</span>`;
+      recSec.innerHTML = `<span>${escapeHtml(tr('recommended'))}</span>`;
       ytResultsList.appendChild(recSec);
     }
 
@@ -3166,7 +3186,7 @@ function initWeatherAndMusic() {
       ytResultsList.innerHTML = `
         <div style="text-align: center; color: #94a3b8; padding: 36px 16px; font-size: 13px; line-height: 1.5;">
           <div style="font-size: 28px; margin-bottom: 6px;">🎧</div>
-          История пуста.<br>Включайте музыку и видео в поиске или рекомендациях, и они сохранятся здесь.
+          ${escapeHtml(tr('playHistoryEmpty'))}
         </div>
       `;
       return;
@@ -3175,8 +3195,8 @@ function initWeatherAndMusic() {
     const histSec = document.createElement('div');
     histSec.className = 'yt-section-header';
     histSec.innerHTML = `
-      <span>История воспроизведения (${history.length})</span>
-      <button class="yt-clear-history-btn" id="btn-clear-all-hist">Очистить всё</button>
+      <span>${escapeHtml(tr('playHistory'))} (${history.length})</span>
+      <button class="yt-clear-history-btn" id="btn-clear-all-hist">${escapeHtml(tr('clearAll'))}</button>
     `;
     ytResultsList.appendChild(histSec);
 
@@ -3242,7 +3262,7 @@ function initWeatherAndMusic() {
       loaderEl = document.createElement('div');
       loaderEl.id = 'yt-infinite-loader';
       loaderEl.style.cssText = 'text-align: center; padding: 12px; color: #94a3b8; font-size: 12px; font-weight: 500;';
-      loaderEl.innerHTML = '<span style="display:inline-block; animation: spin 1s infinite linear;">↻</span> Загрузка...';
+      loaderEl.innerHTML = '<span style="display:inline-block; animation: spin 1s infinite linear;">↻</span> ' + escapeHtml(tr('loading'));
       ytResultsList.appendChild(loaderEl);
     }
 
@@ -3317,7 +3337,7 @@ function initWeatherAndMusic() {
     } catch (err) {
       console.warn('YouTube search error:', err);
     } finally {
-      if (btnYtSearchGo) btnYtSearchGo.textContent = 'Search';
+      if (btnYtSearchGo) btnYtSearchGo.textContent = tr('search');
     }
   }
 
@@ -3642,7 +3662,7 @@ function initDevMode() {
     const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
     btnVoiceSearch.addEventListener('click', () => {
       if (!SpeechRec) {
-        alert('Голосовой ввод не поддерживается браузером Tesla. Используйте клавиатуру.');
+        alert(tr('voiceUnsupported'));
         console.warn('SpeechRecognition API not supported in this browser.');
         return;
       }

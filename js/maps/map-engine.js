@@ -1044,7 +1044,8 @@ class TeslaMapEngine {
     const label = document.getElementById('btn-3d-mode-label');
     if (btn) {
       btn.classList.toggle('is-3d', this.is3D);
-      btn.title = this.is3D ? 'Переключить в 2D плоский вид' : 'Переключить в 3D перспективный вид (MapsEV)';
+      const dict3d = I18N[window.CURRENT_LANG || 'ru'] || I18N.ru;
+      btn.title = this.is3D ? dict3d.switchTo2D : dict3d.switchTo3D;
     }
     if (label) {
       label.textContent = this.is3D ? '3D' : '2D';
@@ -2381,7 +2382,7 @@ class TeslaMapEngine {
     const etaMins = String(etaDate.getMinutes()).padStart(2, '0');
 
     const routeInfo = {
-      distance: distanceMeters >= 1000 ? `${(distanceMeters / 1000).toFixed(1)} км` : `${Math.round(distanceMeters)} м`,
+      distance: this.formatNavDistance(distanceMeters),
       duration: this.formatNavDuration(durationSec),
       eta: `${etaHours}:${etaMins}`,
       name: destination.name || 'Маршрут',
