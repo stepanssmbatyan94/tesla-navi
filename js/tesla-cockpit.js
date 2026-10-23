@@ -1154,8 +1154,6 @@ function updateCommuteEtas() {
       badge.className = 'commute-eta-badge';
     }
   });
-
-  renderQuickDestChips();
 }
 
 // Authentic MapsEV Destination Chips: Home, Work & Favorites with Live GPS Distances & 1-Tap Route
@@ -1194,13 +1192,39 @@ function renderQuickDestChips() {
     });
   });
 
+  const distanceText = item => {
+    if (!cur || !item.place || item.place.lat == null || item.place.lng == null) return '';
+    return mapEngine.formatNavDistance(mapEngine.calculateDistance(cur.lat, cur.lng, item.place.lat, item.place.lng));
+  };
+
+  // This runs on every position update (~2.5 s while driving). Rebuilding the buttons
+  // then would swallow a tap whose press and release straddle the rebuild, so when the
+  // chip set is unchanged only refresh the distance labels in place.
+  const signature = JSON.stringify([dict.btnRoute, chipsList.map(item => [
+    item.type, item.icon, item.title, item.place && item.place.lat, item.place && item.place.lng
+  ])]);
+  if (container.dataset.chipsSignature === signature && container.children.length === chipsList.length) {
+    chipsList.forEach((item, idx) => {
+      const btn = container.children[idx];
+      const distStr = distanceText(item);
+      let distEl = btn.querySelector('.chip-dist');
+      if (distStr && !distEl) {
+        distEl = document.createElement('span');
+        distEl.className = 'chip-dist';
+        btn.appendChild(distEl);
+      }
+      if (distEl) {
+        if (distStr) distEl.textContent = distStr;
+        else distEl.remove();
+      }
+    });
+    return;
+  }
+  container.dataset.chipsSignature = signature;
+
   container.innerHTML = '';
   chipsList.forEach(item => {
-    let distStr = '';
-    if (cur && item.place && item.place.lat != null && item.place.lng != null) {
-      const d = mapEngine.calculateDistance(cur.lat, cur.lng, item.place.lat, item.place.lng);
-      distStr = mapEngine.formatNavDistance(d);
-    }
+    const distStr = distanceText(item);
 
     const btn = document.createElement('button');
     btn.className = 'quick-dest-chip';
