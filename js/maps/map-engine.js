@@ -1655,6 +1655,13 @@ class TeslaMapEngine {
       const isLastStep = (this.currentStepIndex >= this.routeSteps.length - 1);
       const currentSpeedLimit = activeStep.speedLimit || 60;
 
+      // Yandex & OSRM steps carry the maneuver at their START: the turn at the end of the
+      // current step is the NEXT step's maneuver. The last step ends at the destination.
+      const nextStep = isLastStep ? null : this.routeSteps[this.currentStepIndex + 1];
+      const maneuverModifier = nextStep ? (nextStep.modifier || 'straight') : 'straight';
+      const maneuverType = nextStep ? (nextStep.type || 'turn') : 'arrive';
+      const maneuverStreet = nextStep ? (nextStep.name || dest.name) : dest.name;
+
       // Distance to upcoming maneuver continuously counts down to 0
       let activeDist = 0;
       if (isLastStep) {
@@ -1680,7 +1687,7 @@ class TeslaMapEngine {
 
       const activeLanes = (upcomingLaneInter && upcomingLaneDist <= 220)
         ? upcomingLaneInter.lanes
-        : (activeDist <= 220 ? (activeStep.lanes || null) : null);
+        : (activeDist <= 220 ? ((nextStep && nextStep.lanes) || null) : null);
 
       const activeLaneDist = (upcomingLaneInter && upcomingLaneDist <= 220)
         ? upcomingLaneDist
@@ -1688,17 +1695,17 @@ class TeslaMapEngine {
 
       const activeModifier = (upcomingLaneInter && upcomingLaneDist <= 220 && upcomingLaneInter.modifier)
         ? upcomingLaneInter.modifier
-        : (activeStep.modifier || 'straight');
+        : maneuverModifier;
 
-      const stepInstruction = this.formatStepInstruction(activeModifier, activeStep.name || dest.name);
+      const stepInstruction = this.formatStepInstruction(activeModifier, maneuverStreet);
 
       this.onManeuverUpdate({
         distance: this.formatNavDistance(activeDist),
         distanceMeters: activeDist,
         instruction: stepInstruction,
-        street: activeStep.name || dest.name,
+        street: maneuverStreet,
         modifier: activeModifier,
-        type: activeStep.type || 'turn',
+        type: maneuverType,
         speedLimit: currentSpeedLimit,
         location: activeStep.location || null,
         lanes: activeLanes,
@@ -1706,30 +1713,31 @@ class TeslaMapEngine {
       });
 
       // Voice announcements with reliable wide windows (350m-100m and 85m-15m)
-      if (this.voiceEnabled) {
+      // The arrival itself is announced separately within 25m of the destination
+      if (this.voiceEnabled && nextStep) {
         if (activeDist <= 350 && activeDist >= 100 && !activeStep.spoken300) {
           activeStep.spoken300 = true;
           const lang = window.CURRENT_LANG || 'ru';
-          const turnText = this.getTurnSpeech(activeStep.modifier);
+          const turnText = this.getTurnSpeech(maneuverModifier);
           let phrase = '';
           if (lang === 'en') {
-            const streetText = activeStep.name ? ` onto ${activeStep.name}` : '';
+            const streetText = nextStep.name ? ` onto ${nextStep.name}` : '';
             phrase = `In 300 meters ${turnText.toLowerCase()}${streetText}`;
           } else if (lang === 'hy') {
-            const mod = (activeStep.modifier || '').toLowerCase();
+            const mod = maneuverModifier.toLowerCase();
             if (mod.includes('slight left') || mod.includes('keep left') || mod.includes('fork left')) phrase = 'dist_250_keep_left';
             else if (mod.includes('slight right') || mod.includes('keep right') || mod.includes('fork right')) phrase = 'dist_250_keep_right';
             else if (mod.includes('left')) phrase = 'dist_250_left';
             else if (mod.includes('right')) phrase = 'dist_250_right';
             else phrase = 'dist_250_straight';
           } else {
-            const streetText = activeStep.name ? ` на ${activeStep.name}` : '';
+            const streetText = nextStep.name ? ` на ${nextStep.name}` : '';
             phrase = `Через 300 метров ${turnText.toLowerCase()}${streetText}`;
           }
           this.speakVoice(phrase);
         } else if (activeDist <= 85 && activeDist >= 15 && !activeStep.spokenImmediate) {
           activeStep.spokenImmediate = true;
-          this.speakVoice(this.getTurnSpeech(activeStep.modifier));
+          this.speakVoice(this.getTurnSpeech(maneuverModifier));
         }
       }
     }

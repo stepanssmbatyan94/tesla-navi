@@ -650,8 +650,8 @@ function getArmenianAudio(text, voiceChoice = 'gor') {
               const isNorthSouthExp = /север-юг|north-south|\bm-1\b|\bm-2\b/i.test(streetLower);
               const isHwy = /highway|трасса|шоссе|\bh-\d+|\bm-\d+/i.test(streetLower);
               const isFastAvenue = /исаков|isakov|сараландж|saralanj|багреванд|bagrevand|давиташен|davitashen/i.test(streetLower);
-              // Maneuver location is the junction at the end of the section (or start if last)
-              const loc = (sec.edgePoints && sec.edgePoints[1]) ? sec.edgePoints[1] : ((sec.edgePoints && sec.edgePoints[0]) ? sec.edgePoints[0] : null);
+              // The section's action is performed where the section STARTS (edgePoints[0])
+              const loc = (sec.edgePoints && sec.edgePoints[0]) ? sec.edgePoints[0] : ((sec.edgePoints && sec.edgePoints[1]) ? sec.edgePoints[1] : null);
 
               if (isNorthSouthExp) {
                 speedLimit = 110; // Скоростная автомагистраль Север-Юг (Севан, Арташат)

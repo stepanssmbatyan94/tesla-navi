@@ -2118,9 +2118,11 @@ function showNavigationHud(route) {
   document.getElementById('lane-guidance-pill').classList.add('hidden');
 
   // Initial step details from route steps
+  // The first maneuver happens at the end of step 0 and belongs to step 1 (maneuvers sit at step starts)
   const firstStep = (route.steps && route.steps[0]) ? route.steps[0] : null;
+  const firstManeuver = (route.steps && route.steps[1]) ? route.steps[1] : null;
   document.getElementById('maneuver-dist').textContent = firstStep ? (mapEngine ? mapEngine.formatNavDistance(firstStep.distance) : `${Math.round(firstStep.distance)} м`) : route.distance;
-  document.getElementById('maneuver-street').textContent = firstStep ? (firstStep.name || firstStep.instruction) : route.name;
+  document.getElementById('maneuver-street').textContent = firstManeuver ? (firstManeuver.name || firstManeuver.instruction) : route.name;
 
   document.getElementById('nav-duration').textContent = route.duration;
   document.getElementById('nav-distance').textContent = route.distance;
