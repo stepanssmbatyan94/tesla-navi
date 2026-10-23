@@ -842,6 +842,20 @@ function getArmenianAudio(text, voiceChoice = 'gor') {
     return;
   }
 
+  // API: /api/chargers (EV charging stations in Armenia from an OpenStreetMap snapshot,
+  // refreshed with scripts/update_chargers.mjs). No live availability data exists for them.
+  if (pathname === '/api/chargers') {
+    try {
+      const data = fs.readFileSync(path.join(__dirname, 'data', 'ev-chargers.json'), 'utf8');
+      res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'public, max-age=86400' });
+      res.end(data);
+    } catch (e) {
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: e.message, stations: [] }));
+    }
+    return;
+  }
+
   // API 3: /api/traffic-yerevan (Live Official Yandex Traffic Score for Armenia)
   if (pathname === '/api/traffic-yerevan') {
     const qLat = parseFloat(parsedUrl.searchParams.get('lat'));

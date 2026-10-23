@@ -24,20 +24,26 @@ let currentYtQuery = '';
 let currentYtContinuationToken = null;
 let isYtLoadingMore = false;
 
-// Yerevan EV Supercharging Stations Hubs (CPS, Flash, PlugShare, Dalma)
-const EV_CHARGERS = [
-  { name: 'Dalma Garden Mall Supercharger', lat: 40.180200, lng: 44.482000, power: '150 kW', stalls: '4/6 свободно', address: 'Tsitsernakaberd Hwy, Yerevan' },
-  { name: 'Tesla Supercharger Yerevan (Flash)', lat: 40.192000, lng: 44.475000, power: '150 kW', stalls: '3/4 свободно', address: 'Halabyan St, Yerevan' },
-  { name: 'EV Motors Fast Hub (Kievyan St)', lat: 40.198500, lng: 44.493000, power: '120 kW', stalls: '2/2 свободно', address: 'Kievyan St 8, Yerevan' },
-  { name: 'CPS Electric Charging Hub (Halabyan)', lat: 40.187000, lng: 44.471000, power: '60 kW', stalls: '1/2 свободно', address: 'Halabyan St 38, Yerevan' },
-  { name: 'MegaMall Fast Charger Hub', lat: 40.196300, lng: 44.561000, power: '120 kW', stalls: '4/4 свободно', address: 'Gai Ave 16, Nor Nork' },
-  { name: 'Rio Mall EV Hub (Vahram Papazyan)', lat: 40.201200, lng: 44.508500, power: '60 kW', stalls: '2/2 свободно', address: 'Vahram Papazyan St 8, Yerevan' },
-  { name: 'Yerevan Mall Supercharger Hub', lat: 40.155800, lng: 44.501500, power: '120 kW', stalls: '3/4 свободно', address: 'Arshakunyats Ave 34/3, Yerevan' },
-  { name: 'SAS Foodland Fast Charger (Baghramyan)', lat: 40.191200, lng: 44.501500, power: '50 kW', stalls: '1/2 свободно', address: 'Baghramyan Ave 85, Yerevan' },
-  { name: 'Zvartnots Airport EV Supercharger', lat: 40.147500, lng: 44.398000, power: '120 kW', stalls: '4/6 свободно', address: 'Zvartnots International Airport' },
-  { name: 'Northern Avenue Hub (Center)', lat: 40.182200, lng: 44.514000, power: '50 kW', stalls: '2/2 свободно', address: 'Northern Ave, Yerevan' },
-  { name: 'Cascade Plaza EV Hub', lat: 40.191500, lng: 44.515200, power: '60 kW', stalls: '1/2 свободно', address: 'Antarayin St 160, Yerevan' }
-];
+const CHARGERS_LIST_LIMIT = 40;
+
+// EV charging stations: real OpenStreetMap data from /api/chargers (loaded on first use).
+// OSM has no live availability, so none is shown.
+let evChargers = [];
+let evChargersLoad = null;
+
+function loadEvChargers() {
+  if (!evChargersLoad) {
+    evChargersLoad = fetch('/api/chargers')
+      .then(res => res.json())
+      .then(data => { evChargers = Array.isArray(data.stations) ? data.stations : []; return evChargers; })
+      .catch(err => {
+        console.warn('EV chargers load error:', err);
+        evChargersLoad = null; // retry on next open
+        return evChargers;
+      });
+  }
+  return evChargersLoad;
+}
 
 // Escape untrusted text (geocoder/Yandex/YouTube results, phone packets, saved places)
 // before interpolating it into innerHTML templates
@@ -2506,24 +2512,29 @@ function toggleEvChargers(show) {
   activeChargersMarkers.forEach(m => m.remove());
   activeChargersMarkers = [];
 
-  EV_CHARGERS.forEach(charger => {
-    const el = document.createElement('div');
-    el.className = 'tesla-dest-pin';
-    el.innerHTML = `
-      <div style="width: 32px; height: 32px; border-radius: 50%; background: #10b981; border: 2.5px solid #fff; display: grid; place-items: center; color: #fff; font-size: 14px; font-weight: 800; box-shadow: 0 4px 12px rgba(16,185,129,0.5); cursor: pointer;">
-        ⚡
-      </div>
-    `;
+  loadEvChargers().then(() => {
+    if (!chargersVisible || activeChargersMarkers.length) return;
+    const dict = I18N[window.CURRENT_LANG || 'ru'] || I18N.ru;
+    evChargers.forEach(charger => {
+      const el = document.createElement('div');
+      el.className = 'tesla-dest-pin';
+      el.title = charger.name || dict.chargingStationUnnamed;
+      el.innerHTML = `
+        <div style="width: 32px; height: 32px; border-radius: 50%; background: #10b981; border: 2.5px solid #fff; display: grid; place-items: center; color: #fff; font-size: 14px; font-weight: 800; box-shadow: 0 4px 12px rgba(16,185,129,0.5); cursor: pointer;">
+          ⚡
+        </div>
+      `;
 
-    el.addEventListener('click', () => {
-      startNavigationTo({ name: charger.name, lat: charger.lat, lng: charger.lng });
+      el.addEventListener('click', () => {
+        startNavigationTo({ name: charger.name || dict.chargingStationUnnamed, lat: charger.lat, lng: charger.lng });
+      });
+
+      const marker = new window.maplibregl.Marker({ element: el })
+        .setLngLat([charger.lng, charger.lat])
+        .addTo(mapEngine.map);
+
+      activeChargersMarkers.push(marker);
     });
-
-    const marker = new window.maplibregl.Marker({ element: el })
-      .setLngLat([charger.lng, charger.lat])
-      .addTo(mapEngine.map);
-
-    activeChargersMarkers.push(marker);
   });
 }
 
@@ -2591,52 +2602,68 @@ function closeChargingStationsDrawer() {
   document.getElementById('btn-toggle-chargers')?.classList.remove('active');
 }
 
-function renderChargingStationsList() {
+async function renderChargingStationsList() {
   const listEl = document.getElementById('charging-stations-list');
   if (!listEl) return;
-  listEl.innerHTML = '';
-
-  const cur = mapEngine ? mapEngine.currentPosition : { lat: 40.1872, lng: 44.5152 };
   const lang = window.CURRENT_LANG || 'ru';
   const dict = (typeof I18N !== 'undefined' && I18N[lang]) ? I18N[lang] : (I18N ? I18N.ru : {});
 
-  // Calculate distances and sort
-  const chargersWithDist = EV_CHARGERS.map(c => {
-    const distMeters = mapEngine ? mapEngine.calculateDistance(cur.lat, cur.lng, c.lat, c.lng) : 1200;
-    return { ...c, distMeters };
-  });
+  if (!evChargers.length) {
+    listEl.innerHTML = `<div style="padding: 24px 16px; text-align: center; color: #94a3b8; font-size: 13px;">${escapeHtml(dict.loading)}</div>`;
+    await loadEvChargers();
+  }
+  listEl.innerHTML = '';
+  if (!evChargers.length) {
+    listEl.innerHTML = `<div style="padding: 24px 16px; text-align: center; color: #94a3b8; font-size: 13px;">${escapeHtml(dict.chargersUnavailable)}</div>`;
+    return;
+  }
 
-  chargersWithDist.sort((a, b) => a.distMeters - b.distMeters);
+  const cur = mapEngine ? mapEngine.currentPosition : null;
+  const chargersWithDist = evChargers.map(c => ({
+    ...c,
+    distMeters: (mapEngine && cur) ? mapEngine.calculateDistance(cur.lat, cur.lng, c.lat, c.lng) : null
+  }));
+  chargersWithDist.sort((a, b) => (a.distMeters ?? Infinity) - (b.distMeters ?? Infinity));
 
-  chargersWithDist.forEach(charger => {
-    const distStr = mapEngine
-      ? mapEngine.formatNavDistance(charger.distMeters)
-      : (charger.distMeters >= 1000 ? `${(charger.distMeters / 1000).toFixed(1)} км` : `${Math.round(charger.distMeters)} м`);
+  chargersWithDist.slice(0, CHARGERS_LIST_LIMIT).forEach(charger => {
+    const distStr = charger.distMeters != null ? mapEngine.formatNavDistance(charger.distMeters) : '';
+    const name = charger.name || dict.chargingStationUnnamed;
+    const details = [
+      charger.operator && charger.operator !== charger.name ? charger.operator : null,
+      charger.sockets && charger.sockets.length ? charger.sockets.join(' · ') : null,
+      charger.capacity ? `${dict.chargerSpots}: ${charger.capacity}` : null,
+      charger.openingHours
+    ].filter(Boolean).join(' · ');
 
     const card = document.createElement('div');
     card.className = 'ev-charger-card';
     card.innerHTML = `
       <div class="ev-charger-top">
-        <div class="ev-charger-name">⚡ ${escapeHtml(charger.name)}</div>
-        <span class="ev-charger-power">${charger.power}</span>
+        <div class="ev-charger-name">⚡ ${escapeHtml(name)}</div>
+        ${charger.maxPowerKw ? `<span class="ev-charger-power">${escapeHtml(charger.maxPowerKw)} kW</span>` : ''}
       </div>
-      <div style="font-size: 12px; color: #64748b; line-height: 1.3;">${escapeHtml(charger.address)}</div>
+      <div style="font-size: 12px; color: #64748b; line-height: 1.3;">${escapeHtml(charger.address || details)}</div>
       <div class="ev-charger-meta">
-        <span class="ev-stalls-free">● ${charger.stalls}</span>
+        <span style="font-size: 12px; color: #64748b;">${escapeHtml(charger.address ? details : '')}</span>
         <div style="display: flex; align-items: center; gap: 8px;">
-          <span style="font-weight: 600; color: #1e293b;">${distStr}</span>
-          <button class="btn-ev-route-go" type="button">${dict.btnRoute || 'Маршрут'}</button>
+          <span style="font-weight: 600; color: #1e293b;">${escapeHtml(distStr)}</span>
+          <button class="btn-ev-route-go" type="button">${escapeHtml(dict.btnRoute || 'Маршрут')}</button>
         </div>
       </div>
     `;
 
     card.addEventListener('click', () => {
       closeChargingStationsDrawer();
-      startNavigationTo({ name: charger.name, lat: charger.lat, lng: charger.lng, address: charger.address });
+      startNavigationTo({ name, lat: charger.lat, lng: charger.lng, address: charger.address || details });
     });
 
     listEl.appendChild(card);
   });
+
+  const credit = document.createElement('div');
+  credit.style.cssText = 'padding: 10px 16px 16px; font-size: 11px; color: #94a3b8; text-align: center;';
+  credit.textContent = dict.chargersSource;
+  listEl.appendChild(credit);
 }
 
 // 9. Weather (Open-Meteo Real Forecast for Yerevan) & YouTube Music
