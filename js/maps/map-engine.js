@@ -1067,13 +1067,16 @@ class TeslaMapEngine {
 
     if (this.provider === 'maplibre' && this.map) {
       try {
-        this.map.setStyle(targetStyle);
+        // setStyle drops every runtime source/layer (route, traffic, traveled line):
+        // force a full reload so 'style.load' always fires, then redraw the route
         this.map.once('style.load', () => {
           this.update3DMode(this.is3D);
-          if (this.activeRoute) {
-            this.drawRoute(this.activeRoute);
+          if (this.activeRoute && this.lastRouteRender) {
+            const { coordinates, destination, alternatives, trafficSegments } = this.lastRouteRender;
+            this.renderMapLibreRoute(coordinates, destination, alternatives, trafficSegments);
           }
         });
+        this.map.setStyle(targetStyle, { diff: false });
       } catch (err) {
         console.warn('[Theme] Error switching style:', err);
       }
@@ -2349,6 +2352,9 @@ class TeslaMapEngine {
 
   // Render Route on MapLibre GL with Yandex Navigator Styling & Alternative Blue Routes
   renderMapLibreRoute(coordinates, destination, alternatives = null, trafficSegments = null) {
+    // Remembered so the route can be redrawn after a day/night style swap
+    this.lastRouteRender = { coordinates, destination, alternatives, trafficSegments };
+
     // Clear old alternative layers (alt 0, 1, 2, etc.)
     for (let a = 0; a < 5; a++) {
       if (this.map.getLayer(`route-alt-casing-${a}`)) this.map.removeLayer(`route-alt-casing-${a}`);
@@ -2661,6 +2667,7 @@ class TeslaMapEngine {
     this.renderTrafficPoints(); // Completely removes route cameras from map
     this.lastProgressIndex = 0;
     this.routeCoordinates = [];
+    this.lastRouteRender = null;
     this.alternativeCoordinates = null;
     this.routeSteps = [];
     this.routeCameras = [];
