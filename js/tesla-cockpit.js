@@ -396,7 +396,7 @@ function initTeslaCarGps() {
 // 3. Realtime Phone Remote Pairing (Supabase Broadcast)
 function initPairing() {
   const urlParams = new URLSearchParams(window.location.search);
-  currentCode = (urlParams.get('code') || generateCode()).toUpperCase();
+  currentCode = (urlParams.get('code') || generatePairingCode()).toUpperCase();
 
   document.getElementById('pairing-code-display').textContent = currentCode;
 
@@ -424,14 +424,6 @@ function initPairing() {
   realtimeClient.init();
 }
 
-function generateCode() {
-  const chars = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
-  let res = '';
-  for (let i = 0; i < 6; i++) {
-    res += chars.charAt(Math.floor(Math.random() * chars.length));
-  }
-  return res;
-}
 
 function handleIncomingGps(gps) {
   if (!gps || isNaN(gps.lat) || isNaN(gps.lng)) return;

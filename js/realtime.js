@@ -3,6 +3,16 @@
 const WS_RECONNECT_MIN_MS = 1000;
 const WS_RECONNECT_MAX_MS = 15000;
 
+// 6-character easy-to-read pairing code (e.g. 24W84Z), no confusable 0/O/1/I.
+// The code is the only thing guarding a pairing channel, so use the CSPRNG; 32 symbols
+// divide 256 evenly, so byte % 32 is unbiased.
+const PAIRING_CODE_CHARS = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
+
+function generatePairingCode(length = 6) {
+  const bytes = crypto.getRandomValues(new Uint8Array(length));
+  return Array.from(bytes, b => PAIRING_CODE_CHARS[b % PAIRING_CODE_CHARS.length]).join('');
+}
+
 class TeslaRealtime {
   constructor(options = {}) {
     this.code = (options.code || this.generateRoomCode()).toUpperCase();
@@ -19,14 +29,8 @@ class TeslaRealtime {
     this.heartbeatTimer = null;
   }
 
-  // Generates 6-character easy-to-read room code (e.g. 24W84Z)
   generateRoomCode() {
-    const chars = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ'; // Removed confusing 0, O, 1, I
-    let result = '';
-    for (let i = 0; i < 6; i++) {
-      result += chars.charAt(Math.floor(Math.random() * chars.length));
-    }
-    return result;
+    return generatePairingCode();
   }
 
   // Initialize both Supabase Broadcast and Local WebSocket

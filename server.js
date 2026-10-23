@@ -150,6 +150,48 @@ async function resolveMapLinkRedirects(startUrl, maxHops = 5) {
   return null;
 }
 
+// Every upstream call gets a deadline: a hung Yandex/OSRM/YouTube request would otherwise
+// hold the client request (and a Cloud Run slot) until the platform's 300 s timeout
+const UPSTREAM_TIMEOUT_MS = 12000;
+
+function fetchUpstream(url, options = {}) {
+  return fetch(url, { ...options, signal: options.signal || AbortSignal.timeout(UPSTREAM_TIMEOUT_MS) });
+}
+
+// Per-client token bucket for /api/*: the scraping endpoints are expensive and can get the
+// server's IP blocked upstream. Generous enough for typing-as-you-search plus navigation.
+const RATE_LIMIT_CAPACITY = 60;           // burst
+const RATE_LIMIT_REFILL_PER_SEC = 2;      // sustained ~120 requests/minute
+const RATE_LIMIT_IDLE_MS = 5 * 60 * 1000;
+const rateBuckets = new Map();
+
+function clientIp(req) {
+  // Cloud Run puts the original client first in X-Forwarded-For
+  const fwd = req.headers['x-forwarded-for'];
+  return (fwd ? String(fwd).split(',')[0] : req.socket.remoteAddress || 'unknown').trim();
+}
+
+function takeRateToken(ip) {
+  const now = Date.now();
+  let bucket = rateBuckets.get(ip);
+  if (!bucket) {
+    bucket = { tokens: RATE_LIMIT_CAPACITY, at: now };
+    rateBuckets.set(ip, bucket);
+  }
+  bucket.tokens = Math.min(RATE_LIMIT_CAPACITY, bucket.tokens + ((now - bucket.at) / 1000) * RATE_LIMIT_REFILL_PER_SEC);
+  bucket.at = now;
+  if (bucket.tokens < 1) return false;
+  bucket.tokens -= 1;
+  return true;
+}
+
+setInterval(() => {
+  const cutoff = Date.now() - RATE_LIMIT_IDLE_MS;
+  for (const [ip, bucket] of rateBuckets) {
+    if (bucket.at < cutoff) rateBuckets.delete(ip);
+  }
+}, 60000).unref();
+
 // Cache for live Yandex traffic data in Yerevan
 let trafficCache = { time: 0, data: null };
 
@@ -184,6 +226,12 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  if (pathname.startsWith('/api/') && !takeRateToken(clientIp(req))) {
+    res.writeHead(429, { 'Content-Type': 'application/json', 'Retry-After': '5' });
+    res.end(JSON.stringify({ error: 'Too many requests' }));
+    return;
+  }
+
   if (pathname === '/favicon.ico') {
     res.writeHead(204);
     res.end();
@@ -213,7 +261,7 @@ function parseYandexGeoUri(uri) {
 async function resolveYandexOrgCoords(oid) {
   try {
     const url = `https://yandex.com/maps/org/${oid}`;
-    const res = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)' } });
+    const res = await fetchUpstream(url, { headers: { 'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)' } });
     const html = await res.text();
     const match = html.match(/class="state-view">([^<]+)<\/script>/);
     if (match) {
@@ -234,7 +282,7 @@ async function fetchYandexSuggestResults(q, userLng = 44.5125, userLat = 40.1776
   async function doReq(query, lang = 'ru_RU') {
     try {
       const url = `https://suggest-maps.yandex.ru/suggest-geo?v=9&search_type=all&part=${encodeURIComponent(query)}&lang=${lang}&n=8&origin=maps-form&ll=${userLng},${userLat}&spn=1.8,1.8`;
-      const res = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)' } });
+      const res = await fetchUpstream(url, { headers: { 'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)' } });
       const text = await res.text();
       const json = JSON.parse(text.replace(/^[^({]*\(/, '').replace(/\);?$/, ''));
       return json.results || [];
@@ -338,7 +386,7 @@ async function fetchYandexSuggestResults(q, userLng = 44.5125, userLat = 40.1776
       if (!coords) {
         try {
           const photonUrl = `https://photon.komoot.io/api/?q=${encodeURIComponent(input)}&lat=40.18&lon=44.49&limit=1`;
-          const pRes = await fetch(photonUrl);
+          const pRes = await fetchUpstream(photonUrl);
           const pData = await pRes.json();
           if (pData.features && pData.features.length > 0) {
             const f = pData.features[0];
@@ -358,7 +406,7 @@ async function fetchYandexSuggestResults(q, userLng = 44.5125, userLat = 40.1776
       // 3. Nominatim Fallback
       if (!coords) {
         const nomUrl = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(input)}&countrycodes=am,ge&addressdetails=1&limit=1`;
-        const nomRes = await fetch(nomUrl, { headers: { 'User-Agent': 'TeslaNavi/1.0 (stepansmbatyan94@gmail.com)' } });
+        const nomRes = await fetchUpstream(nomUrl, { headers: { 'User-Agent': 'TeslaNavi/1.0 (stepansmbatyan94@gmail.com)' } });
         const results = await nomRes.json();
         if (results && results.length > 0) {
           const item = results[0];
@@ -552,7 +600,7 @@ function getArmenianAudio(text, voiceChoice = 'gor') {
       if (items.length < 2) {
         try {
           const photonUrl = `https://photon.komoot.io/api/?q=${encodeURIComponent(q)}&lat=${userLat}&lon=${userLng}&limit=6`;
-          const pRes = await fetch(photonUrl);
+          const pRes = await fetchUpstream(photonUrl);
           const pData = await pRes.json();
           if (pData.features && pData.features.length > 0) {
             const photonItems = pData.features.map(f => {
@@ -597,7 +645,7 @@ function getArmenianAudio(text, voiceChoice = 'gor') {
 
     // 1. Fetch OSRM route in parallel to extract exact OpenStreetMap intersection lane data
     const osrmUrl = `https://router.project-osrm.org/route/v1/driving/${startLng},${startLat};${destLng},${destLat}?overview=full&geometries=geojson&steps=true&annotations=true`;
-    const osrmPromise = fetch(osrmUrl)
+    const osrmPromise = fetchUpstream(osrmUrl)
       .then(r => r.json())
       .catch(err => {
         console.warn('OSRM parallel route fetch warning:', err.message);
@@ -630,7 +678,7 @@ function getArmenianAudio(text, voiceChoice = 'gor') {
     try {
       // 2. Query live Yandex Maps Router (when provider is yandex or as primary traffic engine)
       const yandexUrl = `https://yandex.com/maps/10262/yerevan/?mode=routes&rtext=${startLat}%2C${startLng}~${destLat}%2C${destLng}&rtt=auto`;
-      const yRes = await fetch(yandexUrl, {
+      const yRes = await fetchUpstream(yandexUrl, {
         headers: {
           'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36'
         }
@@ -802,7 +850,7 @@ function getArmenianAudio(text, voiceChoice = 'gor') {
 
     // 2. Fallback to OSRM if Yandex fails
     try {
-      const osrmData = (await osrmPromise) || await (await fetch(osrmUrl)).json();
+      const osrmData = (await osrmPromise) || await (await fetchUpstream(osrmUrl)).json();
       const laneIntersections = extractLaneIntersections(osrmData);
       if (osrmData && osrmData.routes) {
         osrmData.routes.forEach(r => {
@@ -909,7 +957,7 @@ function getArmenianAudio(text, voiceChoice = 'gor') {
     }
 
     try {
-      const xmlRes = await fetch('https://export.yandex.ru/bar/reginfo.xml?region=10262', {
+      const xmlRes = await fetchUpstream('https://export.yandex.ru/bar/reginfo.xml?region=10262', {
         headers: { 'User-Agent': 'Mozilla/5.0' }
       });
       const xmlText = await xmlRes.text();
@@ -962,7 +1010,7 @@ function getArmenianAudio(text, voiceChoice = 'gor') {
 
       if (continuation) {
         // Fetch next page via YouTube InnerTube Search API
-        const ytRes = await fetch('https://www.youtube.com/youtubei/v1/search?prettyPrint=false', {
+        const ytRes = await fetchUpstream('https://www.youtube.com/youtubei/v1/search?prettyPrint=false', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -1001,7 +1049,7 @@ function getArmenianAudio(text, voiceChoice = 'gor') {
         // Initial HTML search query
         const searchQuery = q || 'trending music';
         const ytUrl = 'https://www.youtube.com/results?search_query=' + encodeURIComponent(searchQuery);
-        const ytRes = await fetch(ytUrl, {
+        const ytRes = await fetchUpstream(ytUrl, {
           headers: {
             'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
             'Accept-Language': 'ru-RU,ru;q=0.9,en-US;q=0.8,en;q=0.7,hy;q=0.6'
@@ -1059,7 +1107,7 @@ function getArmenianAudio(text, voiceChoice = 'gor') {
 
     try {
       const suggestUrl = `https://suggestqueries.google.com/complete/search?client=firefox&ds=yt&hl=ru&gl=AM&q=${encodeURIComponent(q)}`;
-      const suggestRes = await fetch(suggestUrl, {
+      const suggestRes = await fetchUpstream(suggestUrl, {
         headers: {
           'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
         }
