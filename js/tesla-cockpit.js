@@ -869,11 +869,14 @@ function initToolbarHandlers() {
       if (currentRouteInfo) {
         showNavigationHud(currentRouteInfo);
       } else if (mapEngine && mapEngine.activeRoute) {
+        // Built from the engine's own route data (this used to show an invented '15 min / 18:45')
+        const durationSec = mapEngine.activeRoute.durationSec || 0;
+        const etaDate = new Date(Date.now() + durationSec * 1000);
         const fallbackRoute = {
-          duration: '15 мин',
-          distance: `${((mapEngine.totalDistance || 1000) / 1000).toFixed(1)} км`,
-          eta: '18:45',
-          name: mapEngine.activeRoute.destination?.name || 'Маршрут',
+          duration: durationSec ? mapEngine.formatNavDuration(durationSec) : '—',
+          distance: mapEngine.formatNavDistance(mapEngine.totalRouteMeters || mapEngine.totalDistance || 0),
+          eta: durationSec ? `${String(etaDate.getHours()).padStart(2, '0')}:${String(etaDate.getMinutes()).padStart(2, '0')}` : '—',
+          name: mapEngine.activeRoute.destination?.name || tr('destination'),
           steps: mapEngine.routeSteps || [],
           trafficSegments: mapEngine.trafficSegments || []
         };
@@ -1723,6 +1726,10 @@ function initEditPlaceModalHandlers() {
 }
 
 // 6. Search & Autocomplete Handlers with Persistent Search History
+
+// Category chips search the geocoder near the car (Yandex Suggest works best with Russian terms)
+const CATEGORY_SEARCH_QUERIES = { parking: 'парковка', carwash: 'автомойка', food: 'ресторан', coffee: 'кофейня' };
+const CATEGORY_SEARCH_RADIUS_M = 30000;
 const SEARCH_HISTORY_KEY = 'tesla_search_history';
 
 function getSearchHistory() {
@@ -1870,8 +1877,11 @@ function initSearchHandlers() {
   renderSearchHistory();
 
   // Autocomplete typing with Yandex-powered geocoder
-  searchInput.addEventListener('input', () => {
+  searchInput.addEventListener('input', (e) => {
     clearTimeout(debounceTimer);
+    // Typing by the user ends a category search started from a chip
+    if (e.isTrusted) delete searchInput.dataset.category;
+    const isCategorySearch = searchInput.dataset.category === '1';
     const query = searchInput.value.trim();
     const sectionTitle = document.getElementById('drawer-section-title');
 
@@ -1892,7 +1902,14 @@ function initSearchHandlers() {
         const cur = mapEngine ? mapEngine.currentPosition : { lat: 40.1776, lng: 44.5125 };
         const url = `/api/geocode?q=${encodeURIComponent(query)}&lat=${cur.lat}&lng=${cur.lng}`;
         const res = await fetch(url);
-        const items = await res.json();
+        let items = await res.json();
+        if (isCategorySearch && Array.isArray(items) && mapEngine) {
+          // Category chips mean "near me": drop far matches, nearest first
+          items = items
+            .map(it => ({ ...it, _d: mapEngine.calculateDistance(cur.lat, cur.lng, it.lat, it.lng) }))
+            .filter(it => it._d <= CATEGORY_SEARCH_RADIUS_M)
+            .sort((a, b) => a._d - b._d);
+        }
 
         resultsList.innerHTML = '';
 
@@ -1960,17 +1977,12 @@ function initSearchHandlers() {
         openChargingStationsDrawer();
         return;
       }
-      let target = null;
-      if (type === 'parking') target = { name: 'Парковка / Parking Center', lat: 40.186500, lng: 44.473000 };
-      else if (type === 'carwash') target = { name: 'Premium Car Wash Yerevan', lat: 40.184500, lng: 44.478000 };
-      else if (type === 'food') target = { name: 'Ресторан / Dining Yerevan', lat: 40.184000, lng: 44.480000 };
-      else if (type === 'coffee') target = { name: 'Coffee House Yerevan', lat: 40.185500, lng: 44.485000 };
-
-      if (target) {
-        searchDrawer.classList.add('hidden');
-        addToSearchHistory(target);
-        startNavigationTo(target);
-      }
+      // Real places near the car via the geocoder (these chips used to jump to invented points)
+      const query = CATEGORY_SEARCH_QUERIES[type];
+      if (!query) return;
+      searchInput.value = query;
+      searchInput.dataset.category = '1';
+      searchInput.dispatchEvent(new Event('input'));
     });
   });
 }
