@@ -12,7 +12,8 @@ class TeslaMapEngine {
     this.onUserPan = options.onUserPan || (() => {});
     this.onProgressUpdate = options.onProgressUpdate || (() => {});
     this.onCameraAlert = options.onCameraAlert || (() => {});
-    
+    this.onPositionUpdate = options.onPositionUpdate || (() => {});
+
     this.map = null;
     this.carMarker = null;
     this.destMarker = null;
@@ -1317,6 +1318,8 @@ class TeslaMapEngine {
           this.map.setCenter([lat, lng], this.navZoom, { duration: 0 });
         }
       }
+      this._lastPosUpdateCb = performance.now();
+      this.onPositionUpdate({ lat, lng, speed });
       return;
     }
 
@@ -1496,11 +1499,11 @@ class TeslaMapEngine {
       this.checkFreeDrivingCameraAlert(displayLat, displayLng, speed);
     }
 
-    if (this.options && this.options.onPositionUpdate && isRealFix) {
+    if (isRealFix) {
       const now = performance.now();
       if (!this._lastPosUpdateCb || (now - this._lastPosUpdateCb > 2500)) {
         this._lastPosUpdateCb = now;
-        this.options.onPositionUpdate({ lat: displayLat, lng: displayLng, speed });
+        this.onPositionUpdate({ lat: displayLat, lng: displayLng, speed });
       }
     }
   }
