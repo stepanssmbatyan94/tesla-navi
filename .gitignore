@@ -1,6 +1,7 @@
 node_modules
 .DS_Store
 .stitch.json
-.agents
+# Third-party Stitch skill stays local; project skills in .agents/skills/ are committed
+.agents/skills/stitch/
 refs/
 models/
