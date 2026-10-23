@@ -1571,6 +1571,13 @@ class TeslaMapEngine {
   trackNavigationProgress(currentLat, currentLng, isOffRoute = false, distToRoute = 0, speed = 0, isRealFix = true) {
     if (!this.activeRoute) return;
 
+    // Route preview (before "Поехали"): no turn prompts, route-camera voice or arrival yet,
+    // only the same camera warnings as free driving
+    if (!this.isNavigating) {
+      this.checkFreeDrivingCameraAlert(currentLat, currentLng, speed);
+      return;
+    }
+
     // Off-route automatic rerouting: ONLY on genuine GPS fixes!
     // Triggers instantly after 2 consecutive ticks (~1.5s) of staying off-route, exactly like Yandex Navigator
     if (isRealFix && this.isNavigating && isOffRoute && !this.isRerouting) {
