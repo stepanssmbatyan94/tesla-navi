@@ -161,15 +161,28 @@ class TeslaRealtime {
     }
   }
 
+  // Every packet travels over both Supabase and the local WS: drop the second copy
+  // (and any stale out-of-order packet) by its sender timestamp
+  isDuplicate(payload, key) {
+    const ts = payload && payload.timestamp;
+    if (!ts) return false;
+    // A much older timestamp means a new sender with a skewed clock: accept and resync
+    if (this[key] && ts <= this[key] && this[key] - ts < 30000) return true;
+    this[key] = ts;
+    return false;
+  }
+
   handleGpsPacket(payload) {
     this.lastPacketTime = Date.now();
     this.setConnected(true);
+    if (this.isDuplicate(payload, 'lastGpsTimestamp')) return;
     this.onGpsUpdate(payload);
   }
 
   handleDestinationPacket(payload) {
     this.lastPacketTime = Date.now();
     this.setConnected(true);
+    if (this.isDuplicate(payload, 'lastDestinationTimestamp')) return;
     this.onDestinationSet(payload);
   }
 

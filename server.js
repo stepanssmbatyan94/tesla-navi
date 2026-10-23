@@ -1060,10 +1060,12 @@ wss.on('connection', (ws, req) => {
   const clientSet = rooms.get(room);
   clientSet.add(ws);
 
-  ws.on('message', (data) => {
+  ws.on('message', (data, isBinary) => {
+    // ws v8 hands text frames over as Buffers: preserve the frame type, otherwise
+    // browsers receive a Blob and JSON.parse fails on "[object Blob]"
     for (const peer of clientSet) {
       if (peer !== ws && peer.readyState === ws.OPEN) {
-        peer.send(data);
+        peer.send(data, { binary: isBinary });
       }
     }
   });
