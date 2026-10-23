@@ -5,6 +5,34 @@
 const LANE_MATCH_MAX_DIST_M = 20;
 const LANE_MATCH_MAX_BEARING_DIFF = 35;
 
+// Map libraries loaded on demand (MapLibre itself is a deferred <script> in index.html)
+const MAP_LIBRARIES = {
+  yandexJs: 'https://api-maps.yandex.ru/2.1/?lang=ru_RU&coordorder=latlong',
+  leafletJs: 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js',
+  leafletCss: 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css'
+};
+const MAP_LIBRARY_TIMEOUT_MS = 10000;
+
+function loadExternalScript(src, timeoutMs = MAP_LIBRARY_TIMEOUT_MS) {
+  return new Promise((resolve, reject) => {
+    const script = document.createElement('script');
+    const timer = setTimeout(() => reject(new Error(`timeout loading ${src}`)), timeoutMs);
+    script.src = src;
+    script.async = true;
+    script.onload = () => { clearTimeout(timer); resolve(); };
+    script.onerror = () => { clearTimeout(timer); reject(new Error(`failed to load ${src}`)); };
+    document.head.appendChild(script);
+  });
+}
+
+function loadExternalStylesheet(href) {
+  if (document.querySelector(`link[href="${href}"]`)) return;
+  const link = document.createElement('link');
+  link.rel = 'stylesheet';
+  link.href = href;
+  document.head.appendChild(link);
+}
+
 class TeslaMapEngine {
   constructor(containerId, options = {}) {
     this.containerId = containerId;
@@ -65,13 +93,49 @@ class TeslaMapEngine {
     const container = document.getElementById(this.containerId);
     container.innerHTML = '';
 
-    if (this.provider === 'maplibre' && window.maplibregl) {
-      await this.initMapLibre();
-    } else if (this.provider === 'yandex' && window.ymaps) {
-      await this.initYandex();
-    } else {
-      await this.initLeaflet();
+    if (this.provider === 'yandex') {
+      if (!window.ymaps) {
+        try {
+          await loadExternalScript(MAP_LIBRARIES.yandexJs);
+        } catch (err) {
+          console.warn('[MapEngine] Yandex Maps JS unavailable, falling back to MapLibre:', err.message);
+        }
+      }
+      if (window.ymaps) {
+        await this.initYandex();
+        this.startMotionExtrapolator();
+        return;
+      }
+      this.provider = 'maplibre';
     }
+
+    if (this.provider === 'maplibre' && window.maplibregl) {
+      try {
+        await this.initMapLibre();
+        this.startMotionExtrapolator();
+        return;
+      } catch (err) {
+        // e.g. WebGL unavailable on the MCU: the constructor throws
+        console.warn('[MapEngine] MapLibre failed to start, falling back to Leaflet:', err && err.message);
+        try { if (this.map && this.map.remove) this.map.remove(); } catch (removeErr) { console.warn('[MapEngine] MapLibre cleanup:', removeErr.message); }
+        this.map = null;
+        container.innerHTML = '';
+      }
+    }
+
+    // Raster fallback. Every provider-specific branch keys off this.provider, so it must
+    // say 'osm' — keeping 'maplibre' here made every MapLibre call throw on a Leaflet map
+    console.warn('[MapEngine] Using Leaflet/OpenStreetMap fallback map');
+    this.provider = 'osm';
+    if (!window.L) {
+      try {
+        loadExternalStylesheet(MAP_LIBRARIES.leafletCss);
+        await loadExternalScript(MAP_LIBRARIES.leafletJs);
+      } catch (err) {
+        console.error('[MapEngine] No map library could be loaded:', err.message);
+      }
+    }
+    await this.initLeaflet();
     this.startMotionExtrapolator();
   }
 

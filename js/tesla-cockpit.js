@@ -703,6 +703,12 @@ async function initMap() {
   await mapEngine.init();
   window.mapEngine = mapEngine;
 
+  // The engine may have fallen back to another map library: show what is really running
+  const providerIndicator = document.getElementById('provider-indicator');
+  if (providerIndicator && mapEngine.provider !== activeProvider) {
+    providerIndicator.textContent = mapEngine.provider === 'osm' ? 'OSM' : (mapEngine.provider === 'yandex' ? 'ЯН' : 'ML');
+  }
+
   if (pendingGpsFix) {
     mapEngine.updateCarPosition(pendingGpsFix.lat, pendingGpsFix.lng, pendingGpsFix.heading, pendingGpsFix.speed, true);
   }
@@ -2471,7 +2477,8 @@ function showArrivalModal(dest) {
 function toggleEvChargers(show) {
   const btnQuick = document.getElementById('btn-quick-chargers');
   if (btnQuick) btnQuick.classList.toggle('active', !!show);
-  if (!mapEngine || !mapEngine.map) return;
+  // Pins use maplibregl.Marker; on the Yandex/Leaflet maps the charger list drawer still works
+  if (!mapEngine || !mapEngine.map || mapEngine.provider !== 'maplibre') return;
   chargersVisible = !!show;
   document.getElementById('btn-toggle-chargers')?.classList.toggle('active', chargersVisible);
 

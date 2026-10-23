@@ -11,20 +11,16 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600;700&family=Noto+Sans+Armenian:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 
-  <!-- MapLibre GL 4.7.1 Vector Engine (Hardware-Accelerated 3D) -->
+  <!-- MapLibre GL 4.7.1 Vector Engine (Hardware-Accelerated 3D). Deferred so a slow CDN never blocks first paint;
+       Yandex Maps JS and the Leaflet fallback are loaded on demand by map-engine.js -->
   <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" />
-  <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+  <script defer src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
 
-  <!-- Fallbacks: Leaflet & Yandex Maps -->
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <script src="https://api-maps.yandex.ru/2.1/?lang=ru_RU&amp;coordorder=latlong" type="text/javascript"></script>
-
-  <!-- Supabase JS Client for Realtime Phone GPS Streaming -->
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <!-- Supabase JS Client for Realtime Phone GPS Streaming (pinned) -->
+  <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.118.0"></script>
 
   <!-- Tesla Cockpit CSS -->
-  <link rel="stylesheet" href="css/tesla-display.css?v=38">
+  <link rel="stylesheet" href="css/tesla-display.css?v=39">
 </head>
 <body>
 
@@ -964,9 +960,9 @@
   </div>
 
   <!-- Scripts -->
-  <script src="js/config.js?v=38"></script>
-  <script src="js/realtime.js?v=38"></script>
-  <script src="js/maps/map-engine.js?v=38"></script>
-  <script src="js/tesla-cockpit.js?v=38"></script>
+  <script src="js/config.js?v=39"></script>
+  <script src="js/realtime.js?v=39"></script>
+  <script src="js/maps/map-engine.js?v=39"></script>
+  <script src="js/tesla-cockpit.js?v=39"></script>
 </body>
 </html>
