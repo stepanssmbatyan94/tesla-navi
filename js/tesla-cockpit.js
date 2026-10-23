@@ -3515,6 +3515,8 @@ async function loadLiveYerevanWeather() {
 }
 
 // 10. Developer Mode & In-Car Road Simulator (?mode=dev)
+const DEV_LOG_MAX_LINES = 400;
+
 function initDevMode() {
   const urlParams = new URLSearchParams(window.location.search);
   const isDev = urlParams.get('mode') === 'dev';
@@ -3536,32 +3538,50 @@ function initDevMode() {
     if (!logBox) return;
     const now = new Date();
     const timeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`;
-    const text = args.map(a => (typeof a === 'object' ? JSON.stringify(a) : String(a))).join(' ');
+    const text = args.map(stringifyLogArg).join(' ');
 
     const line = document.createElement('div');
     line.className = `dev-log-line ${level}`;
     line.innerHTML = `<span>[${timeStr}]</span> <strong>[${level.toUpperCase()}]</strong> ${escapeHtml(text)}`;
     logBox.appendChild(line);
+    while (logBox.childElementCount > DEV_LOG_MAX_LINES) {
+      logBox.firstElementChild.remove();
+    }
     logBox.scrollTop = logBox.scrollHeight;
   }
 
-  // Hook into browser console
-  const origLog = console.log;
-  const origWarn = console.warn;
-  const origError = console.error;
+  // Logging must never throw into the caller: MapLibre events, maps and errors are
+  // circular or don't serialize, so fall back to a short description
+  function stringifyLogArg(a) {
+    if (a instanceof Error) return `${a.name}: ${a.message}`;
+    if (a === null || typeof a !== 'object') return String(a);
+    try {
+      return JSON.stringify(a);
+    } catch (e) {
+      return `[${(a.constructor && a.constructor.name) || 'Object'}${a.type ? ' ' + a.type : ''}]`;
+    }
+  }
 
-  console.log = function(...args) {
-    origLog.apply(console, args);
-    appendDevLog('log', ...args);
-  };
-  console.warn = function(...args) {
-    origWarn.apply(console, args);
-    appendDevLog('warn', ...args);
-  };
-  console.error = function(...args) {
-    origError.apply(console, args);
-    appendDevLog('error', ...args);
-  };
+  // Hook into browser console (dev mode only: in production nobody sees the panel
+  // and the hidden log box would grow forever)
+  function hookConsoleIntoDevLog() {
+    const origLog = console.log;
+    const origWarn = console.warn;
+    const origError = console.error;
+
+    console.log = function(...args) {
+      origLog.apply(console, args);
+      appendDevLog('log', ...args);
+    };
+    console.warn = function(...args) {
+      origWarn.apply(console, args);
+      appendDevLog('warn', ...args);
+    };
+    console.error = function(...args) {
+      origError.apply(console, args);
+      appendDevLog('error', ...args);
+    };
+  }
 
   // Voice Search Button in Search Drawer (#btn-voice-search)
   const btnVoiceSearch = document.getElementById('btn-voice-search');
@@ -3620,6 +3640,8 @@ function initDevMode() {
     if (devPanel) devPanel.classList.add('hidden');
     return;
   }
+
+  hookConsoleIntoDevLog();
 
   // Show Dev Mode UI
   if (devPill) devPill.classList.remove('hidden');
