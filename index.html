@@ -20,7 +20,7 @@
   <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.118.0"></script>
 
   <!-- Tesla Cockpit CSS -->
-  <link rel="stylesheet" href="css/tesla-display.css?v=39">
+  <link rel="stylesheet" href="css/tesla-display.css?v=40">
 </head>
 <body>
 
@@ -500,7 +500,7 @@
       <div class="speed-current-circle" title="Текущая скорость">
         <span id="speed-current" class="current-speed-val">0</span>
       </div>
-      <div id="speed-limit-val" class="speed-limit-circle" title="Ограничение скорости">60</div>
+      <div id="speed-limit-val" class="speed-limit-circle speed-limit-estimated" data-i18n-title="speedLimitEstimated" title="Оценка по типу дороги, не знак">60</div>
     </div>
 
     <!-- Traffic Camera / Signal Alert (Only shown when approaching real camera along route) -->
@@ -960,9 +960,9 @@
   </div>
 
   <!-- Scripts -->
-  <script src="js/config.js?v=39"></script>
-  <script src="js/realtime.js?v=39"></script>
-  <script src="js/maps/map-engine.js?v=39"></script>
-  <script src="js/tesla-cockpit.js?v=39"></script>
+  <script src="js/config.js?v=40"></script>
+  <script src="js/realtime.js?v=40"></script>
+  <script src="js/maps/map-engine.js?v=40"></script>
+  <script src="js/tesla-cockpit.js?v=40"></script>
 </body>
 </html>

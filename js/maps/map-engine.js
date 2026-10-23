@@ -13,6 +13,10 @@ const MAP_LIBRARIES = {
 };
 const MAP_LIBRARY_TIMEOUT_MS = 10000;
 
+// Window around a route speed camera in which its limit counts as the verified limit
+const CAMERA_LIMIT_AHEAD_M = 400;
+const CAMERA_LIMIT_BEHIND_M = 50;
+
 function loadExternalScript(src, timeoutMs = MAP_LIBRARY_TIMEOUT_MS) {
   return new Promise((resolve, reject) => {
     const script = document.createElement('script');
@@ -1735,7 +1739,18 @@ class TeslaMapEngine {
 
       const activeStep = this.routeSteps[this.currentStepIndex] || this.routeSteps[this.routeSteps.length - 1];
       const isLastStep = (this.currentStepIndex >= this.routeSteps.length - 1);
-      const currentSpeedLimit = activeStep.speedLimit || 60;
+      // Step limits are a heuristic from street names; a speed camera on the route just
+      // ahead (OSM camera DB) is the only verified limit we have
+      let cameraLimit = null;
+      for (const cam of (this.routeCameras || [])) {
+        const ahead = cam.routeDist - vehicleRouteDist;
+        if (ahead > -CAMERA_LIMIT_BEHIND_M && ahead < CAMERA_LIMIT_AHEAD_M && cam.limit) {
+          cameraLimit = cam.limit;
+          break;
+        }
+      }
+      const currentSpeedLimit = cameraLimit || activeStep.speedLimit || 60;
+      const speedLimitSource = cameraLimit ? 'camera' : 'estimated';
 
       // Yandex & OSRM steps carry the maneuver at their START: the turn at the end of the
       // current step is the NEXT step's maneuver. The last step ends at the destination.
@@ -1789,6 +1804,7 @@ class TeslaMapEngine {
         modifier: activeModifier,
         type: maneuverType,
         speedLimit: currentSpeedLimit,
+        speedLimitSource,
         location: activeStep.location || null,
         lanes: activeLanes,
         laneDistanceMeters: activeLaneDist

@@ -263,6 +263,19 @@ function updateVoiceIndicator(voice) {
 
 // Speedometer & Overspeed Alert Manager
 let lastOverspeedChimeTime = 0;
+// 'camera' = limit of a speed camera on the route (OSM data), 'estimated' = street-name heuristic
+let currentSpeedLimitSource = 'estimated';
+
+function setSpeedLimitDisplay(limit, source) {
+  const limitEl = document.getElementById('speed-limit-val');
+  currentSpeedLimitSource = source === 'camera' ? 'camera' : 'estimated';
+  if (!limitEl) return;
+  if (limit) limitEl.textContent = limit;
+  const estimated = currentSpeedLimitSource !== 'camera';
+  limitEl.classList.toggle('speed-limit-estimated', estimated);
+  const dict = I18N[currentLang] || I18N.ru;
+  limitEl.title = estimated ? dict.speedLimitEstimated : dict.speedLimitCamera;
+}
 
 function updateSpeedometerDisplay(speedKmh) {
   const currentSpeed = Math.max(0, Math.round(speedKmh || 0));
@@ -276,8 +289,9 @@ function updateSpeedometerDisplay(speedKmh) {
   // Visual warning: red pulse starts as soon as exceeding limit (e.g. 61+ at limit 60)
   const isOverLimit = currentSpeed > speedLimit;
 
-  // Audio chime warning: strictly when speed exceeds limit + 10 km/h (e.g. 71+ at limit 60)
-  const isAudioWarning = currentSpeed >= (speedLimit + 11);
+  // Audio chime warning: strictly when speed exceeds limit + 10 km/h (e.g. 71+ at limit 60),
+  // and only for a verified (speed-camera) limit, never for a street-name estimate
+  const isAudioWarning = currentSpeedLimitSource === 'camera' && currentSpeed >= (speedLimit + 11);
 
   if (circleEl) {
     if (isOverLimit) {
@@ -2215,8 +2229,7 @@ function updateManeuverHud(m) {
 
   // Update dynamic speed limit circle (60 in city, 90 on highway/outside Yerevan)
   if (m.speedLimit) {
-    const limitEl = document.getElementById('speed-limit-val');
-    if (limitEl) limitEl.textContent = m.speedLimit;
+    setSpeedLimitDisplay(m.speedLimit, m.speedLimitSource);
   }
 
   // Real Lane Guidance matching Yandex Navigator (Screenshots 4 & 5)
@@ -2435,6 +2448,7 @@ function renderLaneGuidance(m) {
 }
 
 function cancelActiveNavigation() {
+  setSpeedLimitDisplay(null, 'estimated');
   document.body.classList.remove('navigating');
   document.body.classList.remove('route-options-open');
   document.getElementById('quick-dest-bar')?.classList.remove('hidden');

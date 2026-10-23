@@ -742,7 +742,8 @@ function getArmenianAudio(text, voiceChoice = 'gor') {
                 distance: sec.distance?.value || 0,
                 duration: sec.durationInTraffic?.value || sec.duration?.value || 0,
                 location: loc, // [lng, lat]
-                speedLimit: speedLimit
+                speedLimit: speedLimit,
+                speedLimitSource: 'estimated' // street-name heuristic, not map data
               };
             });
 
