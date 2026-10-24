@@ -2274,7 +2274,7 @@ window.updateManeuverHud = updateManeuverHud;
 
 // Single Lane Arrow SVG Generator matching authentic road traffic signs
 function getSingleLaneSvg(indications, isActive) {
-  const color = isActive ? '#ffffff' : 'rgba(255,255,255,0.35)';
+  const color = isActive ? '#ffffff' : 'rgba(255,255,255,0.55)';
   const strokeWidth = isActive ? '3.5' : '3';
   const inds = (Array.isArray(indications) ? indications : [indications || 'straight']).map(s => String(s).toLowerCase());
 
@@ -2394,8 +2394,9 @@ function renderLaneGuidance(m) {
     : ((typeof m.distanceMeters === 'number') ? m.distanceMeters : ((typeof m.rawDistance === 'number') ? m.rawDistance : 100));
   const hasLanes = Array.isArray(m.lanes) && m.lanes.length > 0;
 
-  // Only within 220 m of the junction, and only with real lane data for it
-  if (hasLanes && rawDist <= 220) {
+  // Only with real lane data, close to the junction (the engine picks it: the maneuver's own
+  // junction from 300 m, a pass-through junction from 220 m)
+  if (hasLanes && rawDist <= 300) {
     lanePill.innerHTML = `
       <div class="lane-guidance-arrows">
         ${getLaneColumnsHtml(m.lanes)}

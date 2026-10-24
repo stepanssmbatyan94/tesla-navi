@@ -1285,7 +1285,8 @@ html, body {
 }
 
 .lane-col-item.is-faded {
-  opacity: 0.38;
+  /* lanes that don't fit the maneuver: still readable, clearly not highlighted */
+  opacity: 0.7;
 }
 
 .lane-active-dot {
@@ -3426,3 +3427,9 @@ body.route-options-open .quick-dest-bar {
 
 
 
+
+/* Yandex heading-up turns the whole map (syncYandexRotation): markers counter-rotate to stay upright */
+#yandex-map-rotor .yandex-upright {
+  transform: rotate(var(--yandex-upright, 0deg));
+  transition: transform 0.3s linear;
+}

@@ -34,7 +34,7 @@
     const exitText = document.querySelector('#maneuver-arrow-box svg text');
     const pill = document.getElementById('lane-guidance-pill');
     const lanesShown = pill.classList.contains('hidden') ? 0 : pill.querySelectorAll('.lane-col-item').length;
-    const data = lastManeuver && Array.isArray(lastManeuver.lanes) && lastManeuver.laneDistanceMeters <= 220 ? lastManeuver.lanes.length : 0;
+    const data = lastManeuver && Array.isArray(lastManeuver.lanes) && lastManeuver.laneDistanceMeters <= 300 ? lastManeuver.lanes.length : 0;
     if (lanesShown !== data) laneMismatches.push({ lanesShown, data });
     if (lanesShown) laneSamples++;
     return { icon: icon(), exit: exitText ? Number(exitText.textContent) : null, dist: document.getElementById('maneuver-dist').textContent, street: document.getElementById('maneuver-street').textContent };
