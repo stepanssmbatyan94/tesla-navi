@@ -227,7 +227,7 @@ function parseYandexGeoUri(uri) {
         }
       }
     }
-  } catch (e) {}
+  } catch (e) { /* malformed data= payload: treat as no coordinates */ }
   return null;
 }
 
@@ -247,7 +247,7 @@ async function resolveYandexOrgCoords(oid) {
         return { lat: coords[1], lng: coords[0] };
       }
     }
-  } catch (e) {}
+  } catch (e) { console.warn('Yandex org coordinates lookup failed:', e.message); }
   return null;
 }
 
@@ -764,7 +764,7 @@ const server = http.createServer(async (req, res) => {
             });
             items = items.concat(photonItems);
           }
-        } catch (e) {}
+        } catch (e) { console.warn('Photon geocode fallback failed:', e.message); }
       }
 
       res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -1253,19 +1253,19 @@ if (require.main === module) {
         try {
           await synthesizeNeuralSpeech(p, 'svetlana', 'ru');
           await new Promise(r => setTimeout(r, 60));
-        } catch (e) {}
+        } catch (e) { console.warn('[NeuralTTS] prewarm failed:', e.message); }
       }
       for (const p of PREWARM_RU_DMITRY) {
         try {
           await synthesizeNeuralSpeech(p, 'dmitry', 'ru');
           await new Promise(r => setTimeout(r, 60));
-        } catch (e) {}
+        } catch (e) { console.warn('[NeuralTTS] prewarm failed:', e.message); }
       }
       for (const p of PREWARM_EN) {
         try {
           await synthesizeNeuralSpeech(p, 'ava', 'en');
           await new Promise(r => setTimeout(r, 60));
-        } catch (e) {}
+        } catch (e) { console.warn('[NeuralTTS] prewarm failed:', e.message); }
       }
       console.log('🎙️ Neural Voice Cache pre-warmed for Svetlana, Dmitry & Ava');
     }, 1500);

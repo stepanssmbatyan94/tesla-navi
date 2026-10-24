@@ -81,7 +81,7 @@ async function initTeslaCockpit() {
         const dummy = new AudioCtx();
         dummy.resume().then(() => dummy.close()).catch(() => {});
       }
-    } catch (e) {}
+    } catch (e) { /* autoplay unlock is best effort; audio retries on the next gesture */ }
     window.removeEventListener('pointerdown', unlockAudioPipeline);
     window.removeEventListener('touchstart', unlockAudioPipeline);
     window.removeEventListener('click', unlockAudioPipeline);
@@ -371,7 +371,7 @@ function initTeslaCarGps() {
 
       try {
         localStorage.setItem('tesla_last_coords', JSON.stringify({ lat: Number(coords.latitude), lng: Number(coords.longitude) }));
-      } catch (e) {}
+      } catch (e) { /* storage unavailable (private mode / quota): non-critical */ }
 
       // Update cluster speedometer with overspeed check
       updateSpeedometerDisplay(speedKmh);
@@ -456,7 +456,7 @@ function handleIncomingGps(gps) {
 
   try {
     localStorage.setItem('tesla_last_coords', JSON.stringify({ lat: Number(gps.lat), lng: Number(gps.lng) }));
-  } catch (e) {}
+  } catch (e) { /* storage unavailable (private mode / quota): non-critical */ }
 
   const telLat = document.getElementById('tel-lat');
   const telLng = document.getElementById('tel-lng');
@@ -618,7 +618,7 @@ async function initMap() {
   }
   try {
     localStorage.setItem('tesla_map_provider_v2', activeProvider);
-  } catch (e) {}
+  } catch (e) { /* storage unavailable (private mode / quota): non-critical */ }
 
   let startCenter = CONFIG.defaultCenter;
   try {
@@ -629,7 +629,7 @@ async function initMap() {
         startCenter = { lat: parsed.lat, lng: parsed.lng, zoom: CONFIG.navigationZoom || 16.5 };
       }
     }
-  } catch (e) {}
+  } catch (e) { /* missing or corrupt saved position: start from the default center */ }
 
   if (pendingGpsFix) {
     startCenter = { lat: pendingGpsFix.lat, lng: pendingGpsFix.lng, zoom: CONFIG.navigationZoom || 16.5 };
@@ -1074,7 +1074,7 @@ function initToolbarHandlers() {
       const nextProv = (cur === 'yandex') ? 'maplibre' : 'yandex';
       try {
         localStorage.setItem('tesla_map_provider_v2', nextProv);
-      } catch (e) {}
+      } catch (e) { /* storage unavailable (private mode / quota): non-critical */ }
       const url = new URL(window.location.href);
       url.searchParams.set('provider', nextProv);
       window.location.href = url.toString();
@@ -2688,7 +2688,7 @@ function initWeatherAndMusic() {
       isDragging = true;
       try {
         handle.setPointerCapture(e.pointerId);
-      } catch (err) {}
+      } catch (err) { /* pointer already released */ }
       startX = e.clientX;
       startY = e.clientY;
 
@@ -2725,7 +2725,7 @@ function initWeatherAndMusic() {
       isDragging = false;
       try {
         handle.releasePointerCapture(e.pointerId);
-      } catch (err) {}
+      } catch (err) { /* pointer already released */ }
       element.style.transition = '';
       if (element.id === 'music-mini-player') {
         try {
@@ -2733,7 +2733,7 @@ function initWeatherAndMusic() {
             left: element.style.left,
             top: element.style.top
           }));
-        } catch (err) {}
+        } catch (err) { /* storage unavailable (private mode / quota): non-critical */ }
       }
     };
 
@@ -2768,7 +2768,7 @@ function initWeatherAndMusic() {
         miniPlayer.style.right = 'auto';
       }
     }
-  } catch (err) {}
+  } catch (err) { /* missing or corrupt saved position: keep the default */ }
 
   const ytIdleScreen = document.getElementById('yt-idle-screen');
   const ytNowTitle = document.getElementById('yt-now-title');
@@ -3102,14 +3102,14 @@ function initWeatherAndMusic() {
       });
       if (history.length > 40) history = history.slice(0, 40);
       localStorage.setItem('tesla_yt_history', JSON.stringify(history));
-    } catch (e) {}
+    } catch (e) { /* storage unavailable (private mode / quota): non-critical */ }
   }
 
   function clearYouTubeHistory() {
     try {
       localStorage.removeItem('tesla_yt_history');
       loadYouTubeCategory('history');
-    } catch (e) {}
+    } catch (e) { /* storage unavailable (private mode / quota): non-critical */ }
   }
 
   function createResultItemElement(track, idx) {

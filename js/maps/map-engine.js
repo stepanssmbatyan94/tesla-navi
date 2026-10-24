@@ -262,10 +262,10 @@ class TeslaMapEngine {
           });
           canvas.addEventListener('webglcontextrestored', () => {
             console.log('[MapEngine] Tesla MCU WebGL context restored — rebuilding layers.');
-            try { this.map.resize(); } catch (err) {}
+            try { this.map.resize(); } catch (err) { /* map not ready yet: the next render resizes */ }
           });
         }
-      } catch (ctxErr) {}
+      } catch (ctxErr) { console.warn('[MapEngine] WebGL context-loss handlers not attached:', ctxErr.message); }
 
       // Enable full touch gestures for Tesla touchscreen
       this.map.touchZoomRotate.enable();
@@ -278,7 +278,7 @@ class TeslaMapEngine {
       this.navPadding = { top: Math.round(window.innerHeight * 0.28), bottom: 0, left: 0, right: 0 };
       try {
         this.map.setPadding(this.navPadding);
-      } catch (e) {}
+      } catch (e) { console.warn('[MapEngine] setPadding failed:', e.message); }
 
       window.addEventListener('resize', () => {
         if (this.map && typeof this.map.setPadding === 'function') {
@@ -554,7 +554,7 @@ class TeslaMapEngine {
             minZoom: 4,
             maxZoom: 21
           });
-        } catch (e) {}
+        } catch (e) { console.warn('[MapEngine] Yandex zoom range not set:', e.message); }
 
         try {
           this.trafficLayer = new window.ymaps.control.TrafficControl({
@@ -562,12 +562,12 @@ class TeslaMapEngine {
           });
           this.map.controls.add(this.trafficLayer);
           this.trafficLayer.showTraffic();
-        } catch (e) {}
+        } catch (e) { console.warn('[MapEngine] Yandex traffic layer unavailable:', e.message); }
 
         try {
           this.map.behaviors.disable('multiTouch');
           this.map.behaviors.enable(['drag', 'scrollZoom', 'dblClickZoom']);
-        } catch (e) {}
+        } catch (e) { console.warn('[MapEngine] Yandex map behaviours not configured:', e.message); }
 
         const containerEl = document.getElementById(this.containerId);
         this.isUserPinching = false;
@@ -1037,7 +1037,7 @@ class TeslaMapEngine {
       if (typeof localStorage !== 'undefined') {
         localStorage.setItem('tesla_map_3d_mode', this.is3D ? '3d' : '2d');
       }
-    } catch (e) {}
+    } catch (e) { /* storage unavailable (private mode / quota): non-critical */ }
 
     // Update floating toggle button state
     const btn = document.getElementById('btn-toggle-2d3d');
@@ -1090,7 +1090,7 @@ class TeslaMapEngine {
       try {
         localStorage.setItem('tesla_map_3d_mode', '3d');
         localStorage.setItem('tesla_map_provider_v2', 'maplibre');
-      } catch (e) {}
+      } catch (e) { /* storage unavailable (private mode / quota): non-critical */ }
       const url = new URL(window.location.href);
       url.searchParams.set('provider', 'maplibre');
       window.location.href = url.toString();
@@ -1135,7 +1135,7 @@ class TeslaMapEngine {
       if (typeof localStorage !== 'undefined') {
         localStorage.setItem('tesla_map_theme', mode);
       }
-    } catch (e) {}
+    } catch (e) { /* storage unavailable (private mode / quota): non-critical */ }
 
     const isNight = this.isNightActive();
     this.lastIsNight = isNight;
@@ -1225,7 +1225,7 @@ class TeslaMapEngine {
   toggleVoice() {
     this.voiceEnabled = !this.voiceEnabled;
     if (!this.voiceEnabled && this.currentAudioVoice) {
-      try { this.currentAudioVoice.pause(); } catch (e) {}
+      try { this.currentAudioVoice.pause(); } catch (e) { /* already stopped */ }
       this.currentAudioVoice = null;
     }
     return this.voiceEnabled;
@@ -1560,7 +1560,7 @@ class TeslaMapEngine {
       if (this.followCar && !this.isUserPinching) {
         try {
           this.map.setCenter([displayLat, displayLng], this.map.getZoom(), { duration: 0, checkZoomRange: false });
-        } catch (e) {}
+        } catch (e) { /* Yandex map mid re-render: the next GPS fix recenters */ }
       }
     } else if (this.carMarker && window.L && this.provider === 'osm') {
       this.carMarker.setLatLng([displayLat, displayLng]);
@@ -2022,10 +2022,10 @@ class TeslaMapEngine {
 
             osc.start(now);
             osc.stop(now + 0.26);
-          } catch (e) {}
+          } catch (e) { /* no Web Audio either: the chime is skipped */ }
         });
       }
-    } catch (e) {}
+    } catch (e) { /* media playback unavailable: the chime is skipped */ }
   }
 
   // Strictly use our studio audio stream (/api/tts) for authentic, high-quality voice guidance
@@ -2035,7 +2035,7 @@ class TeslaMapEngine {
       this.playNavChime();
       setTimeout(() => {
         if (this.currentAudioVoice) {
-          try { this.currentAudioVoice.pause(); } catch (e) {}
+          try { this.currentAudioVoice.pause(); } catch (e) { /* already stopped */ }
           this.currentAudioVoice = null;
         }
         const lang = window.CURRENT_LANG || 'ru';
@@ -2178,7 +2178,7 @@ class TeslaMapEngine {
             maxZoom: 15.5
           }
         );
-      } catch (err) {}
+      } catch (err) { console.warn('[MapEngine] Leaflet fitBounds failed:', err.message); }
     }
   }
 
@@ -2758,7 +2758,7 @@ class TeslaMapEngine {
     this.totalDistance = 0;
     this.specialRoadPoints = [];
     if (this.currentAudioVoice) {
-      try { this.currentAudioVoice.pause(); } catch (e) {}
+      try { this.currentAudioVoice.pause(); } catch (e) { /* already stopped */ }
       this.currentAudioVoice = null;
     }
 
