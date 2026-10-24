@@ -390,6 +390,115 @@ function getArmenianAudio(text, voiceChoice = 'gor') {
   return null;
 }
 
+// --- Real speed limits: OpenStreetMap maxspeed snapshot (data/speed-limits.json) ----------
+// Yandex returns no speed limits. The snapshot (refreshed by scripts/update_speed_limits.mjs)
+// is indexed on a grid; each route is sampled every 20 m and matched to the nearest OSM way
+// within 15 m that runs the same way, giving real limits per stretch of the route.
+const SPEED_LIMIT_CELL_DEG = 0.01;          // ~1 km grid cells
+const SPEED_LIMIT_MATCH_M = 15;
+const SPEED_LIMIT_BEARING_TOLERANCE = 35;   // degrees between route and way direction
+const SPEED_LIMIT_SAMPLE_M = 20;
+let speedLimitIndex = null;
+
+function loadSpeedLimitIndex(file = path.join(__dirname, 'data', 'speed-limits.json')) {
+  const index = new Map();
+  let data;
+  try {
+    data = JSON.parse(fs.readFileSync(file, 'utf8'));
+  } catch (e) {
+    console.warn('Speed-limit snapshot unavailable:', e.message);
+    return index;
+  }
+  const pad = 0.0002; // ~20 m: a way near a cell edge is also found from the neighbouring cell
+  for (const way of data.ways || []) {
+    const limit = way[0];
+    const oneway = way[1];
+    for (let i = 2; i + 3 < way.length; i += 2) {
+      const x1 = way[i] / 1e5, y1 = way[i + 1] / 1e5, x2 = way[i + 2] / 1e5, y2 = way[i + 3] / 1e5;
+      const seg = [x1, y1, x2, y2, limit, oneway];
+      const cx1 = Math.floor((Math.min(x1, x2) - pad) / SPEED_LIMIT_CELL_DEG);
+      const cx2 = Math.floor((Math.max(x1, x2) + pad) / SPEED_LIMIT_CELL_DEG);
+      const cy1 = Math.floor((Math.min(y1, y2) - pad) / SPEED_LIMIT_CELL_DEG);
+      const cy2 = Math.floor((Math.max(y1, y2) + pad) / SPEED_LIMIT_CELL_DEG);
+      for (let cx = cx1; cx <= cx2; cx++) {
+        for (let cy = cy1; cy <= cy2; cy++) {
+          const key = cx * 100000 + cy;
+          let bucket = index.get(key);
+          if (!bucket) index.set(key, bucket = []);
+          bucket.push(seg);
+        }
+      }
+    }
+  }
+  return index;
+}
+
+function bearingDeg(x1, y1, x2, y2) {
+  const dx = (x2 - x1) * Math.cos(((y1 + y2) / 2) * Math.PI / 180);
+  return (Math.atan2(dx, y2 - y1) * 180 / Math.PI + 360) % 360;
+}
+
+// Nearest OSM way (limit) for a point travelling with `bearing` (null = any direction), or null
+function matchSpeedLimit(index, lng, lat, bearing) {
+  const bucket = index.get(Math.floor(lng / SPEED_LIMIT_CELL_DEG) * 100000 + Math.floor(lat / SPEED_LIMIT_CELL_DEG));
+  if (!bucket) return null;
+  const mx = 111320 * Math.cos(lat * Math.PI / 180);
+  const my = 110540;
+  let best = null;
+  let bestDist = SPEED_LIMIT_MATCH_M;
+  for (const [x1, y1, x2, y2, limit, oneway] of bucket) {
+    const ax = (x1 - lng) * mx, ay = (y1 - lat) * my, bx = (x2 - lng) * mx, by = (y2 - lat) * my;
+    const dx = bx - ax, dy = by - ay;
+    const len2 = dx * dx + dy * dy;
+    const t = len2 ? Math.max(0, Math.min(1, -(ax * dx + ay * dy) / len2)) : 0;
+    const d = Math.hypot(ax + t * dx, ay + t * dy);
+    if (d > bestDist) continue;
+    if (bearing != null) {
+      const diff = Math.abs(((bearingDeg(x1, y1, x2, y2) - bearing) % 360 + 540) % 360 - 180);
+      const sameWay = diff <= SPEED_LIMIT_BEARING_TOLERANCE;
+      const opposite = diff >= 180 - SPEED_LIMIT_BEARING_TOLERANCE;
+      if ((oneway === 1 && !sameWay) || (oneway === -1 && !opposite) || (oneway === 0 && !sameWay && !opposite)) continue;
+    }
+    best = limit;
+    bestDist = d;
+  }
+  return best;
+}
+
+// Route polyline ([lng, lat]) -> [{ from, to, limit }] runs in metres along the route
+function speedLimitsForRoute(coords, index = speedLimitIndex || (speedLimitIndex = loadSpeedLimitIndex())) {
+  if (!Array.isArray(coords) || coords.length < 2 || !index.size) return [];
+  const runs = [];
+  let travelled = 0;
+  let nextSample = 0;
+  let current = null;
+  for (let i = 0; i < coords.length - 1; i++) {
+    const [x1, y1] = coords[i];
+    const [x2, y2] = coords[i + 1];
+    const segLen = Math.hypot((x2 - x1) * 111320 * Math.cos(y1 * Math.PI / 180), (y2 - y1) * 110540);
+    if (!segLen) continue;
+    const bearing = bearingDeg(x1, y1, x2, y2);
+    while (nextSample <= travelled + segLen) {
+      const f = (nextSample - travelled) / segLen;
+      const limit = matchSpeedLimit(index, x1 + (x2 - x1) * f, y1 + (y2 - y1) * f, bearing);
+      if (limit && current && current.limit === limit && nextSample - current.to <= SPEED_LIMIT_SAMPLE_M * 1.5) {
+        current.to = nextSample;
+      } else if (limit) {
+        current = { from: nextSample, to: nextSample, limit };
+        runs.push(current);
+      }
+      nextSample += SPEED_LIMIT_SAMPLE_M;
+    }
+    travelled += segLen;
+  }
+  // A sample stands for the stretch around it
+  for (const run of runs) {
+    run.from = Math.max(0, Math.round(run.from - SPEED_LIMIT_SAMPLE_M / 2));
+    run.to = Math.min(Math.round(travelled), Math.round(run.to + SPEED_LIMIT_SAMPLE_M / 2));
+  }
+  return runs;
+}
+
 // Parse the routes embedded in the Yandex Maps routes page (config.routerResponse.routes)
 // into our route format: traffic-colored segments, steps (maneuver at the step START, see
 // AGENTS.md), heuristic speed limits and distinctive 'via' summaries, fastest first.
@@ -858,6 +967,7 @@ const server = http.createServer(async (req, res) => {
           const laneIntersections = extractLaneIntersections(osrmData);
 
           const parsedRoutes = parseYandexRoutes(yRoutes, laneIntersections);
+          parsedRoutes.forEach(route => { route.speedLimits = speedLimitsForRoute(route.coordinates); });
 
           res.writeHead(200, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify({
@@ -879,6 +989,7 @@ const server = http.createServer(async (req, res) => {
       if (osrmData && osrmData.routes) {
         osrmData.routes.forEach(r => {
           r.laneIntersections = laneIntersections;
+          r.speedLimits = speedLimitsForRoute(r.geometry && r.geometry.coordinates);
         });
       }
 
@@ -911,6 +1022,23 @@ const server = http.createServer(async (req, res) => {
       res.writeHead(500, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ error: e.message }));
     }
+    return;
+  }
+
+  // API: /api/speed-limit (OSM maxspeed of the nearest road, for free driving without a route)
+  if (pathname === '/api/speed-limit') {
+    const lat = Number(parsedUrl.searchParams.get('lat'));
+    const lng = Number(parsedUrl.searchParams.get('lng'));
+    if (!Number.isFinite(lat) || !Number.isFinite(lng) || Math.abs(lat) > 90 || Math.abs(lng) > 180) {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Missing or invalid lat/lng' }));
+      return;
+    }
+    const index = speedLimitIndex || (speedLimitIndex = loadSpeedLimitIndex());
+    // The car's heading lags after turns and is meaningless when stopped: nearest road wins
+    const limit = matchSpeedLimit(index, lng, lat, null);
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ limit: limit || null, source: limit ? 'osm' : 'none' }));
     return;
   }
 
@@ -1292,6 +1420,8 @@ module.exports = {
   extractCoords,
   parseYandexGeoUri,
   parseYandexRoutes,
+  speedLimitsForRoute,
+  loadSpeedLimitIndex,
   getArmenianAudio,
   isAllowedMapLink,
   fetchUpstream,

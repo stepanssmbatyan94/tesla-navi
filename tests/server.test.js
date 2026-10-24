@@ -141,3 +141,43 @@ test('/api/route rejects missing or non-numeric coordinates before calling upstr
     await new Promise(resolve => server.close(resolve));
   }
 });
+
+test('speedLimitsForRoute matches OSM ways running along the route, not crossing or opposite one-way roads', () => {
+  const os = require('node:os');
+  const { speedLimitsForRoute, loadSpeedLimitIndex } = require('../server.js');
+  const E = 1e5;
+  const lat = 40.20;
+  // route: 1 km east along lat 40.20
+  const lngPerKm = 1 / (111.32 * Math.cos(lat * Math.PI / 180));
+  const route = [[44.50, lat], [44.50 + lngPerKm, lat]];
+  const way = (limit, oneway, pts) => [limit, oneway, ...pts.flatMap(([x, y]) => [Math.round(x * E), Math.round(y * E)])];
+  const file = path.join(os.tmpdir(), `speed-limits-test-${process.pid}.json`);
+  fs.writeFileSync(file, JSON.stringify({ ways: [
+    way(60, 0, [[44.50, lat], [44.50 + lngPerKm / 2, lat]]),                              // first half, two-way: 60
+    way(90, 1, [[44.50 + lngPerKm / 2, lat + 0.00005], [44.50 + lngPerKm, lat + 0.00005]]), // second half, one-way eastbound ~5 m off: 90
+    way(40, 1, [[44.50 + lngPerKm, lat - 0.00008], [44.50 + lngPerKm / 2, lat - 0.00008]]), // parallel one-way WESTbound: must not match
+    way(20, 0, [[44.50 + lngPerKm / 4, lat - 0.01], [44.50 + lngPerKm / 4, lat + 0.01]])    // perpendicular crossing street: must not match
+  ] }));
+  const runs = speedLimitsForRoute(route, loadSpeedLimitIndex(file));
+  fs.unlinkSync(file);
+  assert.deepEqual(runs.map(r => r.limit), [60, 90]);
+  assert.ok(runs[0].from <= 10 && Math.abs(runs[0].to - 500) <= 30, JSON.stringify(runs));
+  assert.ok(Math.abs(runs[1].from - 500) <= 30 && runs[1].to >= 990, JSON.stringify(runs));
+});
+
+test('/api/speed-limit returns the OSM limit of the nearest road from the shipped snapshot', async () => {
+  const { server } = require('../server.js');
+  await new Promise(resolve => server.listen(0, resolve));
+  const base = `http://127.0.0.1:${server.address().port}/api/speed-limit`;
+  try {
+    // a point on the Yerevan-Sevan highway (M-4) tagged maxspeed=90 in OSM
+    const highway = await (await fetch(`${base}?lat=40.271554&lng=44.598854`)).json();
+    assert.deepEqual(highway, { limit: 90, source: 'osm' });
+    const nowhere = await (await fetch(`${base}?lat=40.3000&lng=44.3000`)).json();
+    assert.equal(nowhere.limit, null);
+    assert.equal((await fetch(`${base}?lat=abc&lng=1`)).status, 400);
+  } finally {
+    server.closeAllConnections();
+    await new Promise(resolve => server.close(resolve));
+  }
+});
