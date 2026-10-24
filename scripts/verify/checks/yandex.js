@@ -46,13 +46,16 @@
       // measure until the screen positions stop moving (slow CI machines need longer). The dev
       // simulator's extrapolator would keep moving the car meanwhile: pause it while measuring
       window.IS_SIMULATOR_RUNNING = false;
-      let car, pr, angle, prev = null;
-      for (let i = 0; i < 25; i++) {
-        await sleep(i ? 150 : 400);
+      // at least 0.9 s, then three equal readings in a row: on the slow CI runner Yandex sometimes
+      // redraws a placemark only after two quiet 150 ms polls
+      let car, pr, angle, prev = null, stable = 0;
+      await sleep(900);
+      for (let i = 0; i < 30 && stable < 2; i++) {
+        await sleep(150);
         car = centerOf(document.querySelector('#yandex-car-marker .tesla-car-arrow'));
         pr = centerOf(document.getElementById('verify-probe'));
         angle = Math.atan2(pr.x - car.x, car.y - pr.y) * 180 / Math.PI;
-        if (prev && Math.abs(angle - prev.angle) < 0.5 && Math.abs(car.y - prev.y) < 1) break;
+        stable = prev && Math.abs(angle - prev.angle) < 0.5 && Math.abs(car.y - prev.y) < 1 ? stable + 1 : 0;
         prev = { angle, y: car.y };
       }
       window.IS_SIMULATOR_RUNNING = true;
