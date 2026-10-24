@@ -283,18 +283,20 @@ function updateVoiceIndicator(voice) {
 
 // Speedometer & Overspeed Alert Manager
 let lastOverspeedChimeTime = 0;
-// 'camera' = limit of a speed camera on the route (OSM data), 'estimated' = street-name heuristic
+// 'camera' = limit of a speed camera on the route, 'osm' = OpenStreetMap maxspeed of the road,
+// 'estimated' = street-name heuristic (no data)
 let currentSpeedLimitSource = 'estimated';
 
 function setSpeedLimitDisplay(limit, source) {
   const limitEl = document.getElementById('speed-limit-val');
-  currentSpeedLimitSource = source === 'camera' ? 'camera' : 'estimated';
+  currentSpeedLimitSource = (source === 'camera' || source === 'osm') ? source : 'estimated';
   if (!limitEl) return;
-  if (limit) limitEl.textContent = limit;
-  const estimated = currentSpeedLimitSource !== 'camera';
+  // No limit known here: a dash, never the previous road's number
+  limitEl.textContent = limit || '—';
+  const estimated = currentSpeedLimitSource === 'estimated';
   limitEl.classList.toggle('speed-limit-estimated', estimated);
   const dict = I18N[currentLang] || I18N.ru;
-  limitEl.title = estimated ? dict.speedLimitEstimated : dict.speedLimitCamera;
+  limitEl.title = estimated ? dict.speedLimitEstimated : (currentSpeedLimitSource === 'camera' ? dict.speedLimitCamera : dict.speedLimitOsm);
 }
 
 function updateSpeedometerDisplay(speedKmh) {
@@ -304,14 +306,15 @@ function updateSpeedometerDisplay(speedKmh) {
 
   const circleEl = document.querySelector('.speed-current-circle');
   const limitEl = document.getElementById('speed-limit-val');
-  const speedLimit = limitEl ? (parseInt(limitEl.textContent, 10) || 60) : 60;
+  // No warnings at all while the limit is unknown (dash)
+  const speedLimit = limitEl ? parseInt(limitEl.textContent, 10) : NaN;
 
   // Visual warning: red pulse starts as soon as exceeding limit (e.g. 61+ at limit 60)
-  const isOverLimit = currentSpeed > speedLimit;
+  const isOverLimit = Number.isFinite(speedLimit) && currentSpeed > speedLimit;
 
   // Audio chime warning: strictly when speed exceeds limit + 10 km/h (e.g. 71+ at limit 60),
-  // and only for a verified (speed-camera) limit, never for a street-name estimate
-  const isAudioWarning = currentSpeedLimitSource === 'camera' && currentSpeed >= (speedLimit + 11);
+  // and only for a real limit (camera or OSM road data), never for a street-name estimate
+  const isAudioWarning = currentSpeedLimitSource !== 'estimated' && currentSpeed >= (speedLimit + 11);
 
   if (circleEl) {
     if (isOverLimit) {
@@ -681,6 +684,9 @@ async function initMap() {
         if (cursor) cursor.style.left = `${Math.min(96, pct)}%`;
         if (traveledFill) traveledFill.style.width = `${pct}%`;
       }
+    },
+    onSpeedLimit: ({ limit, source }) => {
+      setSpeedLimitDisplay(limit, source);
     },
     onCameraAlert: (alert) => {
       const badge = document.getElementById('camera-alert-badge');

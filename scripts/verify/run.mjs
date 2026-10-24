@@ -29,6 +29,7 @@ const CHECKS = {
   'route-layers': { page: '/' },
   security: { page: '/' },
   'dual-gps': { page: '/' },
+  'speed-limits': { page: '/' },
   i18n: { page: '/' },
   yandex: { page: '/?provider=yandex' },
   'fallback-cdn': { page: '/', file: 'fallback', block: ['**/maplibre-gl*.js'] },
