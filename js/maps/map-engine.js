@@ -4,6 +4,35 @@
 // different direction, belong to another path and are dropped
 const LANE_MATCH_MAX_DIST_M = 20;
 const LANE_MATCH_MAX_BEARING_DIFF = 35;
+// setInterval for network polls that only matter while the page is on screen: ticks are skipped
+// while it's hidden (another app in front, screen off) and a skipped poll runs once as soon as the
+// page is visible again, so the data is fresh without polling in the background.
+const visibleIntervalListeners = new Map(); // interval id -> its visibilitychange listener
+
+function setVisibleInterval(fn, ms) {
+  let missed = false;
+  const tick = () => {
+    if (typeof document !== 'undefined' && document.hidden) { missed = true; return; }
+    fn();
+  };
+  const id = setInterval(tick, ms);
+  if (typeof document !== 'undefined' && document.addEventListener) {
+    const onVisible = () => {
+      if (!document.hidden && missed) { missed = false; fn(); }
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    visibleIntervalListeners.set(id, onVisible);
+  }
+  return id;
+}
+
+function clearVisibleInterval(id) {
+  clearInterval(id);
+  const onVisible = visibleIntervalListeners.get(id);
+  if (onVisible && typeof document !== 'undefined') document.removeEventListener('visibilitychange', onVisible);
+  visibleIntervalListeners.delete(id);
+}
+
 // Live traffic while navigating: the route is asked again from the car's position and, when
 // Yandex still drives the same way, only its traffic colors and remaining time are taken over
 const TRAFFIC_REFRESH_MS = 120000;
@@ -3070,8 +3099,8 @@ class TeslaMapEngine {
 
   startNavigation() {
     this.isNavigating = true;
-    clearInterval(this.trafficRefreshTimer);
-    this.trafficRefreshTimer = setInterval(() => this.refreshRouteTraffic(), TRAFFIC_REFRESH_MS);
+    clearVisibleInterval(this.trafficRefreshTimer);
+    this.trafficRefreshTimer = setVisibleInterval(() => this.refreshRouteTraffic(), TRAFFIC_REFRESH_MS);
     this.followCar = true;
     this.isHeadingUp = true;
     this.offRouteCounter = 0;
@@ -3118,7 +3147,7 @@ class TeslaMapEngine {
   }
 
   cancelRoute() {
-    clearInterval(this.trafficRefreshTimer);
+    clearVisibleInterval(this.trafficRefreshTimer);
     this.trafficRefreshTimer = null;
     this.activeRoute = null;
     this.isNavigating = false;

@@ -114,7 +114,7 @@ async function initTeslaCockpit() {
   // 5. Pick up new deploys (reloads only while idle, see checkForAppUpdate); started before
   // the map so a map that never finishes loading can't block the fix that repairs it
   checkForAppUpdate();
-  setInterval(checkForAppUpdate, APP_VERSION_POLL_MS);
+  setVisibleInterval(checkForAppUpdate, APP_VERSION_POLL_MS);
 
   // 6. Map Engine Initialization (MapLibre GL 3D Primary)
   try {
@@ -785,7 +785,7 @@ async function initMap() {
 
   updateCommuteEtas();
   updateLiveTrafficBadge();
-  setInterval(updateLiveTrafficBadge, 45000); // Live poll Yandex Traffic every 45s
+  setVisibleInterval(updateLiveTrafficBadge, 45000); // Yandex traffic score every 45 s, while on screen
 }
 
 // 5. Toolbar & Drawer UI Handlers
