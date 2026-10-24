@@ -569,6 +569,93 @@ function speedLimitsForRoute(coords, index = speedLimitIndex || (speedLimitIndex
   return runs;
 }
 
+// --- Lane arrows: OSRM along the Yandex path --------------------------------------------------
+// Lanes come from OpenStreetMap turn:lanes through OSRM. A plain OSRM start->destination route
+// often takes other streets than Yandex, so many Yandex junctions got no lanes (and lanes of
+// a junction carry OSRM's own turn as 'valid'). Forcing OSRM along the Yandex polyline with via
+// points (mid-stretch between maneuvers, never on a junction, each with the route bearing so it
+// snaps to the right carriageway) gives the lanes of exactly the junctions Yandex drives.
+const LANE_VIA_SPACING_M = 600;
+const LANE_VIA_MAX_POINTS = 80;
+const LANE_ROUTE_TIMEOUT_MS = 4000;
+
+function extractLaneIntersections(osrmResult) {
+  const laneIntersections = [];
+  const route = osrmResult && osrmResult.routes && osrmResult.routes[0];
+  for (const leg of (route && route.legs) || []) {
+    for (const s of leg.steps || []) {
+      for (const inter of s.intersections || []) {
+        if (!inter.lanes || !inter.lanes.length) continue;
+        laneIntersections.push({
+          location: inter.location, // [lng, lat]
+          // Direction OSRM leaves the junction in: lets the client drop lanes where the OSRM
+          // path diverges from the Yandex route it gets overlaid on
+          outBearing: (Array.isArray(inter.bearings) && inter.out != null) ? inter.bearings[inter.out] : null,
+          lanes: inter.lanes,
+          name: s.name || '',
+          modifier: s.maneuver?.modifier || 'straight',
+          type: s.maneuver?.type || 'turn'
+        });
+      }
+    }
+  }
+  return laneIntersections;
+}
+
+// Via points along a route polyline ([lng, lat]) for the OSRM lane request: [{ point, bearing }]
+function laneViaPoints(coords, steps = []) {
+  if (!Array.isArray(coords) || coords.length < 2) return [];
+  const len = (a, b) => Math.hypot((b[0] - a[0]) * 111320 * Math.cos(a[1] * Math.PI / 180), (b[1] - a[1]) * 110540);
+  const cum = [0];
+  for (let i = 1; i < coords.length; i++) cum.push(cum[i - 1] + len(coords[i - 1], coords[i]));
+  const total = cum[cum.length - 1];
+  const at = m => {
+    m = Math.max(0, Math.min(total, m));
+    let i = 1;
+    while (i < cum.length - 1 && cum[i] < m) i++;
+    const f = (m - cum[i - 1]) / ((cum[i] - cum[i - 1]) || 1);
+    return [coords[i - 1][0] + (coords[i][0] - coords[i - 1][0]) * f, coords[i - 1][1] + (coords[i][1] - coords[i - 1][1]) * f];
+  };
+  const routeDistOf = loc => {
+    let best = 0, bestD = Infinity;
+    for (let i = 0; i < coords.length; i++) { const d = len(coords[i], loc); if (d < bestD) { bestD = d; best = i; } }
+    return bestD <= 30 ? cum[best] : null;
+  };
+  const marks = [0, total, ...steps.map(s => s && s.location ? routeDistOf(s.location) : null).filter(m => m != null)]
+    .sort((a, b) => a - b);
+  const vias = [];
+  for (let i = 0; i + 1 < marks.length; i++) {
+    const stretch = marks[i + 1] - marks[i];
+    if (stretch < 60) continue; // too short to stay clear of both junctions
+    const n = Math.max(1, Math.floor(stretch / LANE_VIA_SPACING_M));
+    for (let k = 1; k <= n; k++) vias.push(marks[i] + stretch * k / (n + 1));
+  }
+  // keep the request bounded on long trips: thin evenly
+  const keep = vias.length > LANE_VIA_MAX_POINTS ? vias.filter((_, i) => i % Math.ceil(vias.length / LANE_VIA_MAX_POINTS) === 0) : vias;
+  return [
+    { point: coords[0], bearing: null },
+    ...keep.map(m => ({ point: at(m), bearing: Math.round(bearingDeg(...at(m - 10), ...at(m + 10))) })),
+    { point: coords[coords.length - 1], bearing: null }
+  ];
+}
+
+async function lanesAlongRoute(coords, steps) {
+  const vias = laneViaPoints(coords, steps);
+  if (vias.length < 2) return null;
+  const url = 'https://router.project-osrm.org/route/v1/driving/' +
+    vias.map(v => `${v.point[0].toFixed(6)},${v.point[1].toFixed(6)}`).join(';') +
+    `?steps=true&overview=false&continue_straight=true&waypoints=0;${vias.length - 1}` +
+    `&bearings=${vias.map(v => (v.bearing == null ? '' : `${v.bearing},45`)).join(';')}` +
+    `&radiuses=${vias.map(() => 25).join(';')}`;
+  try {
+    const data = await (await fetchUpstream(url, {}, LANE_ROUTE_TIMEOUT_MS)).json();
+    return data && data.code === 'Ok' ? extractLaneIntersections(data) : null;
+  } catch (err) {
+    console.warn('OSRM lanes-along-route warning:', err.message);
+    return null;
+  }
+}
+
 // Turn of a polyline ([lng, lat]) at the vertex nearest to `loc`: the bearing of the `arm` metres
 // after it minus the bearing of the `arm` metres before, -180..180 (negative = left), or null.
 function polylineTurnAt(coords, loc, arm = 25) {
@@ -1049,28 +1136,6 @@ const server = http.createServer(async (req, res) => {
         return null;
       });
 
-    const extractLaneIntersections = (osrmResult) => {
-      const laneIntersections = [];
-      if (osrmResult && osrmResult.routes && osrmResult.routes[0] && osrmResult.routes[0].legs) {
-        osrmResult.routes[0].legs[0].steps.forEach(s => {
-          (s.intersections || []).forEach(inter => {
-            if (inter.lanes && inter.lanes.length > 0) {
-              laneIntersections.push({
-                location: inter.location, // [lng, lat]
-                // Direction OSRM leaves the junction in: lets the client drop lanes where
-                // the OSRM path diverges from the Yandex route it gets overlaid on
-                outBearing: (Array.isArray(inter.bearings) && inter.out != null) ? inter.bearings[inter.out] : null,
-                lanes: inter.lanes,
-                name: s.name || '',
-                modifier: s.maneuver?.modifier || 'straight',
-                type: s.maneuver?.type || 'turn'
-              });
-            }
-          });
-        });
-      }
-      return laneIntersections;
-    };
 
     try {
       // 2. Query live Yandex Maps Router (when provider is yandex or as primary traffic engine)
@@ -1093,6 +1158,12 @@ const server = http.createServer(async (req, res) => {
 
           const parsedRoutes = parseYandexRoutes(yRoutes, laneIntersections);
           parsedRoutes.forEach(route => { route.speedLimits = speedLimitsForRoute(route.coordinates); });
+          // Lanes of the junctions each Yandex route really drives (the plain OSRM route above
+          // stays as the fallback when this request fails)
+          await Promise.all(parsedRoutes.slice(0, 3).map(async route => {
+            const along = await lanesAlongRoute(route.coordinates, route.steps);
+            if (along) route.laneIntersections = along;
+          }));
 
           res.writeHead(200, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify({
@@ -1524,6 +1595,8 @@ module.exports = {
   speedLimitsForRoute,
   loadSpeedLimitIndex,
   speedLimitAt,
+  laneViaPoints,
+  extractLaneIntersections,
   parseYandexTrafficXml,
   getArmenianAudio,
   isAllowedMapLink,

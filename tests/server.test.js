@@ -13,7 +13,9 @@ const {
   fetchUpstream,
   takeRateToken,
   RATE_LIMIT_CAPACITY,
-  parseYandexTrafficXml
+  parseYandexTrafficXml,
+  laneViaPoints,
+  extractLaneIntersections
 } = require('../server.js');
 
 const ROOT = path.resolve(__dirname, '..');
@@ -253,4 +255,30 @@ test('parseYandexTrafficXml keeps the ru and en hints and never invents a score'
   assert.equal(parseYandexTrafficXml(''), null);
   // no hints -> nulls, not a made-up phrase
   assert.deepEqual(parseYandexTrafficXml('<level>1</level>').hints, { ru: null, en: null });
+});
+
+test('laneViaPoints keeps OSRM on the Yandex path: mid-stretch via points with the route bearing', () => {
+  // 1 km east, then 1 km north; the turn (a step location) is at the corner
+  const lngPerM = 1 / (111320 * Math.cos(40.18 * Math.PI / 180));
+  const corner = [44.50 + 1000 * lngPerM, 40.18];
+  const coords = [[44.50, 40.18], corner, [corner[0], 40.18 + 1000 / 110540]];
+  const vias = laneViaPoints(coords, [{ location: coords[0] }, { location: corner }]);
+  assert.deepEqual(vias[0].point, coords[0]);
+  assert.deepEqual(vias[vias.length - 1].point, coords[2]);
+  const middle = vias.slice(1, -1);
+  assert.ok(middle.length >= 2, JSON.stringify(vias));
+  const metresFromCorner = p => Math.hypot((p[0] - corner[0]) / lngPerM, (p[1] - corner[1]) * 110540);
+  assert.ok(middle.every(v => metresFromCorner(v.point) > 150), 'never on the junction');
+  const east = middle.filter(v => v.point[1] === 40.18);
+  const north = middle.filter(v => v.point[1] > 40.18);
+  assert.ok(east.length && east.every(v => Math.abs(v.bearing - 90) <= 2), JSON.stringify(east));
+  assert.ok(north.length && north.every(v => v.bearing <= 2 || v.bearing >= 358), JSON.stringify(north));
+});
+
+test('extractLaneIntersections reads lanes from every leg and keeps the exit bearing', () => {
+  const leg = lanes => ({ steps: [{ name: 'X', maneuver: { modifier: 'left', type: 'turn' }, intersections: [{ location: [44.5, 40.18], bearings: [0, 90, 270], out: 2, lanes }] }] });
+  const lanes = [{ valid: true, indications: ['left'] }, { valid: false, indications: ['right'] }];
+  const out = extractLaneIntersections({ routes: [{ legs: [leg(lanes), leg(lanes), leg(null)] }] });
+  assert.equal(out.length, 2);
+  assert.deepEqual([out[0].outBearing, out[0].lanes.length, out[0].modifier], [270, 2, 'left']);
 });
