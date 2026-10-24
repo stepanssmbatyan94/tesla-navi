@@ -202,3 +202,16 @@ test('speed-camera marker tooltip follows the UI language and never invents a li
   ctx.CURRENT_LANG = 'ru';
   assert.equal(title(60), 'Камера контроля скорости 60 км/ч');
 });
+
+test('the very first GPS fix already looks up the free-driving speed limit', async () => {
+  const { ctx, engine } = newEngine();
+  const requests = [];
+  const limits = [];
+  ctx.fetch = async url => { requests.push(url); return { ok: true, json: async () => ({ limit: 60, source: 'default', zone: 'urban' }) }; };
+  engine.onSpeedLimit = l => limits.push(l);
+  engine.updateCarPosition(40.1898, 44.4693, 90, 0, true); // first real fix
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(requests.length, 1);
+  assert.match(requests[0], /^\/api\/speed-limit\?lat=40\.189800&lng=44\.469300$/);
+  assert.deepEqual(JSON.parse(JSON.stringify(limits)), [{ limit: 60, source: 'default' }]); // vm-realm objects
+});
