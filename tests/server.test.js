@@ -12,7 +12,8 @@ const {
   isAllowedMapLink,
   fetchUpstream,
   takeRateToken,
-  RATE_LIMIT_CAPACITY
+  RATE_LIMIT_CAPACITY,
+  parseYandexTrafficXml
 } = require('../server.js');
 
 const ROOT = path.resolve(__dirname, '..');
@@ -180,4 +181,20 @@ test('/api/speed-limit returns the OSM limit of the nearest road from the shippe
     server.closeAllConnections();
     await new Promise(resolve => server.close(resolve));
   }
+});
+
+test('parseYandexTrafficXml keeps the ru and en hints and never invents a score', () => {
+  const xml = `<traffic region="10262"><region id="10262"><level>4</level><icon>yellow</icon><time>12:21</time>
+    <hint lang="ru">Местами затруднения</hint><hint lang="en">Congested in places</hint><hint lang="tr">Yoğun</hint></region></traffic>`;
+  const data = parseYandexTrafficXml(xml);
+  assert.equal(data.score, 4);
+  assert.equal(data.color, '#eab308');
+  assert.deepEqual(data.hints, { ru: 'Местами затруднения', en: 'Congested in places' });
+  assert.equal(data.hint, 'Местами затруднения');
+  assert.equal(data.time, '12:21');
+  // no level -> no data (it used to report level 2 "roads are free")
+  assert.equal(parseYandexTrafficXml('<traffic><hint lang="ru">x</hint></traffic>'), null);
+  assert.equal(parseYandexTrafficXml(''), null);
+  // no hints -> nulls, not a made-up phrase
+  assert.deepEqual(parseYandexTrafficXml('<level>1</level>').hints, { ru: null, en: null });
 });

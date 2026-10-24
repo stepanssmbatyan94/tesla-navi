@@ -390,6 +390,34 @@ function getArmenianAudio(text, voiceChoice = 'gor') {
   return null;
 }
 
+// Yandex traffic score for a region (export.yandex.ru/bar/reginfo.xml). Yandex writes the
+// hint in several languages; ru and en are passed on, the client translates hy itself.
+// No level in the XML -> null: no score is ever made up.
+function parseYandexTrafficXml(xmlText) {
+  const levelMatch = String(xmlText || '').match(/<level>(\d+)<\/level>/);
+  if (!levelMatch) return null;
+  const level = parseInt(levelMatch[1], 10);
+  const tag = re => { const m = xmlText.match(re); return m ? m[1].trim() : null; };
+  const hints = { ru: tag(/<hint lang="ru">([^<]+)<\/hint>/), en: tag(/<hint lang="en">([^<]+)<\/hint>/) };
+
+  let color = '#22c55e';
+  if (level >= 7) color = '#ef4444';
+  else if (level >= 5) color = '#f97316';
+  else if (level >= 4) color = '#eab308';
+
+  return {
+    success: true,
+    city: 'Ереван',
+    score: level,
+    icon: tag(/<icon>([a-z]+)<\/icon>/),
+    color,
+    hint: hints.ru,
+    hints,
+    time: tag(/<time>([^<]+)<\/time>/) || '',
+    source: 'yandex'
+  };
+}
+
 // --- Real speed limits: OpenStreetMap maxspeed snapshot (data/speed-limits.json) ----------
 // Yandex returns no speed limits. The snapshot (refreshed by scripts/update_speed_limits.mjs)
 // is indexed on a grid; each route is sampled every 20 m and matched to the nearest OSM way
@@ -1114,32 +1142,8 @@ const server = http.createServer(async (req, res) => {
       });
       const xmlText = await xmlRes.text();
 
-      const levelMatch = xmlText.match(/<level>(\d+)<\/level>/);
-      const iconMatch = xmlText.match(/<icon>([a-z]+)<\/icon>/);
-      const hintMatch = xmlText.match(/<hint lang="ru">([^<]+)<\/hint>/);
-      const timeMatch = xmlText.match(/<time>([^<]+)<\/time>/);
-
-      const level = levelMatch ? parseInt(levelMatch[1], 10) : 2;
-      const icon = iconMatch ? iconMatch[1] : 'green';
-      const hint = hintMatch ? hintMatch[1] : 'Дороги свободны';
-      const time = timeMatch ? timeMatch[1] : '';
-
-      let color = '#22c55e';
-      if (level >= 7) color = '#ef4444';
-      else if (level >= 5) color = '#f97316';
-      else if (level >= 4) color = '#eab308';
-
-      const data = {
-        success: true,
-        city: 'Ереван',
-        score: level,
-        icon,
-        color,
-        hint,
-        time,
-        source: 'yandex'
-      };
-
+      const data = parseYandexTrafficXml(xmlText);
+      if (!data) throw new Error('no traffic level in Yandex reginfo');
       trafficCache = { time: now, data };
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify(data));
@@ -1422,6 +1426,7 @@ module.exports = {
   parseYandexRoutes,
   speedLimitsForRoute,
   loadSpeedLimitIndex,
+  parseYandexTrafficXml,
   getArmenianAudio,
   isAllowedMapLink,
   fetchUpstream,
