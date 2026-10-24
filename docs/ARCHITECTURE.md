@@ -153,7 +153,7 @@ Per position update (`updateCarPosition(lat, lng, heading, speedKmh, isRealFix)`
 3. **Map matching** (`snapToActiveRoute`): nearest polyline segment in a window around the last progress index (full scan fallback); snap if ≤ 28 m and heading difference ≤ 55° while moving; arrow locked to the road tangent 22 m ahead.
 4. **Off-route**: > 20 m from the route, or > 12 m with > 45° heading difference; two consecutive real fixes while navigating → `recalculateRoute()` from the current position.
 5. **Smoothing**: jump on > 60 m shifts, freeze micro-moves when stationary, 35 % EMA when off-route, heading deadband 3.2°.
-6. **Camera**: heading-up with top padding 28 % while following; user pan stops following, auto re-follow after 6 s idle or when driving.
+6. **Camera**: heading-up with top padding 28 % while following; user pan stops following, auto re-follow after 6 s idle or when driving. Yandex Maps 2.1 cannot rotate, so `syncYandexRotation` turns the map's rotor element (a square larger than the screen, centred on the car at 64 % height) by −heading; labels turn with it. North-up while the user pans or a route preview is fitted.
 7. **Progress** (`trackNavigationProgress`, only while navigating):
    - Distance along route → progress %, remaining distance/time, ETA, traveled line.
    - Step index advances 8 m past the step end (the junction), so the sign for a turn stays up until the car has made it. **The maneuver shown/announced for the current step's end is `steps[k+1]`** (maneuvers sit at step starts); on the last step the target is the destination.
