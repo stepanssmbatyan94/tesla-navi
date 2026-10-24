@@ -320,3 +320,22 @@ test('lanes: every lane the movement fits is highlighted, the maneuver junction 
   assert.equal(active(m.lanes), '1100', 'within 300 m of the left turn: its left lanes');
   assert.ok(Math.abs(m.laneDistanceMeters - 230) <= 15, String(m.laneDistanceMeters));
 });
+
+test('lanes: a fork without its own arrows and a junction node past the maneuver point', () => {
+  const { ctx, engine, maneuvers } = newEngine();
+  const highlight = get(ctx, 'highlightLanesForTurn');
+  const lanes = inds => inds.map(i => ({ indications: i.split(';'), valid: true }));
+  const active = ls => JSON.parse(JSON.stringify(ls)).map(l => (l.valid ? 1 : 0)).join('');
+  // Myasnikyan fork: keep left, lanes only say straight; the lane that also bears right is not it
+  assert.equal(active(highlight(lanes(['straight', 'straight', 'straight;slight right']), 'slight left')), '110');
+  assert.equal(active(highlight(lanes(['straight;slight left', 'straight', 'straight']), 'slight right')), '011');
+
+  // right turn whose OSM junction node is 18 m past Yandex's maneuver point
+  engine.applyRouteData(routeData({ steps: [
+    { name: 'Start Street', modifier: 'straight', action: 'STRAIGHT', distance: 400, location: [COORDS[0][0], LAT] },
+    { name: 'Right Street', modifier: 'right', action: 'RIGHT', distance: 600, location: [at(400).lng, LAT] }
+  ], laneIntersections: [{ location: [at(418).lng, LAT], outBearing: 90, lanes: lanes(['straight', 'right', 'right']) }] }), DEST, 0);
+  engine.isNavigating = true;
+  for (let x = 0; x <= 300; x += 10) driveTo(engine, x);
+  assert.equal(active(maneuvers.at(-1).lanes), '011', 'the turn\'s own lanes, not straight');
+});
