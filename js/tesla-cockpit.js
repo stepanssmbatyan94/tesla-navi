@@ -2373,86 +2373,16 @@ function getSingleLaneSvg(indications, isActive) {
 }
 
 // Lane Guidance SVG Generator (Supporting real OSM lane configurations + fallback modifier synthesis)
-function getLaneColumnsHtml(lanesOrModifier) {
-  // If array of real OSM lanes is provided:
-  if (Array.isArray(lanesOrModifier) && lanesOrModifier.length > 0) {
-    return lanesOrModifier.map((lane, idx) => {
-      const isActive = !!lane.valid;
-      const stateClass = isActive ? 'is-active' : 'is-faded';
-      const svg = getSingleLaneSvg(lane.indications, isActive);
-      const dot = isActive ? '<span class="lane-active-dot"></span>' : '';
-      return `<div class="lane-col-item ${stateClass}" title="${tr('lane')} ${idx + 1}">${svg}${dot}</div>`;
-    }).join('');
-  }
-
-  // Fallback to modifier-based synthesis if no lane array available
-  const mod = (typeof lanesOrModifier === 'string' ? lanesOrModifier : '').toLowerCase();
-  const isSlightLeft = mod.includes('slight left') || mod.includes('fork left') || mod.includes('keep left') || mod.includes('bear left') || mod.includes('левее');
-  const isSlightRight = mod.includes('slight right') || mod.includes('fork right') || mod.includes('keep right') || mod.includes('bear right') || mod.includes('правее');
-  const isUTurn = mod.includes('uturn') || mod.includes('u-turn') || mod.includes('разворот');
-  const isLeft = !isSlightLeft && (mod.includes('left') || mod.includes('налево'));
-  const isRight = !isSlightRight && (mod.includes('right') || mod.includes('направо'));
-
-  if (isSlightLeft) {
-    return `
-      <div class="lane-col-item is-active">
-        ${getSingleLaneSvg(['slight left'], true)}
-        <span class="lane-active-dot"></span>
-      </div>
-      <div class="lane-col-item is-faded">
-        ${getSingleLaneSvg(['straight'], false)}
-      </div>
-    `;
-  } else if (isSlightRight) {
-    return `
-      <div class="lane-col-item is-faded">
-        ${getSingleLaneSvg(['straight'], false)}
-      </div>
-      <div class="lane-col-item is-active">
-        ${getSingleLaneSvg(['slight right'], true)}
-        <span class="lane-active-dot"></span>
-      </div>
-    `;
-  } else if (isLeft) {
-    return `
-      <div class="lane-col-item is-active">
-        ${getSingleLaneSvg(['left'], true)}
-        <span class="lane-active-dot"></span>
-      </div>
-      <div class="lane-col-item is-faded">
-        ${getSingleLaneSvg(['straight'], false)}
-      </div>
-    `;
-  } else if (isRight) {
-    return `
-      <div class="lane-col-item is-faded">
-        ${getSingleLaneSvg(['straight'], false)}
-      </div>
-      <div class="lane-col-item is-active">
-        ${getSingleLaneSvg(['right'], true)}
-        <span class="lane-active-dot"></span>
-      </div>
-    `;
-  } else if (isUTurn) {
-    return `
-      <div class="lane-col-item is-active">
-        ${getSingleLaneSvg(['uturn'], true)}
-        <span class="lane-active-dot"></span>
-      </div>
-      <div class="lane-col-item is-faded">
-        ${getSingleLaneSvg(['straight'], false)}
-      </div>
-    `;
-  } else {
-    return `
-      <div class="lane-col-item is-active">
-        ${getSingleLaneSvg(['straight'], true)}
-      </div>
-      <div class="lane-col-item is-active">
-        ${getSingleLaneSvg(['straight'], true)}
-      </div>
-    `;
-  }
+// Lane arrows from OpenStreetMap (via OSRM). Only real lane data is drawn: a junction without
+// turn:lanes in OSM shows no lanes rather than an invented "one left, one right".
+function getLaneColumnsHtml(lanes) {
+  return lanes.map((lane, idx) => {
+    const isActive = !!lane.valid;
+    const stateClass = isActive ? 'is-active' : 'is-faded';
+    const svg = getSingleLaneSvg(lane.indications, isActive);
+    const dot = isActive ? '<span class="lane-active-dot"></span>' : '';
+    return `<div class="lane-col-item ${stateClass}" title="${tr('lane')} ${idx + 1}">${svg}${dot}</div>`;
+  }).join('');
 }
 
 function renderLaneGuidance(m) {
@@ -2462,18 +2392,13 @@ function renderLaneGuidance(m) {
   const rawDist = (typeof m.laneDistanceMeters === 'number')
     ? m.laneDistanceMeters
     : ((typeof m.distanceMeters === 'number') ? m.distanceMeters : ((typeof m.rawDistance === 'number') ? m.rawDistance : 100));
-  const mod = (m.modifier || '').toLowerCase();
-  const isTurn = mod.includes('left') || mod.includes('right') || mod.includes('uturn') || mod.includes('fork') || mod.includes('roundabout') || mod.includes('левее') || mod.includes('правее');
   const hasLanes = Array.isArray(m.lanes) && m.lanes.length > 0;
 
-  // Strict proximity threshold: only activate within 220m of intersection or upcoming turn (never 700m!)
-  const withinThreshold = rawDist <= 220;
-
-  if (withinThreshold && (hasLanes || isTurn || rawDist <= 120)) {
-    const lanesData = hasLanes ? m.lanes : m.modifier;
+  // Only within 220 m of the junction, and only with real lane data for it
+  if (hasLanes && rawDist <= 220) {
     lanePill.innerHTML = `
       <div class="lane-guidance-arrows">
-        ${getLaneColumnsHtml(lanesData)}
+        ${getLaneColumnsHtml(m.lanes)}
       </div>
     `;
     lanePill.classList.remove('hidden');

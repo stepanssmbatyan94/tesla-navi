@@ -3,7 +3,8 @@
 // turn >= 25°), reads the HUD arrow icon and street from the DOM; 25 m past the junction
 // the HUD must already show the following maneuver.
 // Roundabouts / U-turns are counted separately (no left/right to compare); a roundabout must
-// show its exit number inside the ring icon and the street after the exit.
+// show its exit number inside the ring icon and the street after the exit. The lane pill is
+// shown only with real OSM lane data for the junction ahead, with exactly those lanes.
 // Yandex re-routes with live traffic, so the same trip can produce different routes per run.
 // PASS (the returned `pass` field): on every trip >= 80 % of turns show the right icon and
 //       street at ALL sampled distances, and >= 90 % of after-junction checks show the next step.
@@ -31,8 +32,17 @@
   };
   const hud = () => {
     const exitText = document.querySelector('#maneuver-arrow-box svg text');
+    const pill = document.getElementById('lane-guidance-pill');
+    const lanesShown = pill.classList.contains('hidden') ? 0 : pill.querySelectorAll('.lane-col-item').length;
+    const data = lastManeuver && Array.isArray(lastManeuver.lanes) && lastManeuver.laneDistanceMeters <= 220 ? lastManeuver.lanes.length : 0;
+    if (lanesShown !== data) laneMismatches.push({ lanesShown, data });
+    if (lanesShown) laneSamples++;
     return { icon: icon(), exit: exitText ? Number(exitText.textContent) : null, dist: document.getElementById('maneuver-dist').textContent, street: document.getElementById('maneuver-street').textContent };
   };
+  let lastManeuver = null, laneSamples = 0;
+  const laneMismatches = [];
+  const origManeuverCb = me.onManeuverUpdate;
+  me.onManeuverUpdate = m => { lastManeuver = m; origManeuverCb(m); };
   const out = [];
   for (const [a, b, c, d] of TRIPS) {
     cancelActiveNavigation();
@@ -92,10 +102,12 @@
     out.push({ turns, correct, roundaboutsOrUturns, roundaboutExits: `${roundaboutOk}/${roundaboutChecks}`, roundaboutOk, roundaboutChecks, afterJunction: `${afterOk}/${afterChecks}`, afterOk, afterChecks, mismatches: mismatches.slice(0, 4) });
     cancelActiveNavigation();
   }
+  me.onManeuverUpdate = origManeuverCb;
   localStorage.removeItem('tesla_search_history');
   return {
     pass: out.every(t => !t.error && (t.turns === 0 || t.correct / t.turns >= 0.8) && (t.afterChecks === 0 || t.afterOk / t.afterChecks >= 0.9) && t.roundaboutOk === t.roundaboutChecks) &&
-      out.some(t => t.roundaboutChecks > 0),
+      out.some(t => t.roundaboutChecks > 0) && laneMismatches.length === 0 && laneSamples > 0,
+    lanes: { samplesWithLanes: laneSamples, mismatches: laneMismatches.slice(0, 4) },
     trips: out
   };
 })();
