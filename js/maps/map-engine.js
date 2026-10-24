@@ -4,6 +4,80 @@
 // different direction, belong to another path and are dropped
 const LANE_MATCH_MAX_DIST_M = 20;
 const LANE_MATCH_MAX_BEARING_DIFF = 35;
+// Live traffic while navigating: the route is asked again from the car's position and, when
+// Yandex still drives the same way, only its traffic colors and remaining time are taken over
+const TRAFFIC_REFRESH_MS = 120000;
+const TRAFFIC_MATCH_MAX_M = 30;      // a fresh route point this close to the current route is "on it"
+const TRAFFIC_MATCH_MIN_SHARE = 0.9; // share of the fresh route that must lie on the current one
+
+// Metres from point p to segment a-b ([lng, lat]), flat-earth approximation (fine below ~1 km)
+function pointToSegmentMeters(p, a, b) {
+  const kx = 111320 * Math.cos(p[1] * Math.PI / 180), ky = 110540;
+  const ax = (a[0] - p[0]) * kx, ay = (a[1] - p[1]) * ky, bx = (b[0] - p[0]) * kx, by = (b[1] - p[1]) * ky;
+  const dx = bx - ax, dy = by - ay, len2 = dx * dx + dy * dy;
+  const t = len2 ? Math.max(0, Math.min(1, -(ax * dx + ay * dy) / len2)) : 0;
+  return Math.hypot(ax + t * dx, ay + t * dy);
+}
+
+// Walks `points` in order along `line`, yielding for each point the index of the nearest segment
+// of `line` (searching a window ahead of the last match, so it stays O(n)) or -1 when none is
+// within maxM. Both polylines run the same direction, so the pointer only moves forward.
+function matchAlongLine(points, line, fromIndex, maxM, window = 80) {
+  const out = [];
+  let j = Math.max(0, fromIndex);
+  for (const p of points) {
+    let best = -1, bestD = maxM;
+    for (let k = j; k < Math.min(line.length - 1, j + window); k++) {
+      const d = pointToSegmentMeters(p, line[k], line[k + 1]);
+      if (d <= bestD) { bestD = d; best = k; }
+    }
+    out.push(best);
+    if (best >= 0) j = best;
+  }
+  return out;
+}
+
+// Share of a fresh route ([lng, lat]) that runs along the current route from fromIndex on
+function routeMatchShare(currentCoords, fromIndex, freshCoords) {
+  if (!Array.isArray(freshCoords) || freshCoords.length < 2 || !Array.isArray(currentCoords)) return 0;
+  const step = Math.max(1, Math.floor(freshCoords.length / 300));
+  const sample = freshCoords.filter((_, i) => i % step === 0);
+  const hits = matchAlongLine(sample, currentCoords, Math.max(0, fromIndex - 2), TRAFFIC_MATCH_MAX_M);
+  return hits.filter(h => h >= 0).length / sample.length;
+}
+
+// Per-vertex colors of traffic segments (consecutive segments share their boundary vertex)
+function vertexColorsFromSegments(segments, count, fallback) {
+  const colors = new Array(count).fill(fallback);
+  let i = 0;
+  for (const seg of segments || []) {
+    const n = (seg.coords || []).length;
+    for (let k = 0; k < n - 1 && i < count; k++) colors[i++] = seg.color;
+  }
+  if (count) colors[count - 1] = colors[Math.max(0, count - 2)];
+  return colors;
+}
+
+// New traffic segments for the current route: the part already driven keeps its colors, the rest
+// takes the color of the fresh route's segment it lies on (unmatched points keep theirs)
+function recolorRouteTraffic(routeCoords, fromIndex, oldSegments, freshCoords, freshSegments) {
+  const colors = vertexColorsFromSegments(oldSegments, routeCoords.length, '#22c55e');
+  const freshColors = vertexColorsFromSegments(freshSegments, freshCoords.length, '#22c55e');
+  const start = Math.max(0, fromIndex);
+  const hits = matchAlongLine(routeCoords.slice(start), freshCoords, 0, TRAFFIC_MATCH_MAX_M);
+  hits.forEach((h, k) => { if (h >= 0) colors[start + k] = freshColors[h]; });
+  const segments = [];
+  let segStart = 0;
+  for (let i = 1; i <= routeCoords.length; i++) {
+    if (i === routeCoords.length || colors[i] !== colors[segStart]) {
+      const coords = routeCoords.slice(segStart, Math.min(i + 1, routeCoords.length));
+      if (coords.length >= 2) segments.push({ color: colors[segStart], coords });
+      segStart = i;
+    }
+  }
+  return segments;
+}
+
 // Lanes of the maneuver's own junction appear from this far and win over pass-through junctions
 const LANE_MANEUVER_SHOW_M = 300;
 const LANE_AT_MANEUVER_BEFORE_M = 40; // a lane junction this close before/after the maneuver
@@ -108,6 +182,7 @@ class TeslaMapEngine {
     this.onCameraAlert = options.onCameraAlert || (() => {});
     // Free driving (no route): OSM / legal-default limit at the car's position, see updateFreeDrivingSpeedLimit
     this.onSpeedLimit = options.onSpeedLimit || (() => {});
+    this.onTrafficUpdate = options.onTrafficUpdate || (() => {});
     this.onPositionUpdate = options.onPositionUpdate || (() => {});
 
     this.map = null;
@@ -1814,6 +1889,7 @@ class TeslaMapEngine {
     const vehicleRouteDist = this.getVehicleDistanceAlongRoute(currentLat, currentLng);
     const totalDist = this.totalRouteMeters || this.totalDistance || 1000;
     const remainingMeters = Math.max(0, Math.round(totalDist - vehicleRouteDist));
+    this.lastRemainingMeters = remainingMeters;
     const progressPercent = Math.min(100, Math.max(0, Math.round((vehicleRouteDist / totalDist) * 100)));
 
     const prevProgressIdx = this.lastProgressIndex || 0;
@@ -1843,9 +1919,13 @@ class TeslaMapEngine {
     }
 
     // Calculate remaining duration and ETA
+    // From the latest traffic refresh when there is one (Yandex's time from where the car was
+    // then), otherwise the route's original time scaled by the distance left
     const totalDurSec = this.activeRoute.durationSec || (totalDist / 11);
-    const remainingRatio = Math.max(0, Math.min(1, remainingMeters / totalDist));
-    const remainingDurationSec = Math.max(30, Math.round(totalDurSec * remainingRatio));
+    const anchor = this.activeRoute.remainingAnchor;
+    const remainingDurationSec = anchor
+      ? Math.max(30, Math.round(anchor.sec * Math.min(1, remainingMeters / anchor.meters)))
+      : Math.max(30, Math.round(totalDurSec * Math.max(0, Math.min(1, remainingMeters / totalDist))));
     const remainingMinutes = Math.max(1, Math.round(remainingDurationSec / 60));
 
     const nowTime = new Date();
@@ -2649,6 +2729,75 @@ class TeslaMapEngine {
   }
 
   // Render Route on MapLibre GL with Yandex Navigator Styling & Alternative Blue Routes
+  trafficFeatureCollection(segments) {
+    return {
+      type: 'FeatureCollection',
+      features: (segments || [])
+        .filter(seg => seg.coords && seg.coords.length >= 2)
+        .map(seg => ({
+          type: 'Feature',
+          properties: { color: seg.color || '#10b981' },
+          geometry: { type: 'LineString', coordinates: seg.coords }
+        }))
+    };
+  }
+
+  // Every TRAFFIC_REFRESH_MS while navigating: ask Yandex again from the car's position. When a
+  // returned route runs along the current one, take over its traffic colors and remaining time;
+  // the route itself, its steps and the voice state stay as they are (no repeated prompts).
+  // A different way means Yandex now prefers another route: kept as is (rerouting stays manual).
+  async refreshRouteTraffic() {
+    if (!this.isNavigating || !this.activeRoute || this.isRerouting || this._trafficRefreshPending) return false;
+    if (!this.hasRealFix || !this.currentPosition || !this.rawRouteData || this.rawRouteData.source !== 'yandex') return false;
+    this._trafficRefreshPending = true;
+    const routeAtStart = this.routeCoordinates;
+    try {
+      const { lat, lng } = this.currentPosition;
+      const dest = this.activeRoute.destination;
+      const res = await fetch(`/api/route?startLat=${lat}&startLng=${lng}&destLat=${dest.lat}&destLng=${dest.lng}&provider=${this.provider}`);
+      const data = await res.json();
+      // the route may have been cancelled or rerouted while the request ran
+      if (!this.isNavigating || this.routeCoordinates !== routeAtStart || !data || data.source !== 'yandex' || !Array.isArray(data.routes)) return false;
+      const fromIndex = this.lastProgressIndex || 0;
+      let best = null;
+      for (const r of data.routes) {
+        const share = routeMatchShare(this.routeCoordinates, fromIndex, r.coordinates);
+        if (share >= TRAFFIC_MATCH_MIN_SHARE && (!best || share > best.share)) best = { route: r, share };
+      }
+      if (!best) {
+        console.info('[MapEngine] Traffic refresh: Yandex now prefers another way, keeping the current route');
+        return false;
+      }
+      const segments = recolorRouteTraffic(this.routeCoordinates, fromIndex, this.trafficSegments, best.route.coordinates, best.route.segments);
+      this.trafficSegments = segments;
+      if (this.lastRouteRender) this.lastRouteRender.trafficSegments = segments;
+      if (best.route.duration > 0 && this.lastRemainingMeters > 0) {
+        this.activeRoute.remainingAnchor = { meters: this.lastRemainingMeters, sec: best.route.duration };
+      }
+      this.redrawRouteTraffic(segments);
+      this.onTrafficUpdate(segments);
+      return true;
+    } catch (err) {
+      console.warn('[MapEngine] Traffic refresh failed:', err.message);
+      return false;
+    } finally {
+      this._trafficRefreshPending = false;
+    }
+  }
+
+  redrawRouteTraffic(segments) {
+    if (!this.map) return;
+    if (this.provider === 'maplibre') {
+      const src = this.map.getSource && this.map.getSource('route-traffic');
+      if (src) src.setData(this.trafficFeatureCollection(segments));
+    } else if (this.provider === 'yandex' && window.ymaps && this.activeRoute) {
+      this.renderYandexRoute(this.routeCoordinates.map(c => [c[1], c[0]]), this.activeRoute.destination, segments);
+      this.lastTraveledUpdate = 0; // the traveled line was recreated empty: redraw it on the next fix
+    } else if (window.L && this.activeRoute) {
+      this.renderLeafletRoute(this.routeCoordinates.map(c => [c[1], c[0]]), this.activeRoute.destination, segments);
+    }
+  }
+
   renderMapLibreRoute(coordinates, destination, alternatives = null, trafficSegments = null) {
     // Remembered so the route can be redrawn after a day/night style swap
     this.lastRouteRender = { coordinates, destination, alternatives, trafficSegments };
@@ -2725,19 +2874,7 @@ class TeslaMapEngine {
       ? trafficSegments
       : this.generateTrafficSegments(coordinates);
 
-    this.map.addSource('route-traffic', {
-      type: 'geojson',
-      data: {
-        type: 'FeatureCollection',
-        features: segments
-          .filter(seg => seg.coords && seg.coords.length >= 2)
-          .map(seg => ({
-            type: 'Feature',
-            properties: { color: seg.color || '#10b981' },
-            geometry: { type: 'LineString', coordinates: seg.coords }
-          }))
-      }
-    });
+    this.map.addSource('route-traffic', { type: 'geojson', data: this.trafficFeatureCollection(segments) });
 
     this.map.addLayer({
       id: 'route-traffic',
@@ -2906,6 +3043,8 @@ class TeslaMapEngine {
 
   startNavigation() {
     this.isNavigating = true;
+    clearInterval(this.trafficRefreshTimer);
+    this.trafficRefreshTimer = setInterval(() => this.refreshRouteTraffic(), TRAFFIC_REFRESH_MS);
     this.followCar = true;
     this.isHeadingUp = true;
     this.offRouteCounter = 0;
@@ -2952,6 +3091,8 @@ class TeslaMapEngine {
   }
 
   cancelRoute() {
+    clearInterval(this.trafficRefreshTimer);
+    this.trafficRefreshTimer = null;
     this.activeRoute = null;
     this.isNavigating = false;
     this.followCar = true;
