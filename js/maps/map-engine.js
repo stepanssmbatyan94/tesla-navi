@@ -542,7 +542,7 @@ class TeslaMapEngine {
     } else if (this.provider === 'yandex' && window.ymaps && this.map.geoObjects) {
       const CamLayout = window.ymaps.templateLayoutFactory.createClass(
         `<div class="map-speed-camera-pin" style="transform: translate(-50%, -50%);">
-          <div class="camera-map-badge">
+          <div class="camera-map-badge yandex-upright">
             <svg viewBox="0 0 24 24" width="16" height="16" fill="#1e293b">
               <path d="M4 4h3l2-2h6l2 2h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2zm8 3a5 5 0 1 0 0 10 5 5 0 0 0 0-10zm0 2a3 3 0 1 1 0 6 3 3 0 0 1 0-6z"/>
             </svg>
@@ -828,6 +828,7 @@ class TeslaMapEngine {
       } else {
         this._yandexRotorAngle = 0;
         Object.assign(rotor.style, { left: '0px', top: '0px', width: '100%', height: '100%', transform: 'none' });
+        rotor.style.setProperty('--yandex-upright', '0deg');
       }
       const recenter = () => {
         try {
@@ -844,6 +845,8 @@ class TeslaMapEngine {
       const target = -(this.currentHeading || 0);
       this._yandexRotorAngle += ((target - this._yandexRotorAngle) % 360 + 540) % 360 - 180;
       rotor.style.transform = `rotate(${this._yandexRotorAngle.toFixed(1)}deg)`;
+      // markers inside the rotor (speed cameras) turn back so they stand upright like the car
+      rotor.style.setProperty('--yandex-upright', `${(-this._yandexRotorAngle).toFixed(1)}deg`);
     }
   }
 

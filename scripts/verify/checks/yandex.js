@@ -3,7 +3,7 @@
 // PASS (the returned `pass` field): provider === 'yandex', route built, maneuvers seen,
 //       heading-up like MapLibre (a route point 80 m ahead is drawn at its bearing minus the
 //       car's heading, within 12° — straight up on a straight road; car at ~64 % of the height;
-//       a user pan turns the map back north-up), arrived,
+//       a user pan turns the map back north-up; camera markers stay upright), arrived,
 //       geo objects back to the car marker only, no page errors.
 // Usage: paste into a browser-tool JS console (returns a promise) or run `npm run verify`.
 (async () => {
@@ -32,6 +32,9 @@
   me.map.geoObjects.add(probe);
   const centerOf = el => { const r = el.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; };
   const headingUp = [];
+  // speed-camera markers on the turned map stand upright: their own turn cancels the map's
+  const angleOf = el => { const m = getComputedStyle(el).transform; if (!m || m === 'none') return 0; const [a, b] = m.slice(7, -1).split(',').map(Number); return Math.atan2(b, a) * 180 / Math.PI; };
+  const camerasUpright = [];
   window.IS_SIMULATOR_RUNNING = true;
   for (let d = 0; d <= me.totalRouteMeters + 30 && me.activeRoute; d += 40) {
     const p = me.getPositionAtDistance(d);
@@ -56,10 +59,13 @@
       const cp = me.currentPosition;
       const expected = me.calculateBearing(cp.lat, cp.lng, ahead.lat, ahead.lng) - me.currentHeading;
       const off = Math.abs(((angle - expected) % 360 + 540) % 360 - 180);
+      const rotorEl = document.getElementById('yandex-map-rotor');
+      for (const el of rotorEl.querySelectorAll('.camera-map-badge')) camerasUpright.push(Math.round(Math.abs(((angleOf(el) + angleOf(rotorEl)) % 360 + 540) % 360 - 180)));
       headingUp.push({ d, angle: Math.round(angle), expected: Math.round((expected + 540) % 360 - 180), off: Math.round(off), carY: +(car.y / innerHeight).toFixed(2) });
     }
   }
   me.map.geoObjects.remove(probe);
+
   if (me.activeRoute) { // land exactly on the route end, wherever the step left us
     const end = me.getPositionAtDistance(me.totalRouteMeters);
     me.updateCarPosition(end.lat, end.lng, end.heading, 10, true);
@@ -77,7 +83,7 @@
   const headingUpOk = headingUp.length >= 2 && headingUp.every(h => h.off <= 12 && Math.abs(h.carY - 0.64) <= 0.03);
   return {
     pass: me.provider === 'yandex' && routeBuilt && withRoute > atStart && maneuvers.length > 1 && arrived && afterArrival === atStart && errs.length === 0 &&
-      headingUpOk && afterPan === 'none' && afterRecenter.startsWith('rotate('),
-    provider: me.provider, routeBuilt, geoObjects: { atStart, withRoute, afterArrival }, maneuvers, arrived, headingUp, afterPan, afterRecenter, pageErrors: errs
+      headingUpOk && afterPan === 'none' && afterRecenter.startsWith('rotate(') && camerasUpright.every(d => d <= 3),
+    provider: me.provider, routeBuilt, geoObjects: { atStart, withRoute, afterArrival }, maneuvers, arrived, headingUp, camerasUpright, afterPan, afterRecenter, pageErrors: errs
   };
 })();
