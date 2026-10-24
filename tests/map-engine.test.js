@@ -398,3 +398,35 @@ test('traffic segments of one color are joined: fewer bar divs, features and pol
   assert.deepEqual(out[0].coords, [[0, 0], [1, 0], [2, 0]], 'the shared vertex is kept once');
   assert.equal(segs[0].coords.length, 2, 'input untouched');
 });
+
+test('network polls skip ticks while the page is hidden and catch up once visible', async () => {
+  const listeners = {};
+  let hidden = false;
+  const doc = {
+    readyState: 'complete', head: {}, body: {},
+    get hidden() { return hidden; },
+    addEventListener: (type, fn) => { (listeners[type] = listeners[type] || []).push(fn); },
+    removeEventListener: (type, fn) => { listeners[type] = (listeners[type] || []).filter(f => f !== fn); },
+    getElementById: () => null, querySelector: () => null, querySelectorAll: () => [], createElement: () => ({ style: {}, classList: { add() {}, remove() {} }, appendChild() {} })
+  };
+  const ctx = loadScripts(createBrowserContext({ document: doc }), ['js/config.js', 'js/maps/map-engine.js']);
+  const setVisibleInterval = get(ctx, 'setVisibleInterval');
+  const clearVisibleInterval = get(ctx, 'clearVisibleInterval');
+  const sleep = ms => new Promise(r => setTimeout(r, ms));
+  let calls = 0;
+  const id = setVisibleInterval(() => calls++, 20);
+  await sleep(70);
+  const visibleCalls = calls;
+  assert.ok(visibleCalls >= 2, String(visibleCalls));
+  hidden = true;
+  await sleep(80);
+  assert.equal(calls, visibleCalls, 'no polls while hidden');
+  hidden = false;
+  listeners.visibilitychange.forEach(fn => fn());
+  assert.equal(calls, visibleCalls + 1, 'one catch-up poll on becoming visible');
+  clearVisibleInterval(id);
+  assert.equal(listeners.visibilitychange.length, 0, 'the listener goes with the interval');
+  const after = calls;
+  await sleep(60);
+  assert.equal(calls, after);
+});
