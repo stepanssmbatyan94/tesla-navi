@@ -110,7 +110,7 @@ Returns `audio/mpeg`.
 | `lang` | `ru` (default), `en`, `hy` |
 | `voice` | `svetlana`/`female`, `dmitry`/`male`, `ava`, `andrew`, `gor`, `suzie`, `auto` |
 
-- `ru`/`en`: Microsoft Edge neural voices (Svetlana/Dmitry, Ava/Andrew), cached in memory (LRU, 300 entries). `500` if synthesis fails twice.
+- `ru`/`en`: Google Cloud Text-to-Speech, Chirp3-HD voices (female Kore/Aoede, male Charon; `voice` `dmitry`/`andrew`/`male` picks male), cached in memory (LRU, 300 entries). Microsoft Edge read-aloud (`msedge-tts`) is only a fallback: Microsoft locked it on 2026-10-13. `500` if both fail.
 - `hy` (or voice `gor`/`suzie`): a prerecorded clip from `sounds/hy/<voice>/`. `text` may be a clip key (`turn_left`, `dist_250_keep_left`, `uturn`, …) or Armenian text matched by keywords. Unknown phrase → `404`.
 
 ## `GET /api/speed-cameras`

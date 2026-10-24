@@ -13,7 +13,7 @@ flowchart LR
   Car -- "/api/route, /api/geocode, /api/tts …" --> Server["Node server<br/>(Cloud Run)"]
   Server --> Yandex["Yandex routes, suggest, traffic"]
   Server --> OSRM["OSRM lanes"]
-  Server --> Edge["Edge neural TTS"]
+  Server --> Edge["Google Cloud TTS"]
   Car --> Tiles["OpenFreeMap vector tiles"]
 ```
 
@@ -31,7 +31,7 @@ Details: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 | Map | MapLibre GL vector map with MapsEV-style day/night/auto themes, 2D/3D buildings, heading-up / north-up, auto re-follow; Yandex map option; automatic Leaflet/OSM fallback when MapLibre can't load or WebGL is missing |
 | Routing | Yandex live router with up to 3 alternatives and traffic-colored polylines, OSRM fallback, off-route rerouting |
 | Guidance | Maneuver HUD with countdown, lane arrows (OSRM lanes matched onto the Yandex route), progress bar with ETA, real traffic delay per route |
-| Voice | ru/en Microsoft Edge neural voices (Svetlana/Dmitry, Ava/Andrew), Armenian prerecorded Gor/Suzie, chime, mute |
+| Voice | ru/en Google Cloud TTS neural voices (female/male), Armenian prerecorded Gor/Suzie, chime, mute |
 | Safety | ~185 speed cameras (Yerevan DB) announced only along the active route; road limits from OpenStreetMap `maxspeed`, and where a street has no tag the legal default 60 in built-up areas / 90 outside (dashed); camera limit wins near a camera; overspeed chime on camera/OSM limits |
 | Places | Search (Yandex Suggest → Photon → Nominatim), Google/Yandex link and coordinate parsing, Home/Work, favorites, history |
 | Phone remote | GPS sharing with wake lock, address search, link paste, voice dictation, "Send to Tesla" |
