@@ -272,3 +272,18 @@ test('roundabouts: exit number in text and voice (never "continue straight"), on
   assert.ok(!spoken.some(t => /straight/i.test(t)), JSON.stringify(spoken));
   assert.equal(spoken.filter(t => /^At the roundabout, take exit 3$/.test(t)).length, 1, 'no second prompt on the ring');
 });
+
+test('the 300 m prompt names only a real street, never the destination for an unnamed one', () => {
+  const { ctx, engine, spoken } = newEngine();
+  ctx.CURRENT_LANG = 'ru';
+  engine.applyRouteData(routeData({ steps: [
+    { name: 'Start Street', modifier: 'straight', action: 'STRAIGHT', distance: 400, location: [COORDS[0][0], LAT] },
+    { name: '', modifier: 'left', action: 'LEFT', distance: 300, location: [at(400).lng, LAT] },
+    { name: 'Named Avenue', modifier: 'right', action: 'RIGHT', distance: 300, location: [at(700).lng, LAT] }
+  ] }), DEST, 0);
+  engine.isNavigating = true;
+  engine.voiceEnabled = true;
+  for (let m = 0; m <= 650; m += 10) driveTo(engine, m);
+  const far = spoken.filter(t => /^Через 300 метров/.test(t));
+  assert.deepEqual(far, ['Через 300 метров поверните налево', 'Через 300 метров поверните направо на Named Avenue'], JSON.stringify(spoken));
+});
