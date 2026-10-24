@@ -1,7 +1,9 @@
 // YANDEX — run on /?provider=yandex. The Yandex Maps JS provider loads on demand, builds and
 // draws a route, drives to arrival and cleans up.
 // PASS (the returned `pass` field): provider === 'yandex', route built, maneuvers seen,
-//       arrived, geo objects back to the car marker only, no page errors.
+//       heading-up like MapLibre (the road 80 m ahead is drawn straight above the car, within
+//       30°, car at ~64 % of the height; a user pan turns the map back north-up), arrived,
+//       geo objects back to the car marker only, no page errors.
 // Usage: paste into a browser-tool JS console (returns a promise) or run `npm run verify`.
 (async () => {
   const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -24,11 +26,25 @@
   let arrived = false;
   const origArr = me.onArrival;
   me.onArrival = d => { arrived = true; origArr(d); };
+  // a marker 80 m ahead on the route: where does the screen show it relative to the car?
+  const probe = new ymaps.Placemark([0, 0], {}, { iconLayout: ymaps.templateLayoutFactory.createClass('<div id="verify-probe" style="width:4px;height:4px"></div>') });
+  me.map.geoObjects.add(probe);
+  const centerOf = el => { const r = el.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; };
+  const headingUp = [];
   window.IS_SIMULATOR_RUNNING = true;
   for (let d = 0; d <= me.totalRouteMeters + 30 && me.activeRoute; d += 40) {
     const p = me.getPositionAtDistance(d);
     me.updateCarPosition(p.lat, p.lng, p.heading, 40, true);
+    if (d >= 200 && d % 400 === 0 && d + 120 < me.totalRouteMeters && headingUp.length < 4) {
+      const ahead = me.getPositionAtDistance(d + 80);
+      probe.geometry.setCoordinates([ahead.lat, ahead.lng]);
+      await sleep(450); // the rotor turns with a 0.3 s transition
+      const car = centerOf(document.querySelector('#yandex-car-marker .tesla-car-arrow'));
+      const pr = centerOf(document.getElementById('verify-probe'));
+      headingUp.push({ d, angle: Math.round(Math.atan2(pr.x - car.x, car.y - pr.y) * 180 / Math.PI), carY: +(car.y / innerHeight).toFixed(2) });
+    }
   }
+  me.map.geoObjects.remove(probe);
   if (me.activeRoute) { // land exactly on the route end, wherever the step left us
     const end = me.getPositionAtDistance(me.totalRouteMeters);
     me.updateCarPosition(end.lat, end.lng, end.heading, 10, true);
@@ -38,8 +54,15 @@
   me.onArrival = origArr;
   document.getElementById('arrival-modal')?.classList.add('hidden');
   const afterArrival = geoCount();
+  const rotor = document.getElementById('yandex-map-rotor');
+  me.followCar = false; me.syncYandexRotation(); // what a user pan does
+  const afterPan = rotor.style.transform;
+  me.recenter();
+  const afterRecenter = rotor.style.transform;
+  const headingUpOk = headingUp.length >= 2 && headingUp.every(h => Math.abs(h.angle) <= 30 && Math.abs(h.carY - 0.64) <= 0.03);
   return {
-    pass: me.provider === 'yandex' && routeBuilt && withRoute > atStart && maneuvers.length > 1 && arrived && afterArrival === atStart && errs.length === 0,
-    provider: me.provider, routeBuilt, geoObjects: { atStart, withRoute, afterArrival }, maneuvers, arrived, pageErrors: errs
+    pass: me.provider === 'yandex' && routeBuilt && withRoute > atStart && maneuvers.length > 1 && arrived && afterArrival === atStart && errs.length === 0 &&
+      headingUpOk && afterPan === 'none' && afterRecenter.startsWith('rotate('),
+    provider: me.provider, routeBuilt, geoObjects: { atStart, withRoute, afterArrival }, maneuvers, arrived, headingUp, afterPan, afterRecenter, pageErrors: errs
   };
 })();

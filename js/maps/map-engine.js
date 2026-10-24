@@ -28,6 +28,8 @@ const STEP_ADVANCE_PAST_JUNCTION_M = 8;
 const FREE_DRIVE_LIMIT_MIN_MOVE_M = 80;
 const FREE_DRIVE_LIMIT_MIN_INTERVAL_MS = 4000;
 const FREE_DRIVE_LIMIT_BUSY_RETRY_MS = 500;
+// Heading-up car position on screen: MapLibre pads the top by 28 %, so the car sits at 64 %
+const YANDEX_HEADING_UP_CAR_Y = 0.64;
 
 function loadExternalScript(src, timeoutMs = MAP_LIBRARY_TIMEOUT_MS) {
   return new Promise((resolve, reject) => {
@@ -554,7 +556,17 @@ class TeslaMapEngine {
   async initYandex() {
     return new Promise((resolve) => {
       window.ymaps.ready(() => {
-        this.map = new window.ymaps.Map(this.containerId, {
+        // The map lives in a rotor element so it can be turned for heading-up (syncYandexRotation)
+        const box = document.getElementById(this.containerId);
+        box.style.overflow = 'hidden';
+        this.yandexRotor = document.createElement('div');
+        this.yandexRotor.id = 'yandex-map-rotor';
+        this.yandexRotor.style.cssText = 'position:absolute;left:0;top:0;width:100%;height:100%;transform-origin:50% 50%;transition:transform 0.3s linear';
+        box.appendChild(this.yandexRotor);
+        this._yandexRotated = false;
+        this._yandexRotorAngle = 0;
+        window.addEventListener('resize', () => { this._yandexRotated = null; this.syncYandexRotation(); });
+        this.map = new window.ymaps.Map(this.yandexRotor, {
           center: [this.center.lat, this.center.lng],
           zoom: this.navZoom,
           controls: [],
@@ -640,6 +652,7 @@ class TeslaMapEngine {
               if (Math.hypot(dx, dy) > 55) {
                 // User intentionally dragged map with 1 finger to pan away
                 this.followCar = false;
+                this.syncYandexRotation();
                 const recenterBtn = document.getElementById('floating-recenter-btn');
                 if (recenterBtn) recenterBtn.classList.remove('hidden');
                 if (this.onUserPan) this.onUserPan();
@@ -685,6 +698,7 @@ class TeslaMapEngine {
               const dy = e.clientY - mouseDownPos.y;
               if (Math.hypot(dx, dy) > 55) {
                 this.followCar = false;
+                this.syncYandexRotation();
                 const recenterBtn = document.getElementById('floating-recenter-btn');
                 if (recenterBtn) recenterBtn.classList.remove('hidden');
                 if (this.onUserPan) this.onUserPan();
@@ -754,6 +768,41 @@ class TeslaMapEngine {
         resolve();
       });
     });
+  }
+
+  // Yandex Maps 2.1 cannot rotate the map. For heading-up while following the car, the map's
+  // rotor element becomes a square larger than the screen, centred on the car's screen point
+  // (low on the screen like MapLibre's 28 % top padding) and turned by -heading around it; the
+  // car arrow, turned by +heading inside it, then points straight up and the road scrolls down.
+  // Labels turn with the map (2.1 has no upright labels). Off while the user pans, in north-up
+  // mode and while a route preview is fitted to the screen.
+  syncYandexRotation() {
+    const rotor = this.yandexRotor;
+    if (!rotor || this.provider !== 'yandex' || !this.map) return;
+    const on = !!(this.followCar && this.isHeadingUp && this.hasRealFix && !(this.activeRoute && !this.isNavigating));
+    if (on !== this._yandexRotated) {
+      this._yandexRotated = on;
+      const box = rotor.parentElement;
+      if (on && box) {
+        const w = box.clientWidth, h = box.clientHeight;
+        const ax = w / 2, ay = h * YANDEX_HEADING_UP_CAR_Y;
+        const r = Math.ceil(Math.max(Math.hypot(ax, ay), Math.hypot(ax, h - ay)));
+        Object.assign(rotor.style, { left: `${Math.round(ax - r)}px`, top: `${Math.round(ay - r)}px`, width: `${2 * r}px`, height: `${2 * r}px` });
+      } else {
+        this._yandexRotorAngle = 0;
+        Object.assign(rotor.style, { left: '0px', top: '0px', width: '100%', height: '100%', transform: 'none' });
+      }
+      try {
+        this.map.container.fitToViewport();
+        if (this.currentPosition) this.map.setCenter([this.currentPosition.lat, this.currentPosition.lng], this.map.getZoom(), { duration: 0, checkZoomRange: false });
+      } catch (e) { console.warn('[MapEngine] Yandex viewport refit failed:', e.message); }
+    }
+    if (on) {
+      // unwrap the angle so 359° -> 1° turns 2°, not a full spin back through the transition
+      const target = -(this.currentHeading || 0);
+      this._yandexRotorAngle += ((target - this._yandexRotorAngle) % 360 + 540) % 360 - 180;
+      rotor.style.transform = `rotate(${this._yandexRotorAngle.toFixed(1)}deg)`;
+    }
   }
 
   // 3. Leaflet Fallback
@@ -831,6 +880,7 @@ class TeslaMapEngine {
       });
     } else if (this.provider === 'yandex' && this.map) {
       this.map.setCenter([this.currentPosition.lat, this.currentPosition.lng], this.navZoom, { duration: 0 });
+      this.syncYandexRotation();
     } else if (this.map) {
       this.map.panTo([this.currentPosition.lat, this.currentPosition.lng]);
     }
@@ -1044,6 +1094,7 @@ class TeslaMapEngine {
     } else if (this.provider === 'yandex') {
       const markerEl = document.querySelector('#yandex-car-marker .tesla-car-arrow');
       if (markerEl) markerEl.style.transform = `rotate(${this.currentHeading.toFixed(1)}deg)`;
+      this.syncYandexRotation();
     }
     return this.isHeadingUp;
   }
@@ -1580,6 +1631,7 @@ class TeslaMapEngine {
       this.carMarker.geometry.setCoordinates([displayLat, displayLng]);
       const markerEl = document.querySelector('#yandex-car-marker .tesla-car-arrow');
       if (markerEl) markerEl.style.transform = `rotate(${this.currentHeading.toFixed(1)}deg)`;
+      this.syncYandexRotation();
 
       if (this.followCar && !this.isUserPinching) {
         try {
@@ -2795,6 +2847,7 @@ class TeslaMapEngine {
         duration: 850
       });
     } else if (this.provider === 'yandex' && this.map) {
+      this.syncYandexRotation();
       this.map.setCenter([this.currentPosition.lat, this.currentPosition.lng], this.navZoom, {
         checkZoomRange: true,
         duration: 700
@@ -2855,6 +2908,7 @@ class TeslaMapEngine {
       this.routePolyline = null;
       this.yandexTraveledPolyline = null;
       this.destMarker = null;
+      this.syncYandexRotation();
     } else if (this.map) {
       if (this.routePolyline) this.map.removeLayer(this.routePolyline);
       if (this.destMarker) this.map.removeLayer(this.destMarker);
