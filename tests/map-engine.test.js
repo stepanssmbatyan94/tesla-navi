@@ -215,3 +215,33 @@ test('the very first GPS fix already looks up the free-driving speed limit', asy
   assert.match(requests[0], /^\/api\/speed-limit\?lat=40\.189800&lng=44\.469300$/);
   assert.deepEqual(JSON.parse(JSON.stringify(limits)), [{ limit: 60, source: 'default' }]); // vm-realm objects
 });
+
+test('cancelling the route looks the free-driving limit up again without moving', async () => {
+  const { ctx, engine } = newEngine();
+  const requests = [];
+  ctx.fetch = async url => { requests.push(url); return { ok: true, json: async () => ({ limit: 60, source: 'osm' }) }; };
+  engine.updateCarPosition(LAT, LNG0, 90, 0, true); // first fix: one lookup
+  await new Promise(resolve => setImmediate(resolve));
+  engine.applyRouteData(routeData(), DEST, 0);
+  engine.isNavigating = true;
+  engine.cancelRoute(); // same spot, well within 80 m of the last lookup
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(requests.length, 2);
+});
+
+test('a fix that arrives during a lookup is looked up right after it, not dropped', async () => {
+  const { ctx, engine } = newEngine();
+  const requests = [];
+  let release;
+  ctx.fetch = url => { requests.push(url); return new Promise(resolve => { release = () => resolve({ ok: true, json: async () => ({ limit: 60, source: 'osm' }) }); }); };
+  engine.updateCarPosition(LAT, LNG0, 90, 0, true); // first fix: lookup #1 in flight
+  engine._freeLimitQuery = { ...engine._freeLimitQuery, at: 0 }; // pretend the interval has passed
+  const far = at(500);
+  engine.updateCarPosition(far.lat, far.lng, 90, 0, true); // the car parks 500 m on, no more fixes
+  assert.equal(requests.length, 1);
+  release();
+  await new Promise(resolve => setTimeout(resolve, 700)); // busy retry after 500 ms
+  assert.equal(requests.length, 2);
+  assert.match(requests[1], new RegExp(`lat=${far.lat.toFixed(6)}`));
+  release();
+});

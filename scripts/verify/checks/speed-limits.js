@@ -6,7 +6,7 @@
 // PASS (the returned `pass` field): the route's limits cover >= 95 % of samples and the sign
 //       shows that limit and source at >= 95 % of them; free driving on a tagged road shows its
 //       OSM limit, and on an untagged Yerevan service road the urban default 60 (no dash);
-//       the page's first GPS fix already shows a limit.
+//       the page's first GPS fix, and the stop after cancelling the route, already show a limit.
 // Usage: paste into a browser-tool JS console (returns a promise) or run `npm run verify`.
 (async () => {
   const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -46,24 +46,30 @@
   const longRun = runs.filter(r => r.source !== 'default').sort((a, b) => (b.to - b.from) - (a.to - a.from))[0];
   const freePoint = longRun ? me.getPositionAtDistance((longRun.from + longRun.to) / 2) : null;
   cancelActiveNavigation();
+  // free driving again: the sign comes back for the spot the car stands on, without moving
+  for (let i = 0; i < 20 && currentSpeedLimitSource === 'estimated'; i++) await sleep(150);
   const afterCancel = sign();
 
+  // one parked fix at a spot (lookups in flight are not dropped, they run next): wait until the
+  // app has looked up exactly that spot and shown the answer
+  const parkAt = async (lat, lng) => {
+    me.updateCarPosition(lat, lng, 0, 0, true);
+    for (let i = 0; i < 40; i++) {
+      const q = me._freeLimitQuery;
+      if (q && q.lat === lat && q.lng === lng && !me._freeLimitPending) break;
+      await sleep(150);
+    }
+    await sleep(50);
+    return sign();
+  };
   let freeDriving = null;
-  if (freePoint) {
-    me._freeLimitQuery = null;
-    me.updateCarPosition(freePoint.lat, freePoint.lng, 0, 50, true);
-    for (let i = 0; i < 20 && currentSpeedLimitSource !== 'osm'; i++) await sleep(150);
-    freeDriving = { expected: longRun.limit, ...sign() };
-  }
+  if (freePoint) freeDriving = { expected: longRun.limit, ...await parkAt(freePoint.lat, freePoint.lng) };
   // the spot from the owner's screenshot: a service road by Yerevan City (no maxspeed in OSM)
-  me._freeLimitQuery = null;
-  me.updateCarPosition(40.1898, 44.4693, 0, 0, true);
-  for (let i = 0; i < 20 && currentSpeedLimitSource !== 'default'; i++) await sleep(150);
-  const yerevanYard = sign();
+  const yerevanYard = await parkAt(40.1898, 44.4693);
   localStorage.removeItem('tesla_search_history');
   return {
     pass: samples > 0 && covered / samples >= 0.95 && matched / covered >= 0.95 &&
-      afterCancel.text === '—' && !!freeDriving && Number(freeDriving.text) === freeDriving.expected && freeDriving.source === 'osm' &&
+      afterCancel.text !== '—' && !!freeDriving && Number(freeDriving.text) === freeDriving.expected && freeDriving.source === 'osm' &&
       yerevanYard.text === '60' && yerevanYard.source === 'default' && firstFix.text !== '—',
     samples, covered, legalDefaultSamples: defaults, signMatches: matched, mismatches: mismatches.slice(0, 4), firstFix, afterCancel, freeDriving, yerevanYard
   };

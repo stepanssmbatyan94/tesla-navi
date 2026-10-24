@@ -27,6 +27,7 @@ const STEP_ADVANCE_PAST_JUNCTION_M = 8;
 // Free-driving OSM speed-limit lookups: only after real movement and not too often
 const FREE_DRIVE_LIMIT_MIN_MOVE_M = 80;
 const FREE_DRIVE_LIMIT_MIN_INTERVAL_MS = 4000;
+const FREE_DRIVE_LIMIT_BUSY_RETRY_MS = 500;
 
 function loadExternalScript(src, timeoutMs = MAP_LIBRARY_TIMEOUT_MS) {
   return new Promise((resolve, reject) => {
@@ -1920,14 +1921,29 @@ class TeslaMapEngine {
   }
 
   // Free driving: ask the server for the limit where the car is (OSM or legal default), at most every
-  // FREE_DRIVE_LIMIT_MIN_MOVE_M of movement and FREE_DRIVE_LIMIT_MIN_INTERVAL_MS
-  async updateFreeDrivingSpeedLimit(lat, lng) {
-    const now = Date.now();
+  // FREE_DRIVE_LIMIT_MIN_MOVE_M of movement and FREE_DRIVE_LIMIT_MIN_INTERVAL_MS. A fix that
+  // arrives while a lookup is in flight or too soon is not dropped: one retry runs later with
+  // the latest position, so the spot where the car finally stops always gets its limit.
+  updateFreeDrivingSpeedLimit(lat, lng) {
+    this._freeLimitLatest = { lat, lng };
     const last = this._freeLimitQuery;
-    if (this._freeLimitPending) return;
-    if (last && now - last.at < FREE_DRIVE_LIMIT_MIN_INTERVAL_MS) return;
     if (last && this.calculateDistance(last.lat, last.lng, lat, lng) < FREE_DRIVE_LIMIT_MIN_MOVE_M) return;
-    this._freeLimitQuery = { lat, lng, at: now };
+    const wait = this._freeLimitPending ? FREE_DRIVE_LIMIT_BUSY_RETRY_MS : (last ? last.at + FREE_DRIVE_LIMIT_MIN_INTERVAL_MS - Date.now() : 0);
+    if (wait > 0) {
+      if (!this._freeLimitRetry) {
+        this._freeLimitRetry = setTimeout(() => {
+          this._freeLimitRetry = null;
+          const p = this._freeLimitLatest;
+          if (p && !this.activeRoute) this.updateFreeDrivingSpeedLimit(p.lat, p.lng);
+        }, wait);
+      }
+      return;
+    }
+    this.fetchFreeDrivingSpeedLimit(lat, lng);
+  }
+
+  async fetchFreeDrivingSpeedLimit(lat, lng) {
+    this._freeLimitQuery = { lat, lng, at: Date.now() };
     this._freeLimitPending = true;
     try {
       const res = await fetch(`/api/speed-limit?lat=${lat.toFixed(6)}&lng=${lng.toFixed(6)}`);
@@ -2806,6 +2822,10 @@ class TeslaMapEngine {
     this.routeSteps = [];
     this.routeCameras = [];
     this.routeSpeedLimits = [];
+    // Back to free driving: the UI cleared the sign, so look the limit up again right here,
+    // even if the car hasn't moved the usual 80 m since the last free-driving lookup
+    this._freeLimitQuery = null;
+    if (this.hasRealFix && this.currentPosition) this.updateFreeDrivingSpeedLimit(this.currentPosition.lat, this.currentPosition.lng);
     this.spokenDistanceThresholds = {};
     this.laneIntersections = [];
     this.currentStepIndex = 0;

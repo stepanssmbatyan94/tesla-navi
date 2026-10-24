@@ -163,7 +163,7 @@ Per position update (`updateCarPosition(lat, lng, heading, speedKmh, isRealFix)`
    - Speed limit: a route camera within 200 m ahead (50 m after) gives its limit; otherwise the run at the car's route distance — the OSM limit (solid) or the legal default 60/90 (dashed); otherwise the step's street-name estimate (dashed). The overspeed chime uses camera/OSM limits only.
    - Arrival within 25 m of the destination → arrival modal, route cancelled.
 8. While a route is only previewed (not navigating) only the free-driving camera check runs.
-9. Without a route, the first real GPS fix and then every fix that moved ≥ 80 m (at most every 4 s) asks `/api/speed-limit` (OSM limit or legal default); only without any data the sign shows `—` and no overspeed warning.
+9. Without a route, the first real GPS fix, the moment a route is cancelled or finished, and then every fix that moved ≥ 80 m (at most every 4 s) asks `/api/speed-limit` (OSM limit or legal default); only without any data the sign shows `—` and no overspeed warning.
 
 Route rendering (MapLibre) uses a fixed set of sources/layers — alternatives, casing, one data-driven traffic layer, traveled line — and is replayed after day/night style swaps.
 
@@ -217,6 +217,6 @@ Heuristic data that remains, and how it is presented: speed limits where OSM has
 ## 10. Testing strategy
 
 - `npm run check` — syntax.
-- `npm test` — 28 `node:test` unit tests, no network: server parsing (links, protobuf URIs, `parseYandexRoutes`), Armenian clip mapping, allowlist, rate limit, upstream timeout, OSM speed-limit matching and legal defaults; the map engine loaded in a `vm` with DOM stubs (maneuver = `steps[k+1]`, sign kept until the junction, silent preview, voice text, lane matching, speed-limit priority camera > OSM > legal default > estimate); realtime dedup and pairing codes; cockpit traffic-hint language.
+- `npm test` — 30 `node:test` unit tests, no network: server parsing (links, protobuf URIs, `parseYandexRoutes`), Armenian clip mapping, allowlist, rate limit, upstream timeout, OSM speed-limit matching and legal defaults; the map engine loaded in a `vm` with DOM stubs (maneuver = `steps[k+1]`, sign kept until the junction, silent preview, voice text, lane matching, speed-limit priority camera > OSM > legal default > estimate); realtime dedup and pairing codes; cockpit traffic-hint language.
 - `npm run verify` — 11 headless Chrome checks against a local server with live upstreams: smoke, maneuver vs. geometry (sign sampled down to 5 m before each turn), speed-limit sign vs. OSM, route layers + theme swap, XSS through the pairing channel, dual GPS, translations, Yandex provider, MapLibre-CDN-blocked and no-WebGL fallbacks, phone remote. See [playbooks/verify.md](playbooks/verify.md).
 - CI (`.github/workflows/ci.yml`): check + unit tests block merges; browser checks run but don't block (live upstreams from GitHub's network).
