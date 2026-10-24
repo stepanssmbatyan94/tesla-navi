@@ -21,6 +21,9 @@ const NO_TRAFFIC_COLOR = '#3b82f6';
 const CAMERA_LIMIT_AHEAD_M = 200;
 const CAMERA_LIMIT_BEHIND_M = 50;
 
+// How far past a junction (along the route) the HUD switches to the next maneuver
+const STEP_ADVANCE_PAST_JUNCTION_M = 8;
+
 function loadExternalScript(src, timeoutMs = MAP_LIBRARY_TIMEOUT_MS) {
   return new Promise((resolve, reject) => {
     const script = document.createElement('script');
@@ -1738,10 +1741,11 @@ class TeslaMapEngine {
 
     // 4. Maneuver advancement & countdown strictly based on route progression
     if (this.routeSteps && this.routeSteps.length > 0) {
-      // Advance maneuver step when vehicle reaches within 25m of the step's end
+      // Advance to the next maneuver only once the car has passed the junction: advancing
+      // early (it used to be 25 m before) showed the FOLLOWING turn right at the intersection
       while (
         this.currentStepIndex < this.routeSteps.length - 1 &&
-        (vehicleRouteDist >= (this.routeSteps[this.currentStepIndex].endRouteDist - 25))
+        (vehicleRouteDist >= (this.routeSteps[this.currentStepIndex].endRouteDist + STEP_ADVANCE_PAST_JUNCTION_M))
       ) {
         this.currentStepIndex++;
       }

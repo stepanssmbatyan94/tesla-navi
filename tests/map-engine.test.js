@@ -88,6 +88,16 @@ test('HUD announces the NEXT step: the turn at the end of step k is steps[k+1]',
   assert.equal(m.street, 'A St');
   assert.ok(Math.abs(m.distanceMeters - 100) <= 5);
 
+  // right at the junction (10 m before) the HUD must still show THIS turn
+  driveTo(engine, 290);
+  m = maneuvers.at(-1);
+  assert.equal(m.modifier, 'left', '10 m before the junction the sign is still the left turn');
+  assert.ok(m.distanceMeters <= 15);
+
+  // just past the junction it switches to the next maneuver
+  driveTo(engine, 320);
+  assert.equal(maneuvers.at(-1).modifier, 'right');
+
   driveTo(engine, 500);
   m = maneuvers.at(-1);
   assert.equal(m.modifier, 'right');
