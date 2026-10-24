@@ -1381,6 +1381,8 @@ class TeslaMapEngine {
           this.carMarker.setLngLat([lng, lat]);
         } else if (this.provider === 'yandex') {
           this.carMarker.geometry.setCoordinates([lat, lng]);
+        } else if (this.provider === 'osm') {
+          this.carMarker.setLatLng([lat, lng]);
         }
       }
 
@@ -1394,6 +1396,8 @@ class TeslaMapEngine {
           });
         } else if (this.provider === 'yandex') {
           this.map.setCenter([lat, lng], this.navZoom, { duration: 0 });
+        } else if (this.provider === 'osm') {
+          this.map.setView([lat, lng], this.navZoom, { animate: false });
         }
       }
       this._lastPosUpdateCb = performance.now();
