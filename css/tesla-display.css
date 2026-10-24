@@ -1,5 +1,6 @@
 /* Tesla Navi Automotive Cockpit Stylesheet (Mapsev & Yandex Navigator Architecture) */
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600;700&family=Noto+Sans+Armenian:wght@400;500;600;700;800&display=swap');
+/* Web fonts are linked (non-blocking) from index.html: an @import here delayed the first paint by
+   another serial request */
 
 :root {
   --bg-dark: #f8fafc;
