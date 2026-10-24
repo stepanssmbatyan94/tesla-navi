@@ -682,3 +682,18 @@ const I18N = {
     coordsPoint: 'Coordinates point'
   }
 };
+
+// Yandex traffic hints have no Armenian version (the XML carries ru, en, uk, tr…), so the
+// known phrases are translated here, keyed by the Russian hint (ё → е). An unknown phrase
+// is left out in Armenian rather than shown in Russian.
+const YANDEX_TRAFFIC_HINTS_HY = {
+  'дороги свободны': 'Ճանապարհներն ազատ են',
+  'дороги почти свободны': 'Ճանապարհները գրեթե ազատ են',
+  'местами затруднения': 'Տեղ-տեղ դժվարություններ',
+  'движение плотное': 'Երթևեկությունը խիտ է',
+  'движение затруднено': 'Երթևեկությունը դժվարացած է',
+  'серьезные пробки': 'Լուրջ խցանումներ',
+  'многокилометровые пробки': 'Բազմակիլոմետրանոց խցանումներ',
+  'город стоит': 'Քաղաքը կանգնած է',
+  'пешком быстрее': 'Ոտքով ավելի արագ է'
+};
