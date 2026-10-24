@@ -17,7 +17,7 @@ npm install            # Node >= 20
 npm start              # http://localhost:8085 (PORT env overrides; Cloud Run sets 8080)
 npm run check          # node --check on all server/client JS
 npm test               # unit tests (node:test, no network), ~1 s
-npm run verify         # 11 headless browser checks (system Chrome, live network), ~45 s
+npm run verify         # 12 headless browser checks (system Chrome, live network), ~45 s
 npm run verify -- smoke maneuvers --verbose
 node scripts/update_chargers.mjs   # refresh the OSM charging-station snapshot (~1 min)
 node scripts/update_speed_limits.mjs  # refresh the OSM speed-limit + built-up snapshot (~1-4 min)

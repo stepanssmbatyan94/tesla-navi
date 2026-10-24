@@ -30,6 +30,7 @@ const CHECKS = {
   security: { page: '/' },
   'dual-gps': { page: '/' },
   'speed-limits': { page: '/' },
+  reroute: { page: '/' },
   i18n: { page: '/' },
   yandex: { page: '/?provider=yandex' },
   'fallback-cdn': { page: '/', file: 'fallback', block: ['**/maplibre-gl*.js'] },

@@ -29,7 +29,7 @@ Details: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 |---|---|
 | Pairing | 6-char code + QR, Supabase Broadcast with a local WebSocket fallback, heartbeat and connection status |
 | Map | MapLibre GL vector map with MapsEV-style day/night/auto themes, 2D/3D buildings, heading-up / north-up, auto re-follow; Yandex map option; automatic Leaflet/OSM fallback when MapLibre can't load or WebGL is missing |
-| Routing | Yandex live router with up to 3 alternatives and traffic-colored polylines, OSRM fallback, off-route rerouting |
+| Routing | Yandex live router with up to 3 alternatives and traffic-colored polylines, OSRM fallback, off-route rerouting that drives on with the fastest new route (no choice offered mid-drive) |
 | Guidance | Maneuver HUD with countdown, lane arrows (OSRM lanes matched onto the Yandex route), progress bar with ETA, real traffic delay per route |
 | Voice | ru/en Google Cloud TTS neural voices (female/male), Armenian prerecorded Gor/Suzie, chime, mute |
 | Safety | ~185 speed cameras (Yerevan DB) announced only along the active route; road limits from OpenStreetMap `maxspeed`, and where a street has no tag the legal default 60 in built-up areas / 90 outside (dashed); camera limit wins near a camera; overspeed chime on camera/OSM limits |
@@ -58,7 +58,7 @@ Geolocation on a real phone needs HTTPS: use the production URL or a tunnel (`ng
 ```bash
 npm run check        # syntax check of all JS
 npm test             # unit tests (node:test, ~1 s, no network)
-npm run verify       # 11 headless browser checks in system Chrome (~45 s, needs network)
+npm run verify       # 12 headless browser checks in system Chrome (~45 s, needs network)
 ```
 
 ## Project structure

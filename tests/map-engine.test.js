@@ -430,3 +430,24 @@ test('network polls skip ticks while the page is hidden and catch up once visibl
   await sleep(60);
   assert.equal(calls, after);
 });
+
+test('a reroute while driving takes the fastest route at once, never offers a choice', async () => {
+  const { ctx, engine } = newEngine();
+  const offered = [];
+  const rerouted = [];
+  engine.onRouteCalculated = r => offered.push(r);
+  engine.onRerouted = r => rerouted.push(r);
+  engine.playNavChime = () => {};
+  engine.applyRouteData(routeData(), DEST, 1 - 1);
+  engine.isNavigating = true;
+  // Yandex answers with two routes, fastest first (the server sorts by duration with traffic)
+  const fast = routeData().routes[0];
+  const slow = { ...routeData().routes[0], duration: 1500 };
+  ctx.fetch = async () => ({ json: async () => ({ success: true, source: 'yandex', routes: [{ ...fast, duration: 500 }, slow] }) });
+  await engine.recalculateRoute(LAT + 0.002, LNG0);
+  assert.equal(offered.length, 0, 'no route options mid-drive');
+  assert.equal(rerouted.length, 1);
+  assert.equal(engine.activeRouteIndex, 0, 'the fastest route');
+  assert.equal(engine.isNavigating, true);
+  assert.equal(engine.activeRoute.durationSec, 500);
+});
