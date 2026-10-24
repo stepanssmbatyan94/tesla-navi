@@ -228,3 +228,20 @@ test('cancelling the route looks the free-driving limit up again without moving'
   await new Promise(resolve => setImmediate(resolve));
   assert.equal(requests.length, 2);
 });
+
+test('a fix that arrives during a lookup is looked up right after it, not dropped', async () => {
+  const { ctx, engine } = newEngine();
+  const requests = [];
+  let release;
+  ctx.fetch = url => { requests.push(url); return new Promise(resolve => { release = () => resolve({ ok: true, json: async () => ({ limit: 60, source: 'osm' }) }); }); };
+  engine.updateCarPosition(LAT, LNG0, 90, 0, true); // first fix: lookup #1 in flight
+  engine._freeLimitQuery = { ...engine._freeLimitQuery, at: 0 }; // pretend the interval has passed
+  const far = at(500);
+  engine.updateCarPosition(far.lat, far.lng, 90, 0, true); // the car parks 500 m on, no more fixes
+  assert.equal(requests.length, 1);
+  release();
+  await new Promise(resolve => setTimeout(resolve, 700)); // busy retry after 500 ms
+  assert.equal(requests.length, 2);
+  assert.match(requests[1], new RegExp(`lat=${far.lat.toFixed(6)}`));
+  release();
+});

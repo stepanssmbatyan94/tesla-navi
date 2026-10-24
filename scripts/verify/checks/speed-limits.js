@@ -50,18 +50,22 @@
   for (let i = 0; i < 20 && currentSpeedLimitSource === 'estimated'; i++) await sleep(150);
   const afterCancel = sign();
 
+  // one parked fix at a spot (lookups in flight are not dropped, they run next): wait until the
+  // app has looked up exactly that spot and shown the answer
+  const parkAt = async (lat, lng) => {
+    me.updateCarPosition(lat, lng, 0, 0, true);
+    for (let i = 0; i < 40; i++) {
+      const q = me._freeLimitQuery;
+      if (q && q.lat === lat && q.lng === lng && !me._freeLimitPending) break;
+      await sleep(150);
+    }
+    await sleep(50);
+    return sign();
+  };
   let freeDriving = null;
-  if (freePoint) {
-    me._freeLimitQuery = null;
-    me.updateCarPosition(freePoint.lat, freePoint.lng, 0, 50, true);
-    for (let i = 0; i < 20 && currentSpeedLimitSource !== 'osm'; i++) await sleep(150);
-    freeDriving = { expected: longRun.limit, ...sign() };
-  }
+  if (freePoint) freeDriving = { expected: longRun.limit, ...await parkAt(freePoint.lat, freePoint.lng) };
   // the spot from the owner's screenshot: a service road by Yerevan City (no maxspeed in OSM)
-  me._freeLimitQuery = null;
-  me.updateCarPosition(40.1898, 44.4693, 0, 0, true);
-  for (let i = 0; i < 20 && currentSpeedLimitSource !== 'default'; i++) await sleep(150);
-  const yerevanYard = sign();
+  const yerevanYard = await parkAt(40.1898, 44.4693);
   localStorage.removeItem('tesla_search_history');
   return {
     pass: samples > 0 && covered / samples >= 0.95 && matched / covered >= 0.95 &&
