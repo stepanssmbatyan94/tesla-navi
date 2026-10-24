@@ -1338,6 +1338,7 @@ html, body {
   border: 3.5px solid #ef4444;
   background: #fef2f2;
   box-shadow: 0 0 18px rgba(239, 68, 68, 0.55), 0 4px 14px rgba(0, 0, 0, 0.15);
+  /* only while over the limit; scale only (compositor), the shadow stays still */
   animation: overspeed-pulse 0.9s infinite alternate ease-in-out;
 }
 
@@ -1347,14 +1348,8 @@ html, body {
 }
 
 @keyframes overspeed-pulse {
-  from {
-    transform: scale(1);
-    box-shadow: 0 0 10px rgba(239, 68, 68, 0.35);
-  }
-  to {
-    transform: scale(1.06);
-    box-shadow: 0 0 22px rgba(239, 68, 68, 0.7);
-  }
+  from { transform: scale(1); }
+  to { transform: scale(1.06); }
 }
 
 .current-speed-val {
@@ -2454,10 +2449,12 @@ body.night-mode .nav-progress-traveled-fill {
 }
 .mini-eq-bars span {
   width: 2.5px;
-  height: 4px;
+  height: 13px;
   background: #ef4444;
   border-radius: 1px;
-  transition: height 0.2s ease;
+  /* scaleY, not height: animating height re-ran layout on every frame */
+  transform: scaleY(0.3);
+  transform-origin: bottom;
 }
 .music-mini-player.playing .mini-eq-bars span:nth-child(1) {
   animation: eqBounce 0.8s infinite ease-in-out;
@@ -2469,8 +2466,8 @@ body.night-mode .nav-progress-traveled-fill {
   animation: eqBounce 0.9s infinite ease-in-out 0.4s;
 }
 @keyframes eqBounce {
-  0%, 100% { height: 3px; }
-  50% { height: 13px; }
+  0%, 100% { transform: scaleY(0.23); }
+  50% { transform: scaleY(1); }
 }
 
 .mini-player-info {
@@ -2651,12 +2648,10 @@ body.night-mode .nav-progress-traveled-fill {
   height: 44px;
   border-radius: 50%;
   background: rgba(239, 68, 68, 0.25);
-  animation: carPulse 2s infinite ease-out;
-}
-
-@keyframes carPulse {
-  0% { transform: scale(0.6); opacity: 0.9; }
-  100% { transform: scale(1.8); opacity: 0; }
+  /* a still halo: an endless pulse here kept the compositor redrawing over the map even
+     with the car parked (the main idle cost after the blur) */
+  transform: scale(1.15);
+  opacity: 0.55;
 }
 
 .tesla-car-arrow {
@@ -2681,7 +2676,8 @@ body.night-mode .nav-progress-traveled-fill {
   height: 32px;
   border-radius: 50%;
   background: rgba(239, 68, 68, 0.3);
-  animation: carPulse 1.6s infinite ease-out;
+  transform: scale(1.2);
+  opacity: 0.6;
 }
 
 /* ==========================================================================
@@ -3211,27 +3207,6 @@ body.night-mode .nav-progress-traveled-fill {
   fill: #1e293b;
 }
 
-/* Red ring when camera is active ahead along the current route */
-.camera-map-badge.active-route-camera {
-  border: 2.5px solid #ef4444;
-  box-shadow: 0 0 12px rgba(239, 68, 68, 0.6), 0 2px 6px rgba(0, 0, 0, 0.25);
-  animation: camera-pulse 1.2s infinite alternate ease-in-out;
-}
-
-.camera-map-badge.active-route-camera svg {
-  fill: #dc2626;
-}
-
-@keyframes camera-pulse {
-  from {
-    transform: scale(1);
-    box-shadow: 0 0 8px rgba(239, 68, 68, 0.4);
-  }
-  to {
-    transform: scale(1.12);
-    box-shadow: 0 0 16px rgba(239, 68, 68, 0.8);
-  }
-}
 
 /* Suppress Yandex Maps 2.1 promo links ("Создать свою карту", "Как добраться", taxi, promo banners) */
 ymaps[class*="-gotoymaps"],
@@ -3387,6 +3362,9 @@ body.route-options-open .quick-dest-bar {
   opacity: 0;
   pointer-events: none;
   transform: translateX(-50%) translateY(-10px);
+}
+.gps-status-banner.hidden .gps-pulse-dot {
+  animation: none; /* hidden by opacity, so the pulse would keep running unseen */
 }
 
 .gps-pulse-dot {
