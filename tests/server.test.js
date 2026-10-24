@@ -282,3 +282,30 @@ test('extractLaneIntersections reads lanes from every leg and keeps the exit bea
   assert.equal(out.length, 2);
   assert.deepEqual([out[0].outBearing, out[0].lanes.length, out[0].modifier], [270, 2, 'left']);
 });
+
+test('ru/en voices come from Google Cloud TTS with the right voice, cached per voice and text', async () => {
+  const { synthesizeNeuralSpeech } = require('../server.js');
+  const realFetch = globalThis.fetch;
+  const calls = [];
+  process.env.GOOGLE_TTS_ACCESS_TOKEN = 'test-token';
+  globalThis.fetch = async (url, opts = {}) => {
+    calls.push({ url: String(url), body: opts.body ? JSON.parse(opts.body) : null, auth: opts.headers && opts.headers.Authorization });
+    return { ok: true, status: 200, json: async () => ({ audioContent: Buffer.from('MP3DATA').toString('base64') }) };
+  };
+  try {
+    const text = `Поверните налево ${Date.now()}`; // unique: no cache from other tests
+    const male = await synthesizeNeuralSpeech(text, 'dmitry', 'ru');
+    assert.equal(male.toString(), 'MP3DATA');
+    assert.equal(calls.length, 1);
+    assert.match(calls[0].url, /texttospeech\.googleapis\.com\/v1\/text:synthesize/);
+    assert.equal(calls[0].auth, 'Bearer test-token');
+    assert.deepEqual(calls[0].body.voice, { languageCode: 'ru-RU', name: 'ru-RU-Chirp3-HD-Charon' });
+    await synthesizeNeuralSpeech(text, 'dmitry', 'ru');
+    assert.equal(calls.length, 1, 'second request served from the cache');
+    await synthesizeNeuralSpeech(`Turn left ${Date.now()}`, 'ava', 'en');
+    assert.equal(calls[1].body.voice.name, 'en-US-Chirp3-HD-Aoede');
+  } finally {
+    globalThis.fetch = realFetch;
+    delete process.env.GOOGLE_TTS_ACCESS_TOKEN;
+  }
+});
