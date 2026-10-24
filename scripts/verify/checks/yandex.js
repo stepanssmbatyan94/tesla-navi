@@ -1,8 +1,9 @@
 // YANDEX — run on /?provider=yandex. The Yandex Maps JS provider loads on demand, builds and
 // draws a route, drives to arrival and cleans up.
 // PASS (the returned `pass` field): provider === 'yandex', route built, maneuvers seen,
-//       heading-up like MapLibre (the road 80 m ahead is drawn straight above the car, within
-//       30°, car at ~64 % of the height; a user pan turns the map back north-up), arrived,
+//       heading-up like MapLibre (a route point 80 m ahead is drawn at its bearing minus the
+//       car's heading, within 12° — straight up on a straight road; car at ~64 % of the height;
+//       a user pan turns the map back north-up), arrived,
 //       geo objects back to the car marker only, no page errors.
 // Usage: paste into a browser-tool JS console (returns a promise) or run `npm run verify`.
 (async () => {
@@ -41,7 +42,11 @@
       await sleep(450); // the rotor turns with a 0.3 s transition
       const car = centerOf(document.querySelector('#yandex-car-marker .tesla-car-arrow'));
       const pr = centerOf(document.getElementById('verify-probe'));
-      headingUp.push({ d, angle: Math.round(Math.atan2(pr.x - car.x, car.y - pr.y) * 180 / Math.PI), carY: +(car.y / innerHeight).toFixed(2) });
+      const angle = Math.atan2(pr.x - car.x, car.y - pr.y) * 180 / Math.PI;
+      const cp = me.currentPosition;
+      const expected = me.calculateBearing(cp.lat, cp.lng, ahead.lat, ahead.lng) - me.currentHeading;
+      const off = Math.abs(((angle - expected) % 360 + 540) % 360 - 180);
+      headingUp.push({ d, angle: Math.round(angle), expected: Math.round((expected + 540) % 360 - 180), off: Math.round(off), carY: +(car.y / innerHeight).toFixed(2) });
     }
   }
   me.map.geoObjects.remove(probe);
@@ -59,7 +64,7 @@
   const afterPan = rotor.style.transform;
   me.recenter();
   const afterRecenter = rotor.style.transform;
-  const headingUpOk = headingUp.length >= 2 && headingUp.every(h => Math.abs(h.angle) <= 30 && Math.abs(h.carY - 0.64) <= 0.03);
+  const headingUpOk = headingUp.length >= 2 && headingUp.every(h => h.off <= 12 && Math.abs(h.carY - 0.64) <= 0.03);
   return {
     pass: me.provider === 'yandex' && routeBuilt && withRoute > atStart && maneuvers.length > 1 && arrived && afterArrival === atStart && errs.length === 0 &&
       headingUpOk && afterPan === 'none' && afterRecenter.startsWith('rotate('),
