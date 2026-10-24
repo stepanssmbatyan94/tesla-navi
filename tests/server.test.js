@@ -360,3 +360,21 @@ test('static files: compressed when accepted, ?v= immutable, others revalidated 
     await new Promise(resolve => server.close(resolve));
   }
 });
+
+test('map sprites: each PNG is the size its JSON index was made for (1x half of @2x)', () => {
+  // PNG width/height from the IHDR chunk
+  const pngSize = file => { const b = fs.readFileSync(file); return [b.readUInt32BE(16), b.readUInt32BE(20)]; };
+  for (const theme of ['day', 'night']) {
+    const base = path.join(ROOT, 'styles/sprites', `mapsev-${theme}`);
+    const [w1, h1] = pngSize(`${base}.png`);
+    const [w2, h2] = pngSize(`${base}@2x.png`);
+    assert.deepEqual([w1 * 2, h1 * 2], [w2, h2], `${theme}: the 1x PNG must be half the @2x one`);
+    for (const [suffix, w, h] of [['', w1, h1], ['@2x', w2, h2]]) {
+      const index = JSON.parse(fs.readFileSync(`${base}${suffix}.json`, 'utf8'));
+      const right = Math.max(...Object.values(index).map(i => i.x + i.width));
+      const bottom = Math.max(...Object.values(index).map(i => i.y + i.height));
+      assert.ok(right <= w && bottom <= h, `${theme}${suffix}: icons up to ${right}x${bottom} in a ${w}x${h} image`);
+      assert.ok(right > w * 0.9, `${theme}${suffix}: index uses only ${right} of ${w} px (wrong scale?)`);
+    }
+  }
+});
