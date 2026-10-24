@@ -295,14 +295,19 @@ let currentSpeedLimitSource = 'estimated';
 
 function setSpeedLimitDisplay(limit, source) {
   const limitEl = document.getElementById('speed-limit-val');
-  currentSpeedLimitSource = (source === 'camera' || source === 'osm') ? source : 'estimated';
+  currentSpeedLimitSource = ['camera', 'osm', 'default'].includes(source) ? source : 'estimated';
   if (!limitEl) return;
   // No limit known here: a dash, never the previous road's number
   limitEl.textContent = limit || '—';
-  const estimated = currentSpeedLimitSource === 'estimated';
-  limitEl.classList.toggle('speed-limit-estimated', estimated);
+  // camera/OSM limits come from a sign; a legal default or an estimate is drawn dashed
+  limitEl.classList.toggle('speed-limit-estimated', currentSpeedLimitSource === 'estimated' || currentSpeedLimitSource === 'default');
   const dict = I18N[currentLang] || I18N.ru;
-  limitEl.title = estimated ? dict.speedLimitEstimated : (currentSpeedLimitSource === 'camera' ? dict.speedLimitCamera : dict.speedLimitOsm);
+  limitEl.title = {
+    camera: dict.speedLimitCamera,
+    osm: dict.speedLimitOsm,
+    default: Number(limit) > 60 ? dict.speedLimitDefaultRural : dict.speedLimitDefaultUrban,
+    estimated: dict.speedLimitEstimated
+  }[currentSpeedLimitSource];
 }
 
 function updateSpeedometerDisplay(speedKmh) {
@@ -320,7 +325,8 @@ function updateSpeedometerDisplay(speedKmh) {
 
   // Audio chime warning: strictly when speed exceeds limit + 10 km/h (e.g. 71+ at limit 60),
   // and only for a real limit (camera or OSM road data), never for a street-name estimate
-  const isAudioWarning = currentSpeedLimitSource !== 'estimated' && currentSpeed >= (speedLimit + 11);
+  // the chime only for limits from a sign: an unsigned avenue may legally allow more than the default
+  const isAudioWarning = (currentSpeedLimitSource === 'camera' || currentSpeedLimitSource === 'osm') && currentSpeed >= (speedLimit + 11);
 
   if (circleEl) {
     if (isOverLimit) {

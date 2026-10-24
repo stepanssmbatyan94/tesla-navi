@@ -176,6 +176,9 @@ test('speed limit priority: camera ahead > OpenStreetMap road limit > street-nam
   driveTo(engine, 650);
   assert.deepEqual([maneuvers.at(-1).speedLimit, maneuvers.at(-1).speedLimitSource], [60, 'camera']);
   engine.routeCameras = [];
+  engine.routeSpeedLimits = [{ from: 0, to: 1000, limit: 60, source: 'default' }];
+  driveTo(engine, 680);
+  assert.deepEqual([maneuvers.at(-1).speedLimit, maneuvers.at(-1).speedLimitSource], [60, 'default']);
   engine.routeSpeedLimits = [];
   driveTo(engine, 700);
   assert.equal(maneuvers.at(-1).speedLimitSource, 'estimated');
