@@ -7,15 +7,16 @@ const LANE_MATCH_MAX_BEARING_DIFF = 35;
 // Lanes of the maneuver's own junction appear from this far and win over pass-through junctions
 const LANE_MANEUVER_SHOW_M = 300;
 const LANE_AT_MANEUVER_BEFORE_M = 40; // a lane junction this close before/after the maneuver
-const LANE_AT_MANEUVER_AFTER_M = 15;  // point is the maneuver's junction
+const LANE_AT_MANEUVER_AFTER_M = 30;  // point is the maneuver's junction (OSM's junction node can
+                                      // sit ~20 m past Yandex's maneuver point on wide crossings)
 
 // Lane arrows that fit a movement (OSRM indications: uturn, sharp/slight left/right, straight,
 // none), best first: exact arrows, then near ones when the junction has no exact arrow
 const LANE_TURN_INDICATIONS = {
   left: [['left', 'sharp left'], ['slight left']],
   right: [['right', 'sharp right'], ['slight right']],
-  'slight left': [['slight left'], ['left'], ['straight', 'none']],
-  'slight right': [['slight right'], ['right'], ['straight', 'none']],
+  'slight left': [['slight left'], ['left'], ['straight', 'none']],   // straight: only lanes without a
+  'slight right': [['slight right'], ['right'], ['straight', 'none']], // turn to the other side, see below
   straight: [['straight'], ['none', 'slight left', 'slight right']],
   'u-turn': [['uturn'], ['left', 'sharp left']]
 };
@@ -27,8 +28,15 @@ function highlightLanesForTurn(lanes, turn) {
   if (!Array.isArray(lanes) || !lanes.length) return lanes;
   const groups = LANE_TURN_INDICATIONS[String(turn || 'straight').toLowerCase()];
   if (!groups) return lanes;
+  const t = String(turn || '').toLowerCase();
+  const otherSide = t === 'slight left' ? /right/ : (t === 'slight right' ? /left/ : null);
   for (const group of groups) {
-    const fits = lanes.map(l => (l.indications || []).some(i => group.includes(String(i).toLowerCase())));
+    let fits = lanes.map(l => (l.indications || []).some(i => group.includes(String(i).toLowerCase())));
+    // keeping left at a fork whose lanes only say "straight": not the lane that also turns right
+    if (otherSide && group.includes('straight')) {
+      const strict = lanes.map((l, i) => fits[i] && !(l.indications || []).some(ind => otherSide.test(String(ind).toLowerCase())));
+      if (strict.some(Boolean)) fits = strict;
+    }
     if (fits.some(Boolean)) return lanes.map((l, i) => ({ ...l, valid: fits[i] }));
   }
   return lanes;
