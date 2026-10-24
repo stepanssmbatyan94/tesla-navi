@@ -55,9 +55,11 @@ Single `http.createServer` handler plus a `ws` WebSocketServer on `/ws`. No fram
 | `/api/route` | Fetches the Yandex Maps routes page and parses the embedded `state-view` JSON (`config.routerResponse.routes`): geometry, traffic colorization, segments → steps, speed-limit heuristic, route summaries. OSRM is queried in parallel for lane data and is the fallback router. |
 | `/api/geocode`, `/api/resolve-location` | Yandex Suggest (with word-order and language fallbacks) → org-page coordinates → Photon → Nominatim. `resolve-location` also expands Google/Yandex/Apple/2GIS share links (allowlisted hosts, redirects re-checked). |
 | `/api/tts` | ru/en via `msedge-tts` (LRU cache, 300 entries, text ≤ 300 chars); Armenian via prerecorded clips chosen by `getArmenianAudio()`, 404 for unknown phrases. |
-| `/api/traffic-yerevan` | Yandex traffic score XML for Yerevan (60 s cache); city/highway heuristics elsewhere. |
+| `/api/traffic-yerevan` | Yandex traffic score XML for Yerevan (60 s cache); elsewhere `available: false` (no data, never a guess). |
 | `/api/speed-cameras` | Serves `data/yerevan-cameras-clean.json` (~185 cameras, OSM ids). |
+| `/api/chargers` | Serves `data/ev-chargers.json`: the 105 car charging stations OpenStreetMap has in Armenia (snapshot refreshed by `scripts/update_chargers.mjs`; Overpass is too slow to query per request). No availability data exists. |
 | `/api/yt-search`, `/api/yt-suggestions` | YouTube HTML/InnerTube scraping and Google suggest. |
+| Cross-cutting | Every upstream fetch has a 12 s deadline (`fetchUpstream`); `/api/*` is rate-limited per client IP (token bucket: burst 60, ~120/min, 429 + `Retry-After`). |
 | `/ws?room=<code>` | Rooms in a process-local `Map`; every frame is relayed to the other members of the room, preserving text/binary type. |
 
 ### 3.2 Realtime — `js/realtime.js`
@@ -65,7 +67,7 @@ Single `http.createServer` handler plus a `ws` WebSocketServer on `/ws`. No fram
 `TeslaRealtime` is shared by both pages (`role: 'display' | 'phone'`):
 
 - Joins Supabase Broadcast channel `pair-<code>` **and** the local `/ws?room=<code>`; every send goes over both.
-- Receivers drop duplicates and stale packets by the sender `timestamp` (a timestamp > 30 s older is treated as a new sender and resyncs).
+- Receivers drop exact repeats (kind + timestamp + lat/lng of the last 64 packets), so a second phone or a skewed clock is never silenced.
 - Local WS reconnects with exponential backoff (1 s → 15 s) and on tab visibility.
 - Heartbeat: ping every 4 s; the display marks the phone lost after 8 s without packets.
 
@@ -74,12 +76,13 @@ Message formats: [API.md](API.md#realtime-messages).
 ### 3.3 Car screen — `index.html`, `js/tesla-cockpit.js`, `js/maps/map-engine.js`
 
 - `tesla-cockpit.js` owns all DOM: i18n application, pairing modal + QR, saved places (Home/Work/favorites), search and history, route-alternatives drawer, HUD and lane pill, progress bar, chargers, weather, YouTube player, dev simulator/diagnostics. It wires UI callbacks into the engine.
-- `TeslaMapEngine` owns the map and the navigation state machine (section 5). Providers: MapLibre (default), Yandex Maps JS (`provider=yandex`), Leaflet code path (unused fallback).
-- Scripts are classic (non-module) and load in order: `config.js`, `realtime.js`, `map-engine.js`, `tesla-cockpit.js`; MapLibre, Leaflet, Yandex Maps JS and supabase-js come from CDNs.
+- `TeslaMapEngine` owns the map and the navigation state machine (section 5). Providers: MapLibre (default, deferred `<script>`), Yandex Maps JS (`provider=yandex`, loaded on demand; falls back to MapLibre) and Leaflet/OSM (`provider` becomes `osm`, loaded on demand when MapLibre can't load or start, e.g. CDN down or no WebGL). The toolbar badge shows the engine actually running.
+- **GPS sources:** the paired phone wins; the car browser's own geolocation is used only when no phone fix arrived within 5 s, so two receivers never alternate.
+- Scripts are classic (non-module) and load in order: `config.js`, `realtime.js`, `map-engine.js`, `tesla-cockpit.js`; MapLibre and supabase-js (pinned 2.118.0) come from CDNs.
 
 ### 3.4 Phone remote — `phone.html`, `js/phone-remote.js`
 
-Auto-starts `watchPosition` (high accuracy), derives heading from movement when the device gives none, keeps a screen wake lock (re-acquired on return to the tab), resolves typed addresses/links via `/api/resolve-location` and sends `destination_set`.
+Auto-starts `watchPosition` (high accuracy), derives heading from movement when the device gives none, keeps a screen wake lock (re-acquired on return to the tab), shows the age of the last fix, resolves typed addresses/links via `/api/resolve-location` and sends `destination_set`. Its language comes from the car's QR code (`&lang=`), else the browser language.
 
 ### 3.5 Client state (localStorage)
 
@@ -109,7 +112,7 @@ sequenceDiagram
   loop every GPS fix (~1 Hz)
     Phone->>SB: gps_update {lat,lng,heading,speed m/s,accuracy,timestamp}
     SB-->>Car: same packet twice (both transports)
-    Car->>Car: dedupe by timestamp → updateCarPosition()
+    Car->>Car: drop the exact repeat → updateCarPosition()
   end
   loop every 4 s
     Car-->>Phone: ping {role}
@@ -138,7 +141,7 @@ sequenceDiagram
   UI->>Eng: "Go" → startNavigation()
 ```
 
-If Yandex fails, the OSRM response is returned (`source: "osrm"`) and traffic colors fall back to a synthetic pattern (a known fake, see section 9).
+If Yandex fails, the OSRM response is returned (`source: "osrm"`) and the route is drawn in one neutral color (no traffic information).
 
 ## 5. Navigation engine (`TeslaMapEngine`)
 
@@ -156,6 +159,7 @@ Per position update (`updateCarPosition(lat, lng, heading, speedKmh, isRealFix)`
    - Voice: "in 300 m …" between 350–100 m, immediate prompt between 85–15 m, once per step.
    - Lanes: nearest matched OSRM junction within 220 m ahead.
    - Cameras on the route: chime + voice once between 350–80 m; badge within 600 m.
+   - Speed limit: a route camera within 400 m ahead (50 m after) gives the verified limit; otherwise the step's street-name estimate, drawn as a dashed sign. The overspeed chime uses verified limits only.
    - Arrival within 25 m of the destination → arrival modal, route cancelled.
 8. While a route is only previewed (not navigating) only the free-driving camera check runs.
 
@@ -184,7 +188,8 @@ Details and commands: [DEPLOYMENT.md](DEPLOYMENT.md).
 - **Trust boundaries:** the pairing channel is public to anyone who knows the 6-character code (Supabase anon key is public by design). Everything received on it is untrusted: destination packets are validated, and all external/untrusted text is escaped before reaching `innerHTML`.
 - **Server:** only the front-end is served; `/api/resolve-location` fetches only allowlisted map-link hosts and re-checks each redirect (SSRF); TTS input is length-limited and the cache bounded.
 - **No accounts, no server-side personal data.** Personal data lives in the car browser's localStorage.
-- Open items: room codes come from `Math.random`; no rate limiting on `/api/*`; scraping endpoints can be blocked by upstreams at any time.
+- Pairing codes use `crypto.getRandomValues`; `/api/*` is rate-limited per IP and every upstream call has a deadline.
+- Open items: scraping endpoints can be blocked by upstreams at any time; the rate limiter is per Cloud Run instance.
 
 ## 8. Performance constraints (Tesla MCU)
 
@@ -196,18 +201,20 @@ Details and commands: [DEPLOYMENT.md](DEPLOYMENT.md).
 
 | Dependency | Used for | If it fails |
 |---|---|---|
-| Yandex Maps (scraped page + suggest + XML) | Routes, traffic, geocoding, score | Routes fall back to OSRM (no live traffic, synthetic colors); geocoding to Photon/Nominatim; score to a time-of-day heuristic. Page format changes break parsing silently. |
+| Yandex Maps (scraped page + suggest + XML) | Routes, traffic, geocoding, score | Routes fall back to OSRM (no traffic, neutral color); geocoding to Photon/Nominatim; the score badge shows a dash. Page format changes break parsing silently. |
 | OSRM public demo server | Lanes, fallback routes | No lane arrows; no fallback route. Rate-limited, no SLA. |
 | Supabase Realtime | Primary pairing channel | Local `/ws` only (per-instance, see 6). |
 | Microsoft Edge TTS (`msedge-tts`) | ru/en voice | Prompt fails (chime only); one retry. |
 | OpenFreeMap tiles/glyphs | Base map | Blank map. |
-| CDNs (unpkg, jsdelivr, api-maps.yandex.ru) | MapLibre, Leaflet, supabase-js, Yandex JS | Page fails to initialize the map/realtime. |
+| CDNs (unpkg, jsdelivr, api-maps.yandex.ru) | MapLibre, Leaflet, supabase-js, Yandex JS | MapLibre unavailable → Leaflet/OSM map; Yandex JS unavailable → MapLibre; supabase-js unavailable → local `/ws` only. |
+| OpenStreetMap / Overpass | Charging-station snapshot (offline refresh) | Nothing at runtime; the snapshot just ages. |
 | Open-Meteo, YouTube, api.qrserver.com | Weather, music, QR | Feature unavailable. |
 
-Known fake/heuristic data still in the product (to be removed or labeled): synthetic traffic colors on OSRM fallback, time-of-day traffic score, static EV charger availability, hardcoded "traffic lights" count and phone ping/satellite labels, fixed POIs for category chips, curated YouTube IDs, speed limits inferred from street names.
+Heuristic data that remains, and how it is presented: speed limits from street names (dashed "estimate" sign, no chime); the YouTube home feed is a curated list of existing videos. Battery levels, charger availability, traffic guesses, ping/satellite labels and fixed POIs were removed.
 
 ## 10. Testing strategy
 
 - `npm run check` — syntax.
-- `npm run verify` — headless Chrome end-to-end checks against a local server with live upstreams: smoke flow, maneuver vs. geometry, route layers + theme swap, XSS through the pairing channel, phone remote behaviours. See [playbooks/verify.md](playbooks/verify.md).
-- No unit tests yet. Good first candidates: Yandex response parsing, `formatNavDistance`/`formatNavDuration`, `getArmenianAudio`, `snapToActiveRoute`, step/maneuver alignment (`node:test`, no dependencies).
+- `npm test` — 18 `node:test` unit tests, no network: server parsing (links, protobuf URIs, `parseYandexRoutes`), Armenian clip mapping, allowlist, rate limit, upstream timeout; the map engine loaded in a `vm` with DOM stubs (maneuver = `steps[k+1]`, silent preview, voice text, lane matching, speed-limit source); realtime dedup and pairing codes.
+- `npm run verify` — 10 headless Chrome checks against a local server with live upstreams: smoke, maneuver vs. geometry, route layers + theme swap, XSS through the pairing channel, dual GPS, translations, Yandex provider, MapLibre-CDN-blocked and no-WebGL fallbacks, phone remote. See [playbooks/verify.md](playbooks/verify.md).
+- CI (`.github/workflows/ci.yml`): check + unit tests block merges; browser checks run but don't block (live upstreams from GitHub's network).

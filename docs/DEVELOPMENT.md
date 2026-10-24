@@ -20,6 +20,7 @@ npm start                    # http://localhost:8085   (PORT=xxxx to change)
 | `/phone?code=TEST01` | Phone remote for the same room |
 | `?provider=yandex` | Yandex Maps JS instead of MapLibre |
 | `?theme=day|night|auto` | Force a theme |
+| `/phone?code=…&lang=hy` | Phone remote in a given language (the car's QR adds it) |
 
 Open the car screen and the phone page in two tabs with the same `code` to test pairing on one machine.
 
@@ -48,15 +49,18 @@ ngrok http 8085              # open https://<id>.ngrok.app/?code=… in the car,
 ├── css/                       tesla-display.css (car), phone-remote.css (phone)
 ├── styles/                    mapsev-day.json, mapsev-night.json, sprites/
 ├── sounds/                    nav-chime.wav, hy/{gor,suzie}/*.mp3 (+ legacy hy/*.mp3)
-├── data/                      yerevan-cameras-clean.json (served), yerevan-cameras.json (raw)
+├── data/                      yerevan-cameras-clean.json, ev-chargers.json (served via /api), yerevan-cameras.json (raw)
+├── tests/                     npm test: node:test unit tests; helpers/browser-context.js loads js/*.js in a vm
 ├── scripts/
-│   ├── verify/run.mjs         npm run verify runner (headless Chrome)
+│   ├── verify/run.mjs         npm run verify runner (headless Chrome, per-check blocking/flags)
 │   ├── verify/checks/*.js     Page checks (also pasteable into a browser console)
+│   ├── update_chargers.mjs    Refresh data/ev-chargers.json from OpenStreetMap
 │   └── generate_*.py          Armenian voice pack generators
 ├── docs/                      ARCHITECTURE, API, DEPLOYMENT, DEVELOPMENT, adr/, playbooks/
 ├── AGENTS.md                  AI agent instructions (CLAUDE.md, GEMINI.md, .github/ point here)
 ├── DESIGN.md                  Design tokens (Stitch)
 ├── .claude/                   Claude Code skills/agent/launch config (wrappers over docs/playbooks)
+├── .github/workflows/ci.yml   CI: check + unit tests (blocking), browser checks (non-blocking)
 └── .gcloudignore              What Cloud Run source deploys upload
 ```
 
@@ -66,7 +70,7 @@ Git-ignored, local only: `node_modules/`, `refs/` (reference screenshots/photos)
 
 1. Branch off `main`: `fix/…`, `feat/…`, `chore/…`, `docs/…`.
 2. Make the change following [AGENTS.md](../AGENTS.md) rules and invariants.
-3. `npm run check` and `npm run verify` (see [playbooks/verify.md](playbooks/verify.md)); look at the page yourself for UI changes.
+3. `npm run check`, `npm test` and `npm run verify` (see [playbooks/verify.md](playbooks/verify.md)); add unit tests for new logic in `server.js`, `map-engine.js` or `realtime.js`; look at the page yourself for UI changes.
 4. Review the diff with [playbooks/code-review.md](playbooks/code-review.md); full gate: [playbooks/release-check.md](playbooks/release-check.md).
 5. Conventional commit per logical change; PR with what/why/how verified.
 6. Deploy after merge: [DEPLOYMENT.md](DEPLOYMENT.md).
@@ -87,11 +91,13 @@ Git-ignored, local only: `node_modules/`, `refs/` (reference screenshots/photos)
 |---|---|
 | New UI string | `js/config.js` (3 dictionaries) + markup `data-i18n` |
 | New API endpoint | `server.js` handler + `docs/API.md` |
-| Change route parsing | `server.js` `/api/route` → run `npm run verify -- maneuvers` |
+| Change route parsing | `parseYandexRoutes` in `server.js` → `npm test`, `npm run verify -- maneuvers` |
 | Change guidance/HUD logic | `map-engine.js` `trackNavigationProgress` → `verify -- smoke maneuvers` |
 | New map layer | `map-engine.js` render + clear + style-swap redraw → `verify -- route-layers` |
 | New voice prompt | [playbooks/add-voice-phrase.md](playbooks/add-voice-phrase.md) |
 | New static asset folder | `PUBLIC_DIRS` in `server.js` |
+| Refresh charging stations | `node scripts/update_chargers.mjs` (Overpass, ~1 min), commit `data/ev-chargers.json` |
+| Map-provider code | branch on `mapEngine.provider` (`maplibre` / `yandex` / `osm`) → `verify -- yandex fallback-cdn fallback-webgl` |
 
 ## Debugging
 

@@ -16,8 +16,10 @@ Browser navigator for the Tesla in-car browser in regions where Tesla's own navi
 npm install            # Node >= 20
 npm start              # http://localhost:8085 (PORT env overrides; Cloud Run sets 8080)
 npm run check          # node --check on all server/client JS
-npm run verify         # headless end-to-end checks (system Chrome, live network), ~30 s
+npm test               # unit tests (node:test, no network), ~1 s
+npm run verify         # 10 headless browser checks (system Chrome, live network), ~45 s
 npm run verify -- smoke maneuvers --verbose
+node scripts/update_chargers.mjs   # refresh the OSM charging-station snapshot (~1 min)
 ```
 
 Manual URLs: car screen `/?code=TEST01`, simulator/diagnostics `/?mode=dev`, phone `/phone?code=TEST01`; params `provider=maplibre|yandex`, `theme=day|night|auto`.
@@ -35,8 +37,11 @@ js/phone-remote.js        Phone page: GPS watcher, wake lock, destination search
 css/                      Car + phone styles
 styles/                   MapLibre day/night styles + sprites (tiles: OpenFreeMap)
 sounds/                   nav chime + Armenian clips sounds/hy/{gor,suzie}/<key>.mp3
-data/                     Speed-camera DB (served only via /api/speed-cameras)
+data/                     Speed-camera DB and OSM charging stations (served only via /api/*)
+tests/                    Unit tests (node:test); browser scripts load in a vm with DOM stubs
 scripts/verify/           npm run verify runner + page checks
+scripts/update_chargers.mjs  Refreshes data/ev-chargers.json from OpenStreetMap
+.github/workflows/ci.yml  CI: check + unit tests (blocking), browser checks (non-blocking)
 scripts/generate_*.py     Armenian voice pack generators (piper; model in models/, git-ignored)
 docs/                     Architecture, API, deployment, development, ADRs, playbooks
 ```
@@ -66,12 +71,15 @@ Not served and not for agents to modify casually: `refs/` (personal reference ph
 3. **Yandex is authoritative** for routes and maneuvers. OSRM contributes lane arrows only, for junctions within 20 m of the Yandex polyline that OSRM leaves in the same direction.
 4. **Navigation state.** Turn prompts, route cameras and arrival fire only while `isNavigating`; route preview is silent. Rerouting only on real GPS fixes.
 5. **Map layers** use fixed ids (`route-alt*`, `route-full`, `route-casing`, `route-traffic`, `route-traveled*`) with data-driven colors; never one layer per segment; clear via `clearMapLibreRouteLayers()`. `setStyle` (theme switch) drops runtime layers → redraw on `style.load` (`lastRouteRender`).
-6. **Realtime packets arrive twice** (Supabase + local WS) and are deduped by sender `timestamp` in `realtime.js`. Anything new on the channel needs a `timestamp`.
+6. **Realtime packets arrive twice** (Supabase + local WS) and `realtime.js` drops exact repeats (kind + timestamp + lat/lng). Anything new on the channel needs a `timestamp`.
+7. **One GPS source at a time.** Phone fixes win; the car browser's own geolocation is used only when no phone fix arrived within 5 s (`PHONE_GPS_PRIORITY_MS`).
+8. **Speed limits.** Step limits are a street-name heuristic (`speedLimitSource: 'estimated'`, dashed sign, no chime); only a route speed camera's limit is verified (`'camera'`) and may trigger the overspeed chime.
+9. **Map providers.** `provider` must name the library actually running: `maplibre`, `yandex` (loaded on demand) or `osm` (Leaflet fallback when MapLibre can't load or start). Provider-specific code branches on it.
 
 ## Rules
 
 - **Untrusted text never goes raw into `innerHTML`.** Phone packets, geocoder/Yandex names, YouTube titles, saved places, log text → `escapeHtml()` (in `tesla-cockpit.js`) or `textContent`. Validate packets from the phone channel (anyone with the 6-char code can publish).
-- **No fake data presented as real** (traffic, ETAs, charger availability, ping, satellites, POIs, video IDs). If data is unavailable, hide the element or say so. Legacy fakes still exist — don't add new ones; remove them when you touch that code.
+- **No fake data presented as real** (traffic, ETAs, battery, charger availability, ping, satellites, POIs, video IDs). If data is unavailable, hide the element, show a dash or say so. Traffic exists only for Yerevan (Yandex score) and on Yandex routes; chargers come from OpenStreetMap without availability; the browser has no battery data.
 - **i18n:** every user-visible string in all three `I18N` dictionaries. Voice prompts need ru/en text and an Armenian clip + mapping (`docs/playbooks/add-voice-phrase.md`).
 - **Server:** new static paths go into `PUBLIC_FILES`/`PUBLIC_DIRS`; outbound fetches driven by user input stay allowlisted; give external fetches a timeout; keep caches bounded.
 - **Cache busters:** changing files loaded by `index.html`/`phone.html` → bump every `?v=` in that page.
@@ -80,7 +88,7 @@ Not served and not for agents to modify casually: `refs/` (personal reference ph
 
 ## Definition of done
 
-1. `npm run check` passes.
+1. `npm run check` and `npm test` pass; new logic in `server.js`, `map-engine.js` or `realtime.js` comes with unit tests.
 2. `npm run verify` passes (at least `smoke` plus the checks for the area you touched — see `docs/playbooks/verify.md`). If you have a browser tool, also look at the page.
 3. Diff reviewed against `docs/playbooks/code-review.md` (`docs/playbooks/release-check.md` for the full gate).
 4. Docs updated when behaviour, API, deployment or invariants change (this file first).
