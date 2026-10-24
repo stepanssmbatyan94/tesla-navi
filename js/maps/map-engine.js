@@ -1418,6 +1418,8 @@ class TeslaMapEngine {
       }
       this._lastPosUpdateCb = performance.now();
       this.onPositionUpdate({ lat, lng, speed });
+      // A parked phone may send no second fix for a long time: look the limit up right away
+      if (!(this.activeRoute && this.routeSteps.length > 0)) this.updateFreeDrivingSpeedLimit(lat, lng);
       return;
     }
 

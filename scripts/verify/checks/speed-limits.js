@@ -5,7 +5,8 @@
 // with camera zones removed, sampling the sign every 400 m.
 // PASS (the returned `pass` field): the route's limits cover >= 95 % of samples and the sign
 //       shows that limit and source at >= 95 % of them; free driving on a tagged road shows its
-//       OSM limit, and on an untagged Yerevan service road the urban default 60 (no dash).
+//       OSM limit, and on an untagged Yerevan service road the urban default 60 (no dash);
+//       the page's first GPS fix already shows a limit.
 // Usage: paste into a browser-tool JS console (returns a promise) or run `npm run verify`.
 (async () => {
   const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -15,7 +16,10 @@
   const el = document.getElementById('speed-limit-val');
   const sign = () => ({ text: el.textContent, source: currentSpeedLimitSource, dashed: el.classList.contains('speed-limit-estimated') });
 
+  // the page's very first GPS fix must already bring a limit (a parked phone sends no second one)
   me.updateCarPosition(40.1776, 44.5126, 0, 0, true);
+  for (let i = 0; i < 20 && currentSpeedLimitSource === 'estimated'; i++) await sleep(150);
+  const firstFix = sign();
   await startNavigationTo({ name: 'Etchmiadzin', lat: 40.1656, lng: 44.2936 });
   if (!me.routeSteps.length) return { pass: false, error: 'route not built' };
   document.getElementById('btn-start-route-nav').click();
@@ -60,7 +64,7 @@
   return {
     pass: samples > 0 && covered / samples >= 0.95 && matched / covered >= 0.95 &&
       afterCancel.text === '—' && !!freeDriving && Number(freeDriving.text) === freeDriving.expected && freeDriving.source === 'osm' &&
-      yerevanYard.text === '60' && yerevanYard.source === 'default',
-    samples, covered, legalDefaultSamples: defaults, signMatches: matched, mismatches: mismatches.slice(0, 4), afterCancel, freeDriving, yerevanYard
+      yerevanYard.text === '60' && yerevanYard.source === 'default' && firstFix.text !== '—',
+    samples, covered, legalDefaultSamples: defaults, signMatches: matched, mismatches: mismatches.slice(0, 4), firstFix, afterCancel, freeDriving, yerevanYard
   };
 })();
