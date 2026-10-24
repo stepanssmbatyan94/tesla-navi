@@ -39,10 +39,17 @@
     if (d >= 200 && d % 400 === 0 && d + 120 < me.totalRouteMeters && headingUp.length < 4) {
       const ahead = me.getPositionAtDistance(d + 80);
       probe.geometry.setCoordinates([ahead.lat, ahead.lng]);
-      await sleep(450); // the rotor turns with a 0.3 s transition
-      const car = centerOf(document.querySelector('#yandex-car-marker .tesla-car-arrow'));
-      const pr = centerOf(document.getElementById('verify-probe'));
-      const angle = Math.atan2(pr.x - car.x, car.y - pr.y) * 180 / Math.PI;
+      // Yandex redraws placemarks asynchronously and the rotor turns with a 0.3 s transition:
+      // measure until the screen positions stop moving (slow CI machines need longer)
+      let car, pr, angle, prev = null;
+      for (let i = 0; i < 25; i++) {
+        await sleep(i ? 150 : 400);
+        car = centerOf(document.querySelector('#yandex-car-marker .tesla-car-arrow'));
+        pr = centerOf(document.getElementById('verify-probe'));
+        angle = Math.atan2(pr.x - car.x, car.y - pr.y) * 180 / Math.PI;
+        if (prev && Math.abs(angle - prev.angle) < 0.5 && Math.abs(car.y - prev.y) < 1) break;
+        prev = { angle, y: car.y };
+      }
       const cp = me.currentPosition;
       const expected = me.calculateBearing(cp.lat, cp.lng, ahead.lat, ahead.lng) - me.currentHeading;
       const off = Math.abs(((angle - expected) % 360 + 540) % 360 - 180);
