@@ -21,6 +21,13 @@ const NO_TRAFFIC_COLOR = '#3b82f6';
 const CAMERA_LIMIT_AHEAD_M = 200;
 const CAMERA_LIMIT_BEHIND_M = 50;
 
+// How far past a junction (along the route) the HUD switches to the next maneuver
+const STEP_ADVANCE_PAST_JUNCTION_M = 8;
+
+// Free-driving OSM speed-limit lookups: only after real movement and not too often
+const FREE_DRIVE_LIMIT_MIN_MOVE_M = 80;
+const FREE_DRIVE_LIMIT_MIN_INTERVAL_MS = 4000;
+
 function loadExternalScript(src, timeoutMs = MAP_LIBRARY_TIMEOUT_MS) {
   return new Promise((resolve, reject) => {
     const script = document.createElement('script');
@@ -53,6 +60,8 @@ class TeslaMapEngine {
     this.onUserPan = options.onUserPan || (() => {});
     this.onProgressUpdate = options.onProgressUpdate || (() => {});
     this.onCameraAlert = options.onCameraAlert || (() => {});
+    // Free driving (no route): real OSM limit at the car's position, see updateFreeDrivingSpeedLimit
+    this.onSpeedLimit = options.onSpeedLimit || (() => {});
     this.onPositionUpdate = options.onPositionUpdate || (() => {});
 
     this.map = null;
@@ -1579,6 +1588,7 @@ class TeslaMapEngine {
       this.trackNavigationProgress(displayLat, displayLng, isOffRoute, distToRoute, speed, isRealFix);
     } else {
       this.checkFreeDrivingCameraAlert(displayLat, displayLng, speed);
+      if (isRealFix) this.updateFreeDrivingSpeedLimit(displayLat, displayLng);
     }
 
     if (isRealFix) {
@@ -1738,10 +1748,11 @@ class TeslaMapEngine {
 
     // 4. Maneuver advancement & countdown strictly based on route progression
     if (this.routeSteps && this.routeSteps.length > 0) {
-      // Advance maneuver step when vehicle reaches within 25m of the step's end
+      // Advance to the next maneuver only once the car has passed the junction: advancing
+      // early (it used to be 25 m before) showed the FOLLOWING turn right at the intersection
       while (
         this.currentStepIndex < this.routeSteps.length - 1 &&
-        (vehicleRouteDist >= (this.routeSteps[this.currentStepIndex].endRouteDist - 25))
+        (vehicleRouteDist >= (this.routeSteps[this.currentStepIndex].endRouteDist + STEP_ADVANCE_PAST_JUNCTION_M))
       ) {
         this.currentStepIndex++;
       }
@@ -1758,8 +1769,10 @@ class TeslaMapEngine {
           break;
         }
       }
-      const currentSpeedLimit = cameraLimit || activeStep.speedLimit || 60;
-      const speedLimitSource = cameraLimit ? 'camera' : 'estimated';
+      // Then the OpenStreetMap maxspeed of the stretch the car is on (attached by /api/route)
+      const osmRun = cameraLimit ? null : (this.routeSpeedLimits || []).find(run => vehicleRouteDist >= run.from && vehicleRouteDist <= run.to);
+      const currentSpeedLimit = cameraLimit || (osmRun && osmRun.limit) || activeStep.speedLimit || 60;
+      const speedLimitSource = cameraLimit ? 'camera' : (osmRun ? 'osm' : 'estimated');
 
       // Yandex & OSRM steps carry the maneuver at their START: the turn at the end of the
       // current step is the NEXT step's maneuver. The last step ends at the destination.
@@ -1893,6 +1906,28 @@ class TeslaMapEngine {
       });
     } else {
       this.onCameraAlert({ visible: false });
+    }
+  }
+
+  // Free driving: ask the server for the OSM limit where the car is, at most every
+  // FREE_DRIVE_LIMIT_MIN_MOVE_M of movement and FREE_DRIVE_LIMIT_MIN_INTERVAL_MS
+  async updateFreeDrivingSpeedLimit(lat, lng) {
+    const now = Date.now();
+    const last = this._freeLimitQuery;
+    if (this._freeLimitPending) return;
+    if (last && now - last.at < FREE_DRIVE_LIMIT_MIN_INTERVAL_MS) return;
+    if (last && this.calculateDistance(last.lat, last.lng, lat, lng) < FREE_DRIVE_LIMIT_MIN_MOVE_M) return;
+    this._freeLimitQuery = { lat, lng, at: now };
+    this._freeLimitPending = true;
+    try {
+      const res = await fetch(`/api/speed-limit?lat=${lat.toFixed(6)}&lng=${lng.toFixed(6)}`);
+      const data = await res.json();
+      if (this.activeRoute) return; // a route started meanwhile: its limits take over
+      this.onSpeedLimit(data && data.limit ? { limit: data.limit, source: 'osm' } : { limit: null, source: 'estimated' });
+    } catch (err) {
+      console.warn('[MapEngine] Free-driving speed limit lookup failed:', err.message);
+    } finally {
+      this._freeLimitPending = false;
     }
   }
 
@@ -2217,6 +2252,7 @@ class TeslaMapEngine {
     this.currentStepIndex = 0;
     this.spokenDistanceThresholds = {};
     this.specialRoadPoints = primaryRoute.specialRoadPoints || [];
+    this.routeSpeedLimits = Array.isArray(primaryRoute.speedLimits) ? primaryRoute.speedLimits : [];
     this.activeRoute = { destination, durationSec, distanceMeters };
     this.laneIntersections = primaryRoute.laneIntersections || [];
 
@@ -2757,6 +2793,7 @@ class TeslaMapEngine {
     this.alternativeCoordinates = null;
     this.routeSteps = [];
     this.routeCameras = [];
+    this.routeSpeedLimits = [];
     this.spokenDistanceThresholds = {};
     this.laneIntersections = [];
     this.currentStepIndex = 0;

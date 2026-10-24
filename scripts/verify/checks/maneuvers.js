@@ -1,11 +1,11 @@
-// MANEUVERS — does the HUD announce the turn the road actually makes?
-// Drives each trip with explicit position updates and, 120 m before every real turn
-// (geometry turns >= 25°), compares the HUD modifier with the polyline's turn direction.
+// MANEUVERS — does the driver see the right sign while approaching every real turn?
+// Drives each trip and, at 250 / 120 / 50 / 15 / 5 m before every real turn (geometry
+// turn >= 25°), reads the HUD arrow icon and street from the DOM; 25 m past the junction
+// the HUD must already show the following maneuver.
 // Roundabouts / U-turns are counted separately (no left/right to compare).
 // Yandex re-routes with live traffic, so the same trip can produce different routes per run.
-// PASS (the returned `pass` field): correct / turns >= 0.8 on every trip and stepsWhereHudModifierFlipped === 0.
-// A mismatch right after a very short step (< 120 m) is a measurement artifact: check
-// stepLengthBefore in the mismatches list before calling it a bug.
+// PASS (the returned `pass` field): on every trip >= 80 % of turns show the right icon and
+//       street at ALL sampled distances, and >= 90 % of after-junction checks show the next step.
 // Usage: paste into a browser-tool JS console (returns a promise) or run `npm run verify`.
 (async () => {
   const TRIPS = [
@@ -16,51 +16,72 @@
   for (let i = 0; i < 40 && !(window.mapEngine && mapEngine.map && mapEngine.map.isStyleLoaded()); i++) await sleep(250);
   const me = mapEngine;
   me.voiceEnabled = false;
-  const origCb = me.onManeuverUpdate;
+  // Which arrow the HUD draws (SVG paths from updateManeuverHud)
+  const icon = () => {
+    const h = document.getElementById('maneuver-arrow-box').innerHTML;
+    if (h.includes('circle cx="12" cy="12" r="7"')) return 'roundabout';
+    if (h.includes('M18 19v-9a6 6')) return 'uturn';
+    if (h.includes('M16 19l-4-9-5-5')) return 'slight-left';
+    if (h.includes('M8 19l4-9 5-5')) return 'slight-right';
+    if (h.includes('M18 19V11a4 4 0 0 0-4-4H5')) return 'left';
+    if (h.includes('M6 19V11a4 4 0 0 1 4-4h9')) return 'right';
+    if (h.includes('x1="12" y1="20"')) return 'straight';
+    return '?';
+  };
+  const hud = () => ({ icon: icon(), dist: document.getElementById('maneuver-dist').textContent, street: document.getElementById('maneuver-street').textContent });
   const out = [];
   for (const [a, b, c, d] of TRIPS) {
-    me.cancelRoute();
+    cancelActiveNavigation();
     me.updateCarPosition(a, b, 0, 0, true);
-    if (!(await me.buildRouteTo({ name: 'Check', lat: c, lng: d }))) { out.push({ trip: [a, b, c, d], error: 'route not built' }); continue; }
-    me.startNavigation();
+    await startNavigationTo({ name: 'Check', lat: c, lng: d });
+    if (!me.routeSteps.length) { out.push({ trip: [a, b, c, d], error: 'route not built' }); continue; }
+    document.getElementById('btn-start-route-nav').click();
+    await sleep(300);
     const steps = me.routeSteps;
     const ptAt = m => { const p = me.getPositionAtDistance(m, 0); return [p.lng, p.lat]; };
     const brg = (p, q) => me.calculateBearing(p[1], p[0], q[1], q[0]);
-    let last = null;
-    const perStep = {};
-    me.onManeuverUpdate = m => {
-      last = m;
-      (perStep[me.currentStepIndex] = perStep[me.currentStepIndex] || new Set()).add(m.modifier);
-    };
     window.IS_SIMULATOR_RUNNING = true;
-    let pos = 0, turns = 0, correct = 0, roundaboutsOrUturns = 0;
+    let pos = 0;
+    const driveTo = target => { for (; pos <= target; pos += 5) { const p = me.getPositionAtDistance(pos); me.updateCarPosition(p.lat, p.lng, p.heading, 40, true); } };
+    let turns = 0, correct = 0, roundaboutsOrUturns = 0, afterChecks = 0, afterOk = 0;
     const mismatches = [];
     for (let k = 0; k < steps.length - 1; k++) {
       const end = steps[k].endRouteDist;
       const turn = ((brg(ptAt(end), ptAt(end + 25)) - brg(ptAt(end - 25), ptAt(end))) + 540) % 360 - 180;
-      for (const target = Math.max(pos, end - 120); pos <= target; pos += 30) {
-        const p = me.getPositionAtDistance(pos);
-        me.updateCarPosition(p.lat, p.lng, p.heading, 40, false);
+      const prevEnd = k > 0 ? steps[k - 1].endRouteDist : 0;
+      const samples = [];
+      for (const before of [250, 120, 50, 15, 5]) {
+        if (end - before <= prevEnd + 10 || end - before < pos) continue; // still at the previous junction
+        driveTo(end - before);
+        samples.push({ before, ...hud() });
       }
-      if (Math.abs(turn) < 25) continue;
-      // Roundabouts and U-turns have no left/right to compare against the local angle
-      if (last && /roundabout|u-?turn/.test(last.modifier)) { roundaboutsOrUturns++; continue; }
-      turns++;
-      const geo = turn < 0 ? 'left' : 'right';
-      if (last && last.modifier.includes(geo)) correct++;
-      else mismatches.push({ step: k, geometry: geo, hud: last && last.modifier, stepLengthBefore: Math.round(steps[k].distance) });
-    }
-    for (; pos < me.totalRouteMeters - 40 && me.activeRoute; pos += 30) {
-      const p = me.getPositionAtDistance(pos);
-      me.updateCarPosition(p.lat, p.lng, p.heading, 40, false);
+      if (Math.abs(turn) >= 25 && samples.length) {
+        if (/roundabout|u-?turn/.test(steps[k + 1].modifier)) {
+          roundaboutsOrUturns++;
+        } else {
+          turns++;
+          const geo = turn < 0 ? 'left' : 'right';
+          const expectStreet = steps[k + 1].name || 'Check';
+          const wrong = samples.filter(s => !s.icon.includes(geo) || s.street !== expectStreet);
+          if (!wrong.length) correct++;
+          else mismatches.push({ step: k, geometry: geo, expectStreet, wrong });
+        }
+      }
+      if (k + 2 < steps.length && steps[k + 1].distance > 60) {
+        driveTo(end + 25);
+        afterChecks++;
+        const h = hud();
+        if (h.street === (steps[k + 2].name || 'Check')) afterOk++;
+        else mismatches.push({ step: k, afterJunction: true, shown: h, expectStreet: steps[k + 2].name });
+      }
     }
     window.IS_SIMULATOR_RUNNING = false;
-    me.onManeuverUpdate = origCb;
-    out.push({ turns, correct, roundaboutsOrUturns, mismatches, stepsWhereHudModifierFlipped: Object.values(perStep).filter(s => s.size > 1).length });
+    out.push({ turns, correct, roundaboutsOrUturns, afterJunction: `${afterOk}/${afterChecks}`, afterOk, afterChecks, mismatches: mismatches.slice(0, 4) });
     cancelActiveNavigation();
   }
+  localStorage.removeItem('tesla_search_history');
   return {
-    pass: out.every(t => !t.error && t.stepsWhereHudModifierFlipped === 0 && (t.turns === 0 || t.correct / t.turns >= 0.8)),
+    pass: out.every(t => !t.error && (t.turns === 0 || t.correct / t.turns >= 0.8) && (t.afterChecks === 0 || t.afterOk / t.afterChecks >= 0.9)),
     trips: out
   };
 })();
