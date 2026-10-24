@@ -1392,6 +1392,13 @@ html, body {
   flex: none;
 }
 
+/* Street-name estimate, not a verified sign: dashed muted ring so it never reads as a real sign */
+.speed-limit-circle.speed-limit-estimated {
+  border-style: dashed;
+  border-color: #94a3b8;
+  color: #64748b;
+}
+
 /* Auxiliary Control Column: Charger, Lane/Traffic, Sound Toggle (Screenshots 2 & 3) */
 .top-aux-row {
   display: flex;

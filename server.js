@@ -150,6 +150,58 @@ async function resolveMapLinkRedirects(startUrl, maxHops = 5) {
   return null;
 }
 
+// Every upstream call gets a deadline: a hung Yandex/OSRM/YouTube request would otherwise
+// hold the client request (and a Cloud Run slot) until the platform's 300 s timeout
+const UPSTREAM_TIMEOUT_MS = 12000;
+
+function fetchUpstream(url, options = {}, timeoutMs = UPSTREAM_TIMEOUT_MS) {
+  return fetch(url, { ...options, signal: options.signal || AbortSignal.timeout(timeoutMs) });
+}
+
+// Per-client token bucket for /api/*: the scraping endpoints are expensive and can get the
+// server's IP blocked upstream. Generous enough for typing-as-you-search plus navigation.
+const RATE_LIMIT_CAPACITY = 60;           // burst
+const RATE_LIMIT_REFILL_PER_SEC = 2;      // sustained ~120 requests/minute
+const RATE_LIMIT_IDLE_MS = 5 * 60 * 1000;
+const RATE_LIMIT_MAX_CLIENTS = 10000;
+const rateBuckets = new Map();
+
+function clientIp(req) {
+  // Cloud Run's front end APPENDS the peer address to X-Forwarded-For; earlier entries are
+  // whatever the client sent and can be forged, so only the last one identifies the client
+  const fwd = req.headers['x-forwarded-for'];
+  if (fwd) {
+    const parts = String(fwd).split(',').map(p => p.trim()).filter(Boolean);
+    if (parts.length) return parts[parts.length - 1];
+  }
+  return (req.socket && req.socket.remoteAddress) || 'unknown';
+}
+
+function takeRateToken(ip) {
+  const now = Date.now();
+  let bucket = rateBuckets.get(ip);
+  if (!bucket) {
+    bucket = { tokens: RATE_LIMIT_CAPACITY, at: now };
+    rateBuckets.set(ip, bucket);
+    // Bounded memory: drop the oldest-created buckets beyond the cap
+    while (rateBuckets.size > RATE_LIMIT_MAX_CLIENTS) {
+      rateBuckets.delete(rateBuckets.keys().next().value);
+    }
+  }
+  bucket.tokens = Math.min(RATE_LIMIT_CAPACITY, bucket.tokens + ((now - bucket.at) / 1000) * RATE_LIMIT_REFILL_PER_SEC);
+  bucket.at = now;
+  if (bucket.tokens < 1) return false;
+  bucket.tokens -= 1;
+  return true;
+}
+
+setInterval(() => {
+  const cutoff = Date.now() - RATE_LIMIT_IDLE_MS;
+  for (const [ip, bucket] of rateBuckets) {
+    if (bucket.at < cutoff) rateBuckets.delete(ip);
+  }
+}, 60000).unref();
+
 // Cache for live Yandex traffic data in Yerevan
 let trafficCache = { time: 0, data: null };
 
@@ -170,26 +222,6 @@ function extractCoords(str) {
   return null;
 }
 
-const server = http.createServer(async (req, res) => {
-  const parsedUrl = new URL(req.url, `http://${req.headers.host}`);
-  let pathname = parsedUrl.pathname;
-
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-
-  if (req.method === 'OPTIONS') {
-    res.writeHead(204);
-    res.end();
-    return;
-  }
-
-  if (pathname === '/favicon.ico') {
-    res.writeHead(204);
-    res.end();
-    return;
-  }
-
 // Helper: Parse coordinates directly from Yandex Maps protobuf URI
 function parseYandexGeoUri(uri) {
   if (!uri || !uri.includes('data=')) return null;
@@ -205,7 +237,7 @@ function parseYandexGeoUri(uri) {
         }
       }
     }
-  } catch (e) {}
+  } catch (e) { /* malformed data= payload: treat as no coordinates */ }
   return null;
 }
 
@@ -213,7 +245,7 @@ function parseYandexGeoUri(uri) {
 async function resolveYandexOrgCoords(oid) {
   try {
     const url = `https://yandex.com/maps/org/${oid}`;
-    const res = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)' } });
+    const res = await fetchUpstream(url, { headers: { 'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)' } });
     const html = await res.text();
     const match = html.match(/class="state-view">([^<]+)<\/script>/);
     if (match) {
@@ -225,7 +257,7 @@ async function resolveYandexOrgCoords(oid) {
         return { lat: coords[1], lng: coords[0] };
       }
     }
-  } catch (e) {}
+  } catch (e) { console.warn('Yandex org coordinates lookup failed:', e.message); }
   return null;
 }
 
@@ -234,7 +266,7 @@ async function fetchYandexSuggestResults(q, userLng = 44.5125, userLat = 40.1776
   async function doReq(query, lang = 'ru_RU') {
     try {
       const url = `https://suggest-maps.yandex.ru/suggest-geo?v=9&search_type=all&part=${encodeURIComponent(query)}&lang=${lang}&n=8&origin=maps-form&ll=${userLng},${userLat}&spn=1.8,1.8`;
-      const res = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)' } });
+      const res = await fetchUpstream(url, { headers: { 'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)' } });
       const text = await res.text();
       const json = JSON.parse(text.replace(/^[^({]*\(/, '').replace(/\);?$/, ''));
       return json.results || [];
@@ -288,101 +320,6 @@ async function fetchYandexSuggestResults(q, userLng = 44.5125, userLat = 40.1776
 
   return results;
 }
-
-  // API 1: /api/resolve-location (Resolves Google Maps links, coordinates, or search queries)
-  if (pathname === '/api/resolve-location') {
-    const input = (parsedUrl.searchParams.get('url') || parsedUrl.searchParams.get('q') || '').trim();
-    if (!input) {
-      res.writeHead(400, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ error: 'Missing query' }));
-      return;
-    }
-
-    try {
-      let coords = extractCoords(input);
-
-      // Follow redirect if short URL
-      if (!coords && (input.startsWith('http://') || input.startsWith('https://'))) {
-        try {
-          const finalUrl = await resolveMapLinkRedirects(input);
-          coords = finalUrl ? extractCoords(finalUrl) : null;
-        } catch (e) {
-          console.warn('Redirect resolve warning:', e.message);
-        }
-      }
-
-      // 1. Try Yandex Maps Suggest first (Best for Armenia villages, addresses, Russian & Armenian names)
-      if (!coords) {
-        try {
-          const yResults = await fetchYandexSuggestResults(input, 44.5125, 40.1776);
-          if (yResults && yResults.length > 0) {
-            for (const r of yResults) {
-              let geo = parseYandexGeoUri(r.uri);
-              if (!geo && r.uri && r.uri.includes('oid=')) {
-                const m = r.uri.match(/oid=(\d+)/);
-                if (m) geo = await resolveYandexOrgCoords(m[1]);
-              }
-              if (geo) {
-                const name = r.title ? r.title.text : input;
-                coords = { name, lat: geo.lat, lng: geo.lng };
-                break;
-              }
-            }
-          }
-        } catch (e) {
-          console.warn('Yandex Suggest resolve error:', e.message);
-        }
-      }
-
-      // 2. High-precision Photon fuzzy search fallback
-      if (!coords) {
-        try {
-          const photonUrl = `https://photon.komoot.io/api/?q=${encodeURIComponent(input)}&lat=40.18&lon=44.49&limit=1`;
-          const pRes = await fetch(photonUrl);
-          const pData = await pRes.json();
-          if (pData.features && pData.features.length > 0) {
-            const f = pData.features[0];
-            const p = f.properties;
-            const name = [p.housenumber, p.name || p.street].filter(Boolean).join(' ') || input;
-            coords = {
-              name,
-              lat: f.geometry.coordinates[1],
-              lng: f.geometry.coordinates[0]
-            };
-          }
-        } catch (e) {
-          console.warn('Photon error:', e.message);
-        }
-      }
-
-      // 3. Nominatim Fallback
-      if (!coords) {
-        const nomUrl = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(input)}&countrycodes=am,ge&addressdetails=1&limit=1`;
-        const nomRes = await fetch(nomUrl, { headers: { 'User-Agent': 'TeslaNavi/1.0 (stepansmbatyan94@gmail.com)' } });
-        const results = await nomRes.json();
-        if (results && results.length > 0) {
-          const item = results[0];
-          coords = {
-            name: item.display_name.split(',')[0],
-            lat: parseFloat(item.lat),
-            lng: parseFloat(item.lon)
-          };
-        }
-      }
-
-      if (coords) {
-        res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ success: true, name: coords.name || input, lat: coords.lat, lng: coords.lng }));
-      } else {
-        res.writeHead(404, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ success: false, error: 'Location not found' }));
-      }
-    } catch (err) {
-      res.writeHead(500, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ success: false, error: err.message }));
-    }
-    return;
-  }
 
 // Authentic Armenian Neural Voice Pack (Gor & Suzie - High-Fidelity Eastern Armenian)
 function getArmenianAudio(text, voiceChoice = 'gor') {
@@ -452,6 +389,275 @@ function getArmenianAudio(text, voiceChoice = 'gor') {
   }
   return null;
 }
+
+// Parse the routes embedded in the Yandex Maps routes page (config.routerResponse.routes)
+// into our route format: traffic-colored segments, steps (maneuver at the step START, see
+// AGENTS.md), heuristic speed limits and distinctive 'via' summaries, fastest first.
+function parseYandexRoutes(yRoutes, laneIntersections = []) {
+  const colors = {
+    'FREE': '#82ea0d',       // 100% Sampled Yandex Navigator Lime Green
+    'LIGHT': '#fbd42e',      // 100% Sampled Yandex Navigator Sunny Yellow
+    'HARD': '#ff4533',       // 100% Sampled Yandex Navigator Bright Red
+    'VERY_HARD': '#a80000',  // 100% Sampled Yandex Navigator Burgundy
+    'UNKNOWN': '#82ea0d'
+  };
+
+  const parsedRoutes = yRoutes.map((r, idx) => {
+    const coords = r.coordinates || [];
+    const colorize = r.colorizeInfo || [];
+    const segments = [];
+    let curIdx = 0;
+
+    for (const info of colorize) {
+      const nextIdx = Math.min(curIdx + info.count, coords.length);
+      const segCoords = coords.slice(curIdx, nextIdx + 1);
+      if (segCoords.length >= 2) {
+        segments.push({
+          type: info.type,
+          color: colors[info.type] || '#22c55e',
+          coords: segCoords // [[lng, lat], ...]
+        });
+      }
+      curIdx = nextIdx;
+    }
+
+    // Parse turn-by-turn navigation steps from Yandex paths segments
+    const rawSections = (r.paths && r.paths[0] && r.paths[0].segments) ? r.paths[0].segments : (r.sections || []);
+    const steps = rawSections.map((sec, sIdx) => {
+      const actionVal = (sec.action?.value || sec.action?.text || '').toUpperCase();
+      let modifier = 'straight';
+      let type = 'turn';
+
+      const isSlightOrKeep = actionVal.includes('SLIGHT') || actionVal.includes('KEEP') || actionVal.includes('BEAR') || actionVal.includes('FORK') || actionVal.includes('EXIT') || actionVal.includes('MERGE') || actionVal.includes('ЛЕВЕЕ') || actionVal.includes('ПРАВЕЕ') || actionVal.includes('ПЛАВН');
+
+      if (actionVal.includes('UTURN') || actionVal.includes('РАЗВОРОТ')) {
+        modifier = 'u-turn';
+      } else if (actionVal.includes('ROUNDABOUT') || actionVal.includes('КРУГ')) {
+        modifier = 'roundabout';
+        type = 'roundabout';
+      } else if (actionVal.includes('LEFT') || actionVal.includes('ЛЕВЕЕ')) {
+        modifier = isSlightOrKeep ? 'slight left' : 'left';
+      } else if (actionVal.includes('RIGHT') || actionVal.includes('ПРАВЕЕ')) {
+        modifier = isSlightOrKeep ? 'slight right' : 'right';
+      } else {
+        modifier = 'straight';
+      }
+
+      const rawStreet = (sec.street || '').trim();
+      const isValidStreet = rawStreet.length > 2 && !/^(straight|right|left|roundabout|u-turn|fork)/i.test(rawStreet);
+      const streetName = isValidStreet ? rawStreet : '';
+
+      // Authentic turn instruction (clean Russian voice grammar)
+      let instruction = 'Двигайтесь прямо';
+      if (modifier === 'slight left') instruction = streetName ? `Держитесь левее на ${streetName}` : 'Держитесь левее';
+      else if (modifier === 'slight right') instruction = streetName ? `Держитесь правее на ${streetName}` : 'Держитесь правее';
+      else if (modifier === 'left') instruction = streetName ? `Поверните налево на ${streetName}` : 'Поверните налево';
+      else if (modifier === 'right') instruction = streetName ? `Поверните направо на ${streetName}` : 'Поверните направо';
+      else if (modifier === 'u-turn') instruction = 'Развернитесь';
+      else if (modifier === 'roundabout') instruction = 'Круговое движение';
+      else if (streetName) instruction = `Двигайтесь по ${streetName}`;
+
+      // Determine speed limit for this section (ПДД РА + знаки магистралей)
+      let speedLimit = 60; // Стандарт по ПДД Армении в черте населенных пунктов
+      const streetLower = (streetName || '').toLowerCase();
+      const isNorthSouthExp = /север-юг|north-south|\bm-1\b|\bm-2\b/i.test(streetLower);
+      const isHwy = /highway|трасса|шоссе|\bh-\d+|\bm-\d+/i.test(streetLower);
+      const isFastAvenue = /исаков|isakov|сараландж|saralanj|багреванд|bagrevand|давиташен|davitashen/i.test(streetLower);
+      // The section's action is performed where the section STARTS (edgePoints[0])
+      const loc = (sec.edgePoints && sec.edgePoints[0]) ? sec.edgePoints[0] : ((sec.edgePoints && sec.edgePoints[1]) ? sec.edgePoints[1] : null);
+
+      if (isNorthSouthExp) {
+        speedLimit = 110; // Скоростная автомагистраль Север-Юг (Севан, Арташат)
+      } else if (isHwy) {
+        speedLimit = 90; // Загородная трасса / шоссе по ПДД РА
+      } else if (isFastAvenue) {
+        speedLimit = 70; // Специальные городские магистрали Еревана со знаками 70
+      } else if (loc) {
+        // Check distance from Yerevan center (40.1772, 44.5105)
+        const dLat = (loc[1] - 40.1772) * 111;
+        const dLng = (loc[0] - 44.5105) * 85;
+        const distCenter = Math.sqrt(dLat * dLat + dLng * dLng);
+        if (distCenter > 14) speedLimit = 90; // За пределами Еревана — трасса 90
+      }
+
+      return {
+        index: sIdx,
+        name: streetName,
+        instruction: instruction,
+        action: actionVal,
+        modifier: modifier,
+        type: type,
+        distance: sec.distance?.value || 0,
+        duration: sec.durationInTraffic?.value || sec.duration?.value || 0,
+        location: loc, // [lng, lat]
+        speedLimit: speedLimit,
+        speedLimitSource: 'estimated' // street-name heuristic, not map data
+      };
+    });
+
+    // Collect street names along route
+    const cleanStreets = (rawSections.map(s => s.street).filter(Boolean).filter((v, i, a) => a.indexOf(v) === i))
+      .filter(st => st.length > 3 && !/^(straight|right|left|roundabout|u-turn|подъезд|двор)/i.test(st));
+
+    return {
+      index: idx,
+      cleanStreets: cleanStreets,
+      distance: r.distance?.value || 0,
+      duration: r.durationInTraffic || r.duration || 0,
+      durationWithoutTraffic: r.duration || 0,
+      coordinates: coords, // [lng, lat]
+      segments: segments.length ? segments : [{ type: 'FREE', color: '#22c55e', coords }],
+      steps: steps,
+      laneIntersections: laneIntersections,
+      specialRoadPoints: r.specialRoadPoints || []
+    };
+  });
+
+  // Sort routes so the fastest route (lowest duration) is guaranteed to be at index 0
+  parsedRoutes.sort((a, b) => a.duration - b.duration);
+
+  // Assign human-friendly distinctive summaries (e.g. "через ул. Теряна", "через просп. Мясникяна")
+  const usedViaStreets = new Set();
+  parsedRoutes.forEach((r, i) => {
+    r.index = i;
+    let via = '';
+    if (i === 0) {
+      // Primary fastest route: use major/longest street
+      via = r.cleanStreets.find(s => s.length > 7) || r.cleanStreets[1] || r.cleanStreets[0] || '';
+    } else {
+      // Alternative route: find the street that has not been used yet
+      via = r.cleanStreets.find(s => !usedViaStreets.has(s) && s.length > 4) ||
+            r.cleanStreets.find(s => s.length > 6) ||
+            r.cleanStreets[0] || '';
+    }
+    if (via) usedViaStreets.add(via);
+    r.summary = via ? `через ${via}` : `Маршрут ${i + 1}`;
+    delete r.cleanStreets; // Clean up temporary array
+  });
+
+  return parsedRoutes;
+}
+
+const server = http.createServer(async (req, res) => {
+  const parsedUrl = new URL(req.url, `http://${req.headers.host}`);
+  let pathname = parsedUrl.pathname;
+
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+
+  if (req.method === 'OPTIONS') {
+    res.writeHead(204);
+    res.end();
+    return;
+  }
+
+  if (pathname.startsWith('/api/') && !takeRateToken(clientIp(req))) {
+    res.writeHead(429, { 'Content-Type': 'application/json', 'Retry-After': '5' });
+    res.end(JSON.stringify({ error: 'Too many requests' }));
+    return;
+  }
+
+  if (pathname === '/favicon.ico') {
+    res.writeHead(204);
+    res.end();
+    return;
+  }
+
+  // API 1: /api/resolve-location (Resolves Google Maps links, coordinates, or search queries)
+  if (pathname === '/api/resolve-location') {
+    const input = (parsedUrl.searchParams.get('url') || parsedUrl.searchParams.get('q') || '').trim();
+    if (!input) {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Missing query' }));
+      return;
+    }
+
+    try {
+      let coords = extractCoords(input);
+
+      // Follow redirect if short URL
+      if (!coords && (input.startsWith('http://') || input.startsWith('https://'))) {
+        try {
+          const finalUrl = await resolveMapLinkRedirects(input);
+          coords = finalUrl ? extractCoords(finalUrl) : null;
+        } catch (e) {
+          console.warn('Redirect resolve warning:', e.message);
+        }
+      }
+
+      // 1. Try Yandex Maps Suggest first (Best for Armenia villages, addresses, Russian & Armenian names)
+      if (!coords) {
+        try {
+          const yResults = await fetchYandexSuggestResults(input, 44.5125, 40.1776);
+          if (yResults && yResults.length > 0) {
+            for (const r of yResults) {
+              let geo = parseYandexGeoUri(r.uri);
+              if (!geo && r.uri && r.uri.includes('oid=')) {
+                const m = r.uri.match(/oid=(\d+)/);
+                if (m) geo = await resolveYandexOrgCoords(m[1]);
+              }
+              if (geo) {
+                const name = r.title ? r.title.text : input;
+                coords = { name, lat: geo.lat, lng: geo.lng };
+                break;
+              }
+            }
+          }
+        } catch (e) {
+          console.warn('Yandex Suggest resolve error:', e.message);
+        }
+      }
+
+      // 2. High-precision Photon fuzzy search fallback
+      if (!coords) {
+        try {
+          const photonUrl = `https://photon.komoot.io/api/?q=${encodeURIComponent(input)}&lat=40.18&lon=44.49&limit=1`;
+          const pRes = await fetchUpstream(photonUrl);
+          const pData = await pRes.json();
+          if (pData.features && pData.features.length > 0) {
+            const f = pData.features[0];
+            const p = f.properties;
+            const name = [p.housenumber, p.name || p.street].filter(Boolean).join(' ') || input;
+            coords = {
+              name,
+              lat: f.geometry.coordinates[1],
+              lng: f.geometry.coordinates[0]
+            };
+          }
+        } catch (e) {
+          console.warn('Photon error:', e.message);
+        }
+      }
+
+      // 3. Nominatim Fallback
+      if (!coords) {
+        const nomUrl = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(input)}&countrycodes=am,ge&addressdetails=1&limit=1`;
+        const nomRes = await fetchUpstream(nomUrl, { headers: { 'User-Agent': 'TeslaNavi/1.0 (stepansmbatyan94@gmail.com)' } });
+        const results = await nomRes.json();
+        if (results && results.length > 0) {
+          const item = results[0];
+          coords = {
+            name: item.display_name.split(',')[0],
+            lat: parseFloat(item.lat),
+            lng: parseFloat(item.lon)
+          };
+        }
+      }
+
+      if (coords) {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ success: true, name: coords.name || input, lat: coords.lat, lng: coords.lng }));
+      } else {
+        res.writeHead(404, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ success: false, error: 'Location not found' }));
+      }
+    } catch (err) {
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ success: false, error: err.message }));
+    }
+    return;
+  }
 
   // API 1.5: /api/tts (STRICTLY Neural Studio Voice Synthesizer - 100% Non-Robotic)
   if (pathname === '/api/tts') {
@@ -552,7 +758,7 @@ function getArmenianAudio(text, voiceChoice = 'gor') {
       if (items.length < 2) {
         try {
           const photonUrl = `https://photon.komoot.io/api/?q=${encodeURIComponent(q)}&lat=${userLat}&lon=${userLng}&limit=6`;
-          const pRes = await fetch(photonUrl);
+          const pRes = await fetchUpstream(photonUrl);
           const pData = await pRes.json();
           if (pData.features && pData.features.length > 0) {
             const photonItems = pData.features.map(f => {
@@ -568,7 +774,7 @@ function getArmenianAudio(text, voiceChoice = 'gor') {
             });
             items = items.concat(photonItems);
           }
-        } catch (e) {}
+        } catch (e) { console.warn('Photon geocode fallback failed:', e.message); }
       }
 
       res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -583,21 +789,26 @@ function getArmenianAudio(text, voiceChoice = 'gor') {
 
   // API 3: /api/route (Lane-accurate OpenStreetMap OSRM routing for MapLibre + Yandex Live Router for Yandex provider)
   if (pathname === '/api/route') {
-    const startLat = parsedUrl.searchParams.get('startLat');
-    const startLng = parsedUrl.searchParams.get('startLng');
-    const destLat = parsedUrl.searchParams.get('destLat');
-    const destLng = parsedUrl.searchParams.get('destLng');
-    const provider = parsedUrl.searchParams.get('provider') || 'maplibre';
+    // Parsed as numbers: the values are interpolated into upstream OSRM/Yandex URLs
+    const coord = name => {
+      const raw = parsedUrl.searchParams.get(name);
+      return raw === null || raw.trim() === '' ? NaN : Number(raw);
+    };
+    const startLat = coord('startLat');
+    const startLng = coord('startLng');
+    const destLat = coord('destLat');
+    const destLng = coord('destLng');
 
-    if (!startLat || !startLng || !destLat || !destLng) {
+    if (![startLat, startLng, destLat, destLng].every(Number.isFinite) ||
+        Math.abs(startLat) > 90 || Math.abs(destLat) > 90 || Math.abs(startLng) > 180 || Math.abs(destLng) > 180) {
       res.writeHead(400, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ error: 'Missing coordinates' }));
+      res.end(JSON.stringify({ error: 'Missing or invalid coordinates' }));
       return;
     }
 
     // 1. Fetch OSRM route in parallel to extract exact OpenStreetMap intersection lane data
     const osrmUrl = `https://router.project-osrm.org/route/v1/driving/${startLng},${startLat};${destLng},${destLat}?overview=full&geometries=geojson&steps=true&annotations=true`;
-    const osrmPromise = fetch(osrmUrl)
+    const osrmPromise = fetchUpstream(osrmUrl)
       .then(r => r.json())
       .catch(err => {
         console.warn('OSRM parallel route fetch warning:', err.message);
@@ -630,7 +841,7 @@ function getArmenianAudio(text, voiceChoice = 'gor') {
     try {
       // 2. Query live Yandex Maps Router (when provider is yandex or as primary traffic engine)
       const yandexUrl = `https://yandex.com/maps/10262/yerevan/?mode=routes&rtext=${startLat}%2C${startLng}~${destLat}%2C${destLng}&rtt=auto`;
-      const yRes = await fetch(yandexUrl, {
+      const yRes = await fetchUpstream(yandexUrl, {
         headers: {
           'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36'
         }
@@ -643,148 +854,10 @@ function getArmenianAudio(text, voiceChoice = 'gor') {
         const yRoutes = stateData.config?.routerResponse?.routes;
 
         if (yRoutes && yRoutes.length > 0) {
-          const colors = {
-            'FREE': '#82ea0d',       // 100% Sampled Yandex Navigator Lime Green
-            'LIGHT': '#fbd42e',      // 100% Sampled Yandex Navigator Sunny Yellow
-            'HARD': '#ff4533',       // 100% Sampled Yandex Navigator Bright Red
-            'VERY_HARD': '#a80000',  // 100% Sampled Yandex Navigator Burgundy
-            'UNKNOWN': '#82ea0d'
-          };
-
           const osrmData = await osrmPromise;
           const laneIntersections = extractLaneIntersections(osrmData);
 
-          const parsedRoutes = yRoutes.map((r, idx) => {
-            const coords = r.coordinates || [];
-            const colorize = r.colorizeInfo || [];
-            const segments = [];
-            let curIdx = 0;
-
-            for (const info of colorize) {
-              const nextIdx = Math.min(curIdx + info.count, coords.length);
-              const segCoords = coords.slice(curIdx, nextIdx + 1);
-              if (segCoords.length >= 2) {
-                segments.push({
-                  type: info.type,
-                  color: colors[info.type] || '#22c55e',
-                  coords: segCoords // [[lng, lat], ...]
-                });
-              }
-              curIdx = nextIdx;
-            }
-
-            // Parse turn-by-turn navigation steps from Yandex paths segments
-            const rawSections = (r.paths && r.paths[0] && r.paths[0].segments) ? r.paths[0].segments : (r.sections || []);
-            const steps = rawSections.map((sec, sIdx) => {
-              const actionVal = (sec.action?.value || sec.action?.text || '').toUpperCase();
-              let modifier = 'straight';
-              let type = 'turn';
-
-              const isSlightOrKeep = actionVal.includes('SLIGHT') || actionVal.includes('KEEP') || actionVal.includes('BEAR') || actionVal.includes('FORK') || actionVal.includes('EXIT') || actionVal.includes('MERGE') || actionVal.includes('ЛЕВЕЕ') || actionVal.includes('ПРАВЕЕ') || actionVal.includes('ПЛАВН');
-
-              if (actionVal.includes('UTURN') || actionVal.includes('РАЗВОРОТ')) {
-                modifier = 'u-turn';
-              } else if (actionVal.includes('ROUNDABOUT') || actionVal.includes('КРУГ')) {
-                modifier = 'roundabout';
-                type = 'roundabout';
-              } else if (actionVal.includes('LEFT') || actionVal.includes('ЛЕВЕЕ')) {
-                modifier = isSlightOrKeep ? 'slight left' : 'left';
-              } else if (actionVal.includes('RIGHT') || actionVal.includes('ПРАВЕЕ')) {
-                modifier = isSlightOrKeep ? 'slight right' : 'right';
-              } else {
-                modifier = 'straight';
-              }
-
-              const rawStreet = (sec.street || '').trim();
-              const isValidStreet = rawStreet.length > 2 && !/^(straight|right|left|roundabout|u-turn|fork)/i.test(rawStreet);
-              const streetName = isValidStreet ? rawStreet : '';
-
-              // Authentic turn instruction (clean Russian voice grammar)
-              let instruction = 'Двигайтесь прямо';
-              if (modifier === 'slight left') instruction = streetName ? `Держитесь левее на ${streetName}` : 'Держитесь левее';
-              else if (modifier === 'slight right') instruction = streetName ? `Держитесь правее на ${streetName}` : 'Держитесь правее';
-              else if (modifier === 'left') instruction = streetName ? `Поверните налево на ${streetName}` : 'Поверните налево';
-              else if (modifier === 'right') instruction = streetName ? `Поверните направо на ${streetName}` : 'Поверните направо';
-              else if (modifier === 'u-turn') instruction = 'Развернитесь';
-              else if (modifier === 'roundabout') instruction = 'Круговое движение';
-              else if (streetName) instruction = `Двигайтесь по ${streetName}`;
-
-              // Determine speed limit for this section (ПДД РА + знаки магистралей)
-              let speedLimit = 60; // Стандарт по ПДД Армении в черте населенных пунктов
-              const streetLower = (streetName || '').toLowerCase();
-              const isNorthSouthExp = /север-юг|north-south|\bm-1\b|\bm-2\b/i.test(streetLower);
-              const isHwy = /highway|трасса|шоссе|\bh-\d+|\bm-\d+/i.test(streetLower);
-              const isFastAvenue = /исаков|isakov|сараландж|saralanj|багреванд|bagrevand|давиташен|davitashen/i.test(streetLower);
-              // The section's action is performed where the section STARTS (edgePoints[0])
-              const loc = (sec.edgePoints && sec.edgePoints[0]) ? sec.edgePoints[0] : ((sec.edgePoints && sec.edgePoints[1]) ? sec.edgePoints[1] : null);
-
-              if (isNorthSouthExp) {
-                speedLimit = 110; // Скоростная автомагистраль Север-Юг (Севан, Арташат)
-              } else if (isHwy) {
-                speedLimit = 90; // Загородная трасса / шоссе по ПДД РА
-              } else if (isFastAvenue) {
-                speedLimit = 70; // Специальные городские магистрали Еревана со знаками 70
-              } else if (loc) {
-                // Check distance from Yerevan center (40.1772, 44.5105)
-                const dLat = (loc[1] - 40.1772) * 111;
-                const dLng = (loc[0] - 44.5105) * 85;
-                const distCenter = Math.sqrt(dLat * dLat + dLng * dLng);
-                if (distCenter > 14) speedLimit = 90; // За пределами Еревана — трасса 90
-              }
-
-              return {
-                index: sIdx,
-                name: streetName,
-                instruction: instruction,
-                action: actionVal,
-                modifier: modifier,
-                type: type,
-                distance: sec.distance?.value || 0,
-                duration: sec.durationInTraffic?.value || sec.duration?.value || 0,
-                location: loc, // [lng, lat]
-                speedLimit: speedLimit
-              };
-            });
-
-            // Collect street names along route
-            const cleanStreets = (rawSections.map(s => s.street).filter(Boolean).filter((v, i, a) => a.indexOf(v) === i))
-              .filter(st => st.length > 3 && !/^(straight|right|left|roundabout|u-turn|подъезд|двор)/i.test(st));
-
-            return {
-              index: idx,
-              cleanStreets: cleanStreets,
-              distance: r.distance?.value || 0,
-              duration: r.durationInTraffic || r.duration || 0,
-              durationWithoutTraffic: r.duration || 0,
-              coordinates: coords, // [lng, lat]
-              segments: segments.length ? segments : [{ type: 'FREE', color: '#22c55e', coords }],
-              steps: steps,
-              laneIntersections: laneIntersections,
-              specialRoadPoints: r.specialRoadPoints || []
-            };
-          });
-
-          // Sort routes so the fastest route (lowest duration) is guaranteed to be at index 0
-          parsedRoutes.sort((a, b) => a.duration - b.duration);
-
-          // Assign human-friendly distinctive summaries (e.g. "через ул. Теряна", "через просп. Мясникяна")
-          const usedViaStreets = new Set();
-          parsedRoutes.forEach((r, i) => {
-            r.index = i;
-            let via = '';
-            if (i === 0) {
-              // Primary fastest route: use major/longest street
-              via = r.cleanStreets.find(s => s.length > 7) || r.cleanStreets[1] || r.cleanStreets[0] || '';
-            } else {
-              // Alternative route: find the street that has not been used yet
-              via = r.cleanStreets.find(s => !usedViaStreets.has(s) && s.length > 4) ||
-                    r.cleanStreets.find(s => s.length > 6) ||
-                    r.cleanStreets[0] || '';
-            }
-            if (via) usedViaStreets.add(via);
-            r.summary = via ? `через ${via}` : `Маршрут ${i + 1}`;
-            delete r.cleanStreets; // Clean up temporary array
-          });
+          const parsedRoutes = parseYandexRoutes(yRoutes, laneIntersections);
 
           res.writeHead(200, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify({
@@ -801,7 +874,7 @@ function getArmenianAudio(text, voiceChoice = 'gor') {
 
     // 2. Fallback to OSRM if Yandex fails
     try {
-      const osrmData = (await osrmPromise) || await (await fetch(osrmUrl)).json();
+      const osrmData = (await osrmPromise) || await (await fetchUpstream(osrmUrl)).json();
       const laneIntersections = extractLaneIntersections(osrmData);
       if (osrmData && osrmData.routes) {
         osrmData.routes.forEach(r => {
@@ -841,6 +914,20 @@ function getArmenianAudio(text, voiceChoice = 'gor') {
     return;
   }
 
+  // API: /api/chargers (EV charging stations in Armenia from an OpenStreetMap snapshot,
+  // refreshed with scripts/update_chargers.mjs). No live availability data exists for them.
+  if (pathname === '/api/chargers') {
+    try {
+      const data = fs.readFileSync(path.join(__dirname, 'data', 'ev-chargers.json'), 'utf8');
+      res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'public, max-age=86400' });
+      res.end(data);
+    } catch (e) {
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: e.message, stations: [] }));
+    }
+    return;
+  }
+
   // API 3: /api/traffic-yerevan (Live Official Yandex Traffic Score for Armenia)
   if (pathname === '/api/traffic-yerevan') {
     const qLat = parseFloat(parsedUrl.searchParams.get('lat'));
@@ -872,35 +959,15 @@ function getArmenianAudio(text, voiceChoice = 'gor') {
         }
       }
 
-      if (!currentCity) {
-        // Outside known cities -> Highway
+      if (!currentCity || !currentCity.isYerevan) {
+        // Yandex publishes a traffic score only for Yerevan (region 10262). Elsewhere we have
+        // no data, so say so instead of claiming the roads are free.
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({
           success: true,
-          outsideCity: true,
-          city: 'Трасса',
-          score: '🛣️',
-          icon: 'green',
-          color: '#22c55e',
-          hint: 'Трасса свободна',
-          time: '',
-          source: 'highway'
-        }));
-        return;
-      } else if (!currentCity.isYerevan) {
-        // Other Armenian city: Yandex publishes 1-10 numerical traffic index only for Yerevan (10262).
-        // For other cities, motion is fluid and free-flowing.
-        res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({
-          success: true,
-          outsideCity: false,
-          city: currentCity.name,
-          score: 'OK',
-          icon: 'green',
-          color: '#22c55e',
-          hint: `${currentCity.name}: дороги свободны`,
-          time: '',
-          source: 'regional'
+          available: false,
+          city: currentCity ? currentCity.name : null,
+          source: 'none'
         }));
         return;
       }
@@ -914,7 +981,7 @@ function getArmenianAudio(text, voiceChoice = 'gor') {
     }
 
     try {
-      const xmlRes = await fetch('https://export.yandex.ru/bar/reginfo.xml?region=10262', {
+      const xmlRes = await fetchUpstream('https://export.yandex.ru/bar/reginfo.xml?region=10262', {
         headers: { 'User-Agent': 'Mozilla/5.0' }
       });
       const xmlText = await xmlRes.text();
@@ -967,7 +1034,7 @@ function getArmenianAudio(text, voiceChoice = 'gor') {
 
       if (continuation) {
         // Fetch next page via YouTube InnerTube Search API
-        const ytRes = await fetch('https://www.youtube.com/youtubei/v1/search?prettyPrint=false', {
+        const ytRes = await fetchUpstream('https://www.youtube.com/youtubei/v1/search?prettyPrint=false', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -1006,7 +1073,7 @@ function getArmenianAudio(text, voiceChoice = 'gor') {
         // Initial HTML search query
         const searchQuery = q || 'trending music';
         const ytUrl = 'https://www.youtube.com/results?search_query=' + encodeURIComponent(searchQuery);
-        const ytRes = await fetch(ytUrl, {
+        const ytRes = await fetchUpstream(ytUrl, {
           headers: {
             'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
             'Accept-Language': 'ru-RU,ru;q=0.9,en-US;q=0.8,en;q=0.7,hy;q=0.6'
@@ -1064,7 +1131,7 @@ function getArmenianAudio(text, voiceChoice = 'gor') {
 
     try {
       const suggestUrl = `https://suggestqueries.google.com/complete/search?client=firefox&ds=yt&hl=ru&gl=AM&q=${encodeURIComponent(q)}`;
-      const suggestRes = await fetch(suggestUrl, {
+      const suggestRes = await fetchUpstream(suggestUrl, {
         headers: {
           'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
         }
@@ -1162,57 +1229,73 @@ wss.on('connection', (ws, req) => {
   });
 });
 
-server.listen(PORT, () => {
-  console.log(`⚡ Tesla Navi Server running at: http://localhost:${PORT}`);
-  console.log(`📱 Tesla Display: http://localhost:${PORT}/`);
-  console.log(`📱 Phone Remote: http://localhost:${PORT}/phone?code=DEMO12`);
+// Start only when run directly (`node server.js`, Cloud Run); tests require() the helpers
+if (require.main === module) {
+  server.listen(PORT, () => {
+    console.log(`⚡ Tesla Navi Server running at: http://localhost:${PORT}`);
+    console.log(`📱 Tesla Display: http://localhost:${PORT}/`);
+    console.log(`📱 Phone Remote: http://localhost:${PORT}/phone?code=DEMO12`);
 
-  // Pre-warm neural audio cache in background for instant 0ms response
-  const PREWARM_RU_SVETLANA = [
-    'Здравствуйте! Я Светлана, ваш голосовой навигатор в Tesla Navi. Маршрут свободен, приятной дороги!',
-    'Голос изменён на Светлана. Приятной дороги!',
-    'Маршрут построен. Поехали!',
-    'Вы прибыли в пункт назначения',
-    'Перестраиваю маршрут',
-    'Поверните направо',
-    'Поверните налево',
-    'Держитесь правее',
-    'Держитесь левее',
-    'Двигайтесь прямо'
-  ];
-  const PREWARM_RU_DMITRY = [
-    'Здравствуйте! Я Дмитрий, ваш голосовой навигатор в Tesla Navi. Маршрут свободен, приятной дороги!',
-    'Голос изменён на Дмитрий. Приятной дороги!',
-    'Маршрут построен. Поехали!',
-    'Вы прибыли в пункт назначения',
-    'Перестраиваю маршрут'
-  ];
-  const PREWARM_EN = [
-    'Hello! I am Ava, your Tesla Navi voice assistant. The route is clear, have a safe trip!',
-    'Voice switched to Ava',
-    'Route calculated. Let us go!',
-    'You have arrived at your destination',
-    'Rerouting'
-  ];
-  setTimeout(async () => {
-    for (const p of PREWARM_RU_SVETLANA) {
-      try {
-        await synthesizeNeuralSpeech(p, 'svetlana', 'ru');
-        await new Promise(r => setTimeout(r, 60));
-      } catch (e) {}
-    }
-    for (const p of PREWARM_RU_DMITRY) {
-      try {
-        await synthesizeNeuralSpeech(p, 'dmitry', 'ru');
-        await new Promise(r => setTimeout(r, 60));
-      } catch (e) {}
-    }
-    for (const p of PREWARM_EN) {
-      try {
-        await synthesizeNeuralSpeech(p, 'ava', 'en');
-        await new Promise(r => setTimeout(r, 60));
-      } catch (e) {}
-    }
-    console.log('🎙️ Neural Voice Cache pre-warmed for Svetlana, Dmitry & Ava');
-  }, 1500);
-});
+    // Pre-warm neural audio cache in background for instant 0ms response
+    const PREWARM_RU_SVETLANA = [
+      'Здравствуйте! Я Светлана, ваш голосовой навигатор в Tesla Navi. Маршрут свободен, приятной дороги!',
+      'Голос изменён на Светлана. Приятной дороги!',
+      'Маршрут построен. Поехали!',
+      'Вы прибыли в пункт назначения',
+      'Перестраиваю маршрут',
+      'Поверните направо',
+      'Поверните налево',
+      'Держитесь правее',
+      'Держитесь левее',
+      'Двигайтесь прямо'
+    ];
+    const PREWARM_RU_DMITRY = [
+      'Здравствуйте! Я Дмитрий, ваш голосовой навигатор в Tesla Navi. Маршрут свободен, приятной дороги!',
+      'Голос изменён на Дмитрий. Приятной дороги!',
+      'Маршрут построен. Поехали!',
+      'Вы прибыли в пункт назначения',
+      'Перестраиваю маршрут'
+    ];
+    const PREWARM_EN = [
+      'Hello! I am Ava, your Tesla Navi voice assistant. The route is clear, have a safe trip!',
+      'Voice switched to Ava',
+      'Route calculated. Let us go!',
+      'You have arrived at your destination',
+      'Rerouting'
+    ];
+    setTimeout(async () => {
+      for (const p of PREWARM_RU_SVETLANA) {
+        try {
+          await synthesizeNeuralSpeech(p, 'svetlana', 'ru');
+          await new Promise(r => setTimeout(r, 60));
+        } catch (e) { console.warn('[NeuralTTS] prewarm failed:', e.message); }
+      }
+      for (const p of PREWARM_RU_DMITRY) {
+        try {
+          await synthesizeNeuralSpeech(p, 'dmitry', 'ru');
+          await new Promise(r => setTimeout(r, 60));
+        } catch (e) { console.warn('[NeuralTTS] prewarm failed:', e.message); }
+      }
+      for (const p of PREWARM_EN) {
+        try {
+          await synthesizeNeuralSpeech(p, 'ava', 'en');
+          await new Promise(r => setTimeout(r, 60));
+        } catch (e) { console.warn('[NeuralTTS] prewarm failed:', e.message); }
+      }
+      console.log('🎙️ Neural Voice Cache pre-warmed for Svetlana, Dmitry & Ava');
+    }, 1500);
+  });
+}
+
+module.exports = {
+  server,
+  extractCoords,
+  parseYandexGeoUri,
+  parseYandexRoutes,
+  getArmenianAudio,
+  isAllowedMapLink,
+  fetchUpstream,
+  takeRateToken,
+  clientIp,
+  RATE_LIMIT_CAPACITY
+};

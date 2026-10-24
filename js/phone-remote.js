@@ -7,8 +7,31 @@ let watchId = null;
 let wakeLock = null;
 let gpsPermissionDenied = false;
 let lastPhonePos = null;
+let lastFixAt = 0;
+let currentLang = 'ru';
+
+// Language: ?lang= from the car's QR code, else the phone's own language, else Russian
+function detectPhoneLanguage() {
+  const fromUrl = new URLSearchParams(window.location.search).get('lang');
+  if (fromUrl && I18N[fromUrl]) return fromUrl;
+  const nav = (navigator.language || '').slice(0, 2).toLowerCase();
+  return I18N[nav] ? nav : 'ru';
+}
+
+function tr(key) {
+  return (I18N[currentLang] && I18N[currentLang][key]) || I18N.ru[key] || key;
+}
+
+function applyPhoneLanguage() {
+  document.documentElement.lang = currentLang;
+  document.querySelectorAll('[data-i18n]').forEach(el => { el.textContent = tr(el.dataset.i18n); });
+  document.querySelectorAll('[data-i18n-placeholder]').forEach(el => { el.placeholder = tr(el.dataset.i18nPlaceholder); });
+  document.querySelectorAll('[data-i18n-title]').forEach(el => { el.title = tr(el.dataset.i18nTitle); });
+}
 
 document.addEventListener('DOMContentLoaded', () => {
+  currentLang = detectPhoneLanguage();
+  applyPhoneLanguage();
   initParams();
   initRealtime();
   initGpsToggle();
@@ -61,10 +84,10 @@ function updateTeslaConnectionPill(connected) {
 
   if (connected) {
     pill.className = 'connection-pill connected';
-    label.textContent = 'Подключено к Tesla';
+    label.textContent = tr('connectedCar');
   } else {
     pill.className = 'connection-pill disconnected';
-    label.textContent = 'Ожидание автомобиля...';
+    label.textContent = tr('waitingCar');
   }
 }
 
@@ -91,7 +114,7 @@ async function requestWakeLock() {
       if (wakeLock === lock) wakeLock = null;
       document.getElementById('wake-status').textContent = '';
     });
-    document.getElementById('wake-status').textContent = '• Экран бодрствует';
+    document.getElementById('wake-status').textContent = tr('screenAwake');
   } catch (err) {
     console.warn('Wake Lock error:', err);
   }
@@ -109,7 +132,7 @@ function calculatePhoneBearing(lat1, lon1, lat2, lon2) {
 
 async function startGpsSharing() {
   if (!navigator.geolocation) {
-    alert('Геолокация не поддерживается вашим браузером');
+    alert(tr('geoUnsupported'));
     return;
   }
   // Auto-start, the button and visibilitychange can all fire: never stack watchers
@@ -124,7 +147,7 @@ async function startGpsSharing() {
       <circle cx="12" cy="12" r="2"></circle>
       <path d="M16.24 7.76a6 6 0 0 1 0 8.49m-8.48-.01a6 6 0 0 1 0-8.49m11.31-2.82a10 10 0 0 1 0 14.14m-14.14 0a10 10 0 0 1 0-14.14"></path>
     </svg>
-    <span>Остановить передачу GPS</span>
+    <span>${tr('stopGps')}</span>
   `;
 
   requestWakeLock();
@@ -144,10 +167,12 @@ async function startGpsSharing() {
         }
       }
       lastPhonePos = { lat: coords.latitude, lng: coords.longitude };
+      lastFixAt = Date.now();
+      updateFixAge();
 
       // Update phone UI
       document.getElementById('phone-speed-val').textContent = speedKmh;
-      document.getElementById('phone-accuracy-val').textContent = `±${Math.round(coords.accuracy)}м`;
+      document.getElementById('phone-accuracy-val').textContent = `±${Math.round(coords.accuracy)} ${tr('m')}`;
 
       // Broadcast to Tesla display
       realtimeClient.sendGps({
@@ -164,7 +189,7 @@ async function startGpsSharing() {
         stopGpsSharing();
         // Don't re-prompt on every tab switch: retry only from the button
         gpsPermissionDenied = true;
-        alert('Пожалуйста, разрешите доступ к геопозиции в настройках браузера');
+        alert(tr('geoDenied'));
       }
     },
     {
@@ -174,6 +199,17 @@ async function startGpsSharing() {
     }
   );
 }
+
+// How long ago the phone got its last GPS fix (replaces the old fixed '18 satellites / 12 ms')
+function updateFixAge() {
+  const el = document.getElementById('phone-fix-age');
+  if (!el) return;
+  if (!lastFixAt) { el.textContent = '—'; return; }
+  const sec = Math.round((Date.now() - lastFixAt) / 1000);
+  el.textContent = sec <= 1 ? tr('fixNow') : `${sec} ${tr('secondsAgo')}`;
+  el.style.color = sec > 10 ? 'var(--accent-red, #ef4444)' : '';
+}
+setInterval(updateFixAge, 1000);
 
 function stopGpsSharing() {
   if (watchId !== null) {
@@ -193,7 +229,7 @@ function stopGpsSharing() {
       <circle cx="12" cy="12" r="2"></circle>
       <path d="M16.24 7.76a6 6 0 0 1 0 8.49m-8.48-.01a6 6 0 0 1 0-8.49m11.31-2.82a10 10 0 0 1 0 14.14m-14.14 0a10 10 0 0 1 0-14.14"></path>
     </svg>
-    <span>Включить передачу GPS</span>
+    <span>${tr('startGps')}</span>
   `;
   document.getElementById('wake-status').textContent = '';
 }
@@ -240,7 +276,7 @@ function initDestinationHandlers() {
 async function parseAndSendDestination(query) {
   const btnSend = document.getElementById('btn-send-tesla');
   const originalText = btnSend.textContent;
-  btnSend.textContent = 'Отправка в Tesla...';
+  btnSend.textContent = tr('sendingToTesla');
   btnSend.disabled = true;
 
   try {
@@ -251,7 +287,7 @@ async function parseAndSendDestination(query) {
     if (match && !query.includes('http')) {
       const lat = parseFloat(match[1]);
       const lng = parseFloat(match[2]);
-      sendToTeslaAndNotify({ name: 'Координаты точки', lat, lng }, btnSend, originalText);
+      sendToTeslaAndNotify({ name: tr('coordsPoint'), lat, lng }, btnSend, originalText);
       return;
     }
 
@@ -267,14 +303,14 @@ async function parseAndSendDestination(query) {
         lng: data.lng
       }, btnSend, originalText);
     } else {
-      alert('Не удалось определить адрес или ссылку. Попробуйте уточнить название.');
+      alert(tr('resolveFailed'));
       btnSend.disabled = false;
       btnSend.textContent = originalText;
     }
   } catch (err) {
     console.error('Resolve error:', err);
     // Direct fallback
-    alert('Ошибка сети при поиске адреса: ' + err.message);
+    alert(`${tr('networkError')}: ${err.message}`);
     btnSend.disabled = false;
     btnSend.textContent = originalText;
   }
@@ -286,7 +322,7 @@ function sendToTeslaAndNotify(dest, btn, originalText) {
 
   btn.disabled = false;
   btn.style.background = '#10b981';
-  btn.textContent = '✓ Отправлено в Tesla!';
+  btn.textContent = tr('sentToTesla');
 
   // Vibrate if mobile device supports it
   if (navigator.vibrate) {
@@ -310,7 +346,7 @@ function initVoiceSearch() {
   }
 
   const recognition = new SpeechRecognition();
-  recognition.lang = 'ru-RU';
+  recognition.lang = currentLang === 'hy' ? 'hy-AM' : (currentLang === 'en' ? 'en-US' : 'ru-RU');
 
   btnMic.addEventListener('click', () => {
     btnMic.style.color = '#ef4444';

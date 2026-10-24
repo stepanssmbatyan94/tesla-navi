@@ -11,20 +11,16 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600;700&family=Noto+Sans+Armenian:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 
-  <!-- MapLibre GL 4.7.1 Vector Engine (Hardware-Accelerated 3D) -->
+  <!-- MapLibre GL 4.7.1 Vector Engine (Hardware-Accelerated 3D). Deferred so a slow CDN never blocks first paint;
+       Yandex Maps JS and the Leaflet fallback are loaded on demand by map-engine.js -->
   <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" />
-  <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+  <script defer src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
 
-  <!-- Fallbacks: Leaflet & Yandex Maps -->
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <script src="https://api-maps.yandex.ru/2.1/?lang=ru_RU&amp;coordorder=latlong" type="text/javascript"></script>
-
-  <!-- Supabase JS Client for Realtime Phone GPS Streaming -->
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <!-- Supabase JS Client for Realtime Phone GPS Streaming (pinned) -->
+  <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.118.0"></script>
 
   <!-- Tesla Cockpit CSS -->
-  <link rel="stylesheet" href="css/tesla-display.css?v=37">
+  <link rel="stylesheet" href="css/tesla-display.css?v=56">
 </head>
 <body>
 
@@ -64,14 +60,10 @@
       </svg>
     </button>
 
-    <!-- Attached Battery Pill (Anchored to centered dock) -->
-    <div id="dock-battery-badge" class="dock-battery-pill" data-i18n-title="battery" title="Заряд батареи Tesla">
-      <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="#16a34a" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
-        <rect x="2" y="7" width="16" height="10" rx="2" ry="2"></rect>
-        <line x1="20" y1="11" x2="20" y2="13"></line>
-        <rect x="4" y="9" width="10" height="6" fill="#16a34a" rx="1"></rect>
-      </svg>
-      <span id="dock-battery-val">80%</span>
+    <!-- Charging stations shortcut (the browser can't read the car's battery, so no charge % here) -->
+    <div id="dock-battery-badge" class="dock-battery-pill" data-i18n-title="chargingStations" title="Зарядные станции">
+      <span aria-hidden="true">⚡</span>
+      <span data-i18n="charging">Зарядки</span>
     </div>
   </nav>
 
@@ -175,7 +167,7 @@
             </div>
             <div class="commute-right-actions">
               <span id="home-eta-badge" class="commute-eta-badge">12 мин</span>
-              <button class="commute-edit-btn" id="btn-edit-home" title="Настроить Дом">
+              <button class="commute-edit-btn" id="btn-edit-home" data-i18n-title="editHomeTitle" title="Настроить Дом">
                 <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="#64748b" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
               </button>
             </div>
@@ -191,7 +183,7 @@
             </div>
             <div class="commute-right-actions">
               <span id="work-eta-badge" class="commute-eta-badge">19 мин</span>
-              <button class="commute-edit-btn" id="btn-edit-work" title="Настроить Работу">
+              <button class="commute-edit-btn" id="btn-edit-work" data-i18n-title="editWorkTitle" title="Настроить Работу">
                 <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="#64748b" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
               </button>
             </div>
@@ -240,7 +232,7 @@
       <div>
         <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
           <div id="drawer-section-title" class="drawer-section-title" data-i18n="history">История</div>
-          <button id="btn-clear-search-history" class="btn-clear-history-link" data-i18n="clear" title="Очистить историю поиска">Очистить</button>
+          <button id="btn-clear-search-history" class="btn-clear-history-link" data-i18n="clear" data-i18n-title="clearSearchHistory" title="Очистить историю поиска">Очистить</button>
         </div>
         <div id="search-results-list" class="drawer-list">
           <!-- Dynamically populated from localStorage tesla_search_history -->
@@ -361,24 +353,6 @@
       </div>
 
       <!-- Battery Quick Info Card -->
-      <div style="padding: 0 16px 12px 16px;">
-        <div class="ev-battery-status-card">
-          <div class="ev-battery-top">
-            <div style="display: flex; align-items: center; gap: 8px;">
-              <span style="font-size: 22px;">🔋</span>
-              <div>
-                <div style="font-weight: 700; font-size: 15px; color: #111827;">Tesla Model 3 / Y</div>
-                <div style="font-size: 12px; color: #16a34a; font-weight: 600;">Заряд: 80% · Запас хода ~380 км</div>
-              </div>
-            </div>
-            <span class="ev-soc-badge">80%</span>
-          </div>
-          <div class="ev-progress-bar">
-            <div class="ev-progress-fill" style="width: 80%;"></div>
-          </div>
-        </div>
-      </div>
-
       <!-- Stations List Container -->
       <div id="charging-stations-list" class="my-places-list" style="padding-top: 0;">
         <!-- Dynamically rendered EV stations with live distance, kW and 1-tap route button -->
@@ -390,7 +364,7 @@
   <aside id="route-alternatives-drawer" class="route-alternatives-drawer hidden">
     <div class="route-alt-header">
       <div class="alt-header-title" data-i18n="routeOptions">Варианты маршрута</div>
-      <button id="btn-close-alt-drawer" class="drawer-close-btn" title="Закрыть">
+      <button id="btn-close-alt-drawer" class="drawer-close-btn" data-i18n-title="dismiss" title="Закрыть">
         <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
       </button>
     </div>
@@ -405,8 +379,7 @@
           <span id="route-0-dist" class="card-dist">2.4 км</span>
         </div>
         <div class="card-details-row">
-          <span class="card-battery">🔋 80%</span>
-          <span class="card-tag">8 светофоров</span>
+          <span class="card-tag"></span>
         </div>
       </div>
 
@@ -418,7 +391,6 @@
           <span id="route-1-dist" class="card-dist">3.2 км · +1 мин</span>
         </div>
         <div class="card-details-row">
-          <span class="card-battery">🔋 80%</span>
           <span class="card-tag">Альтернатива 1</span>
         </div>
       </div>
@@ -431,7 +403,6 @@
           <span id="route-2-dist" class="card-dist">4.1 км · +3 мин</span>
         </div>
         <div class="card-details-row">
-          <span class="card-battery">🔋 79%</span>
           <span class="card-tag">Альтернатива 2</span>
         </div>
       </div>
@@ -484,7 +455,7 @@
           <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
         </svg>
       </button>
-      <div id="traffic-score-badge" class="traffic-score-pill" title="Балл пробок и полос">
+      <div id="traffic-score-badge" class="traffic-score-pill" data-i18n-title="trafficScoreHint" title="Балл пробок">
         <span class="traffic-car-icon">🚘</span>
         <span class="traffic-divider"></span>
         <span id="traffic-score-val" class="traffic-num">2</span>
@@ -501,10 +472,10 @@
 
     <!-- Twin Circles: Current Speed Circle + Speed Limit Sign (Screenshots 2 & 3) -->
     <div class="speed-cluster-badge">
-      <div class="speed-current-circle" title="Текущая скорость">
+      <div class="speed-current-circle" data-i18n-title="currentSpeed" title="Текущая скорость">
         <span id="speed-current" class="current-speed-val">0</span>
       </div>
-      <div id="speed-limit-val" class="speed-limit-circle" title="Ограничение скорости">60</div>
+      <div id="speed-limit-val" class="speed-limit-circle speed-limit-estimated" data-i18n-title="speedLimitEstimated" title="Оценка по типу дороги, не знак">60</div>
     </div>
 
     <!-- Traffic Camera / Signal Alert (Only shown when approaching real camera along route) -->
@@ -527,10 +498,6 @@
           <span id="nav-duration" class="nav-metric-duration">0 мин</span>
           <span id="nav-distance" class="nav-metric-dist">0 км</span>
           <span id="nav-eta" class="nav-metric-eta">--:--</span>
-          <span class="nav-battery-pill" data-i18n-title="batteryAtArrival" title="Запас батареи по прибытию">
-            <span class="nav-battery-outline"><span id="nav-battery-level-bar" class="nav-battery-level" style="width: 78%;"></span></span>
-            <span id="nav-battery-val">78%</span>
-          </span>
         </div>
 
         <div class="nav-route-progress-wrap">
@@ -569,7 +536,7 @@
     </div>
 
     <!-- 2D / 3D Mode Toggle Button (MapsEV Style Isometric Cube) -->
-    <button id="btn-toggle-2d3d" class="map-3d-toggle-btn" title="Переключить 2D / 3D вид">
+    <button id="btn-toggle-2d3d" class="map-3d-toggle-btn" data-i18n-title="toggle2D3D" title="Переключить 2D / 3D вид">
       <svg class="cube-3d-icon" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
         <polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline>
@@ -670,8 +637,8 @@
     <div class="compact-card">
       <div class="card-top-row">
         <div>
-          <div class="card-title">Yerevan, AM</div>
-          <div id="weather-desc" style="font-size: 13px; color: var(--text-secondary);">Облачно · 15°C</div>
+          <div class="card-title" data-i18n="weather">Погода</div>
+          <div id="weather-desc" style="font-size: 13px; color: var(--text-secondary);">—</div>
         </div>
         <button id="btn-close-weather-x" class="card-close-btn">
           <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
@@ -679,38 +646,12 @@
       </div>
 
       <!-- Real Forecast Hourly Row -->
-      <div id="weather-hourly-row" class="weather-forecast-row">
-        <div class="weather-hour-col">
-          <span>09:00</span>
-          <span>☀️</span>
-          <span class="weather-hour-temp">14°</span>
-        </div>
-        <div class="weather-hour-col">
-          <span>12:00</span>
-          <span>⛅</span>
-          <span class="weather-hour-temp">17°</span>
-        </div>
-        <div class="weather-hour-col">
-          <span>15:00</span>
-          <span>☁️</span>
-          <span class="weather-hour-temp">16°</span>
-        </div>
-        <div class="weather-hour-col">
-          <span>18:00</span>
-          <span>🌙</span>
-          <span class="weather-hour-temp">13°</span>
-        </div>
-        <div class="weather-hour-col">
-          <span>21:00</span>
-          <span>✨</span>
-          <span class="weather-hour-temp">11°</span>
-        </div>
-      </div>
+      <div id="weather-hourly-row" class="weather-forecast-row"></div>
 
       <div style="display: flex; justify-content: space-between; font-size: 13px; color: var(--text-secondary);">
-        <span>Влажность: <b id="weather-humidity" style="color: #fff;">45%</b></span>
-        <span>Ветер: <b id="weather-wind" style="color: #fff;">8 км/ч</b></span>
-        <span>UV: <b style="color: #fff;">2</b></span>
+        <span><span data-i18n="humidity">Влажность</span>: <b id="weather-humidity" style="color: #fff;">—</b></span>
+        <span><span data-i18n="wind">Ветер</span>: <b id="weather-wind" style="color: #fff;">—</b></span>
+        <span>UV: <b id="weather-uv" style="color: #fff;">—</b></span>
       </div>
 
       <button id="btn-weather-done" class="btn-primary-action" data-i18n="done">Готово</button>
@@ -725,7 +666,7 @@
         <svg viewBox="0 0 24 24" width="22" height="22" fill="#ff0000"><path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg>
         <span>YouTube</span>
       </div>
-      <button id="btn-close-music" class="card-close-btn" title="Закрыть">
+      <button id="btn-close-music" class="card-close-btn" data-i18n-title="dismiss" title="Закрыть">
         <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
       </button>
     </div>
@@ -754,27 +695,27 @@
 
     <!-- Transport Controls (Screenshot 3: Center Red Play/Pause Button) -->
     <div class="yt-transport-row">
-      <button id="btn-music-prev" class="yt-skip-btn" title="Предыдущий">
+      <button id="btn-music-prev" class="yt-skip-btn" data-i18n-title="prevTrack" title="Предыдущий">
         <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><polygon points="11 19 2 12 11 5 11 19"/><polygon points="22 19 13 12 22 5 22 19"/></svg>
       </button>
-      <button id="btn-music-play" class="yt-red-play-btn" title="Воспроизведение / Пауза">
+      <button id="btn-music-play" class="yt-red-play-btn" data-i18n-title="playPause" title="Воспроизведение / Пауза">
         <svg id="yt-play-icon" viewBox="0 0 24 24" width="24" height="24" fill="#ffffff"><polygon points="6 4 20 12 6 20 6 4"/></svg>
       </button>
-      <button id="btn-music-next" class="yt-skip-btn" title="Следующий">
+      <button id="btn-music-next" class="yt-skip-btn" data-i18n-title="nextTrack" title="Следующий">
         <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><polygon points="5 5 14 12 5 19 5 5"/><polygon points="13 5 22 12 13 19 13 5"/></svg>
       </button>
     </div>
 
     <!-- User Account & Quick Controls Row (Screenshot 3) -->
     <div class="yt-user-controls-row">
-      <div class="yt-account-identity" id="yt-account-badge" title="Подключенный аккаунт">
-        <span id="yt-user-name-text">Stepan Smbatyan</span>
+      <div class="yt-account-identity" id="yt-account-badge" data-i18n-title="ytAccount" title="Аккаунт YouTube">
+        <span id="yt-user-name-text"></span>
       </div>
       <div class="yt-aux-buttons">
-        <button id="btn-yt-shuffle" class="yt-aux-btn" title="Перемешать">
+        <button id="btn-yt-shuffle" class="yt-aux-btn" data-i18n-title="shuffle" title="Перемешать">
           <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M16 3h5v5M4 20L21 3M21 16v5h-5M15 15l6 6M4 4l5 5"/></svg>
         </button>
-        <button id="btn-yt-fullscreen" class="yt-aux-btn" title="Во весь экран">
+        <button id="btn-yt-fullscreen" class="yt-aux-btn" data-i18n-title="fullscreen" title="Во весь экран">
           <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>
         </button>
       </div>
@@ -784,7 +725,7 @@
     <div class="yt-search-pill-container" style="position: relative;">
       <div class="yt-search-pill-wrap">
         <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#64748b" stroke-width="2.4"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
-        <input id="yt-search-input" class="yt-search-pill-input" type="text" placeholder="Поиск в YouTube..." autocomplete="off" />
+        <input id="yt-search-input" class="yt-search-pill-input" type="text" data-i18n-placeholder="ytSearchPlaceholder" placeholder="Поиск в YouTube..." autocomplete="off" />
         <button id="btn-yt-search-clear" class="yt-search-clear-btn hidden" title="Очистить">✕</button>
       </div>
       <button id="btn-yt-search-go" class="yt-btn-red-search" type="button">Search</button>
@@ -795,14 +736,14 @@
 
     <!-- Category Filter Tabs matching YouTube Home Feed (Screenshots 2 & 3) -->
     <div class="yt-category-tabs-row">
-      <button class="yt-filter-tab active" data-tab="all">Все</button>
-      <button class="yt-filter-tab" data-tab="music">Музыка</button>
-      <button class="yt-filter-tab" data-tab="jams">Джемы</button>
+      <button class="yt-filter-tab active" data-tab="all" data-i18n="ytTabAll">Все</button>
+      <button class="yt-filter-tab" data-tab="music" data-i18n="ytTabMusic">Музыка</button>
+      <button class="yt-filter-tab" data-tab="jams" data-i18n="ytTabJams">Джемы</button>
       <button class="yt-filter-tab" data-tab="armcomedy">ArmComedy</button>
-      <button class="yt-filter-tab" data-tab="auto">Авто & Игры</button>
-      <button class="yt-filter-tab" data-tab="football">Футбол</button>
-      <button class="yt-filter-tab" data-tab="news">Новости</button>
-      <button class="yt-filter-tab" data-tab="history">История</button>
+      <button class="yt-filter-tab" data-tab="auto" data-i18n="ytTabAuto">Авто & Игры</button>
+      <button class="yt-filter-tab" data-tab="football" data-i18n="ytTabFootball">Футбол</button>
+      <button class="yt-filter-tab" data-tab="news" data-i18n="ytTabNews">Новости</button>
+      <button class="yt-filter-tab" data-tab="history" data-i18n="history">История</button>
     </div>
 
     <!-- Dynamic Recommendations / Search Results List (Screenshots 3, 4, 5) -->
@@ -812,13 +753,13 @@
 
     <!-- Bottom Account Action (Screenshot 5) -->
     <div class="yt-disconnect-footer">
-      <button id="btn-yt-account-toggle" class="btn-yt-disconnect-pill">Disconnect YouTube · Stepan Smbatyan</button>
+      <button id="btn-yt-account-toggle" class="btn-yt-disconnect-pill"></button>
     </div>
   </div>
 
   <!-- Floating Mini Music Player (Tesla Automotive Capsule - Draggable & Expandable) -->
-  <div id="music-mini-player" class="music-mini-player hidden" title="Зажмите и перетащите в любое место экрана">
-    <div class="mini-player-drag-handle" id="btn-mini-info-expand" title="Нажмите, чтобы развернуть YouTube плеер">
+  <div id="music-mini-player" class="music-mini-player hidden" data-i18n-title="dragHint" title="Зажмите и перетащите в любое место экрана">
+    <div class="mini-player-drag-handle" id="btn-mini-info-expand" data-i18n-title="expandPlayer" title="Развернуть">
       <div class="mini-eq-bars" id="mini-eq-bars">
         <span></span><span></span><span></span>
       </div>
@@ -828,17 +769,17 @@
       </div>
     </div>
     <div class="mini-player-controls">
-      <button id="btn-mini-prev" class="mini-ctrl-btn" title="Предыдущий трек">
+      <button id="btn-mini-prev" class="mini-ctrl-btn" data-i18n-title="prevTrack" title="Предыдущий">
         <svg viewBox="0 0 24 24" width="12" height="12" fill="currentColor"><polygon points="11 19 2 12 11 5 11 19"/><polygon points="22 19 13 12 22 5 22 19"/></svg>
       </button>
-      <button id="btn-mini-play" class="mini-ctrl-btn mini-play-circle" title="Воспроизведение / Пауза">
+      <button id="btn-mini-play" class="mini-ctrl-btn mini-play-circle" data-i18n-title="playPause" title="Воспроизведение / Пауза">
         <svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor"><polygon points="6 4 20 12 6 20 6 4"/></svg>
       </button>
-      <button id="btn-mini-next" class="mini-ctrl-btn" title="Следующий трек">
+      <button id="btn-mini-next" class="mini-ctrl-btn" data-i18n-title="nextTrack" title="Следующий">
         <svg viewBox="0 0 24 24" width="12" height="12" fill="currentColor"><polygon points="5 5 14 12 5 19 5 5"/><polygon points="13 5 22 12 13 19 13 5"/></svg>
       </button>
-      <button id="btn-mini-expand" class="mini-ctrl-btn mini-expand-btn" style="display:none;" title="Развернуть"></button>
-      <button id="btn-mini-close" class="mini-ctrl-btn mini-close-btn" title="Остановить и закрыть">
+      <button id="btn-mini-expand" class="mini-ctrl-btn mini-expand-btn" style="display:none;" data-i18n-title="expandPlayer" title="Развернуть"></button>
+      <button id="btn-mini-close" class="mini-ctrl-btn mini-close-btn" data-i18n-title="stopAndClose" title="Остановить и закрыть">
         <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
       </button>
     </div>
@@ -859,7 +800,7 @@
           <img id="qr-image" alt="QR Code" style="width: 100%; height: 100%; object-fit: contain;" />
         </div>
         <div style="display: flex; flex-direction: column; gap: 6px;">
-          <div style="font-size: 12px; color: var(--text-muted);">Код сопряжения:</div>
+          <div style="font-size: 12px; color: var(--text-muted);" data-i18n="pairingCodeLabel">Код сопряжения:</div>
           <div id="pairing-code-display" style="font-size: 24px; font-weight: 800; color: var(--accent-cyan); font-family: var(--font-mono);">FXRLUP</div>
           <div id="pairing-status-text" style="font-size: 13px; font-weight: 600; color: var(--accent-amber);" data-i18n="waitingPhone">Ожидание телефона...</div>
           <div style="font-size: 11px; color: var(--text-muted); line-height: 1.3;" data-i18n="shareGpsPrompt">
@@ -964,9 +905,9 @@
   </div>
 
   <!-- Scripts -->
-  <script src="js/config.js?v=37"></script>
-  <script src="js/realtime.js?v=37"></script>
-  <script src="js/maps/map-engine.js?v=37"></script>
-  <script src="js/tesla-cockpit.js?v=37"></script>
+  <script src="js/config.js?v=56"></script>
+  <script src="js/realtime.js?v=56"></script>
+  <script src="js/maps/map-engine.js?v=56"></script>
+  <script src="js/tesla-cockpit.js?v=56"></script>
 </body>
 </html>

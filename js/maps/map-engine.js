@@ -5,6 +5,42 @@
 const LANE_MATCH_MAX_DIST_M = 20;
 const LANE_MATCH_MAX_BEARING_DIFF = 35;
 
+// Map libraries loaded on demand (MapLibre itself is a deferred <script> in index.html)
+const MAP_LIBRARIES = {
+  yandexJs: 'https://api-maps.yandex.ru/2.1/?lang=ru_RU&coordorder=latlong',
+  leafletJs: 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js',
+  leafletCss: 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css'
+};
+const MAP_LIBRARY_TIMEOUT_MS = 10000;
+
+// Route/progress color when there is no traffic information
+const NO_TRAFFIC_COLOR = '#3b82f6';
+
+// Window around a route speed camera in which its limit counts as the verified limit.
+// Kept short: before the zone the road may allow more, and the voice alert already fires at 350 m.
+const CAMERA_LIMIT_AHEAD_M = 200;
+const CAMERA_LIMIT_BEHIND_M = 50;
+
+function loadExternalScript(src, timeoutMs = MAP_LIBRARY_TIMEOUT_MS) {
+  return new Promise((resolve, reject) => {
+    const script = document.createElement('script');
+    const timer = setTimeout(() => reject(new Error(`timeout loading ${src}`)), timeoutMs);
+    script.src = src;
+    script.async = true;
+    script.onload = () => { clearTimeout(timer); resolve(); };
+    script.onerror = () => { clearTimeout(timer); reject(new Error(`failed to load ${src}`)); };
+    document.head.appendChild(script);
+  });
+}
+
+function loadExternalStylesheet(href) {
+  if (document.querySelector(`link[href="${href}"]`)) return;
+  const link = document.createElement('link');
+  link.rel = 'stylesheet';
+  link.href = href;
+  document.head.appendChild(link);
+}
+
 class TeslaMapEngine {
   constructor(containerId, options = {}) {
     this.containerId = containerId;
@@ -65,13 +101,49 @@ class TeslaMapEngine {
     const container = document.getElementById(this.containerId);
     container.innerHTML = '';
 
-    if (this.provider === 'maplibre' && window.maplibregl) {
-      await this.initMapLibre();
-    } else if (this.provider === 'yandex' && window.ymaps) {
-      await this.initYandex();
-    } else {
-      await this.initLeaflet();
+    if (this.provider === 'yandex') {
+      if (!window.ymaps) {
+        try {
+          await loadExternalScript(MAP_LIBRARIES.yandexJs);
+        } catch (err) {
+          console.warn('[MapEngine] Yandex Maps JS unavailable, falling back to MapLibre:', err.message);
+        }
+      }
+      if (window.ymaps) {
+        await this.initYandex();
+        this.startMotionExtrapolator();
+        return;
+      }
+      this.provider = 'maplibre';
     }
+
+    if (this.provider === 'maplibre' && window.maplibregl) {
+      try {
+        await this.initMapLibre();
+        this.startMotionExtrapolator();
+        return;
+      } catch (err) {
+        // e.g. WebGL unavailable on the MCU: the constructor throws
+        console.warn('[MapEngine] MapLibre failed to start, falling back to Leaflet:', err && err.message);
+        try { if (this.map && this.map.remove) this.map.remove(); } catch (removeErr) { console.warn('[MapEngine] MapLibre cleanup:', removeErr.message); }
+        this.map = null;
+        container.innerHTML = '';
+      }
+    }
+
+    // Raster fallback. Every provider-specific branch keys off this.provider, so it must
+    // say 'osm' — keeping 'maplibre' here made every MapLibre call throw on a Leaflet map
+    console.warn('[MapEngine] Using Leaflet/OpenStreetMap fallback map');
+    this.provider = 'osm';
+    if (!window.L) {
+      try {
+        loadExternalStylesheet(MAP_LIBRARIES.leafletCss);
+        await loadExternalScript(MAP_LIBRARIES.leafletJs);
+      } catch (err) {
+        console.error('[MapEngine] No map library could be loaded:', err.message);
+      }
+    }
+    await this.initLeaflet();
     this.startMotionExtrapolator();
   }
 
@@ -191,10 +263,10 @@ class TeslaMapEngine {
           });
           canvas.addEventListener('webglcontextrestored', () => {
             console.log('[MapEngine] Tesla MCU WebGL context restored — rebuilding layers.');
-            try { this.map.resize(); } catch (err) {}
+            try { this.map.resize(); } catch (err) { /* map not ready yet: the next render resizes */ }
           });
         }
-      } catch (ctxErr) {}
+      } catch (ctxErr) { console.warn('[MapEngine] WebGL context-loss handlers not attached:', ctxErr.message); }
 
       // Enable full touch gestures for Tesla touchscreen
       this.map.touchZoomRotate.enable();
@@ -207,7 +279,7 @@ class TeslaMapEngine {
       this.navPadding = { top: Math.round(window.innerHeight * 0.28), bottom: 0, left: 0, right: 0 };
       try {
         this.map.setPadding(this.navPadding);
-      } catch (e) {}
+      } catch (e) { console.warn('[MapEngine] setPadding failed:', e.message); }
 
       window.addEventListener('resize', () => {
         if (this.map && typeof this.map.setPadding === 'function') {
@@ -483,7 +555,7 @@ class TeslaMapEngine {
             minZoom: 4,
             maxZoom: 21
           });
-        } catch (e) {}
+        } catch (e) { console.warn('[MapEngine] Yandex zoom range not set:', e.message); }
 
         try {
           this.trafficLayer = new window.ymaps.control.TrafficControl({
@@ -491,12 +563,12 @@ class TeslaMapEngine {
           });
           this.map.controls.add(this.trafficLayer);
           this.trafficLayer.showTraffic();
-        } catch (e) {}
+        } catch (e) { console.warn('[MapEngine] Yandex traffic layer unavailable:', e.message); }
 
         try {
           this.map.behaviors.disable('multiTouch');
           this.map.behaviors.enable(['drag', 'scrollZoom', 'dblClickZoom']);
-        } catch (e) {}
+        } catch (e) { console.warn('[MapEngine] Yandex map behaviours not configured:', e.message); }
 
         const containerEl = document.getElementById(this.containerId);
         this.isUserPinching = false;
@@ -966,14 +1038,15 @@ class TeslaMapEngine {
       if (typeof localStorage !== 'undefined') {
         localStorage.setItem('tesla_map_3d_mode', this.is3D ? '3d' : '2d');
       }
-    } catch (e) {}
+    } catch (e) { /* storage unavailable (private mode / quota): non-critical */ }
 
     // Update floating toggle button state
     const btn = document.getElementById('btn-toggle-2d3d');
     const label = document.getElementById('btn-3d-mode-label');
     if (btn) {
       btn.classList.toggle('is-3d', this.is3D);
-      btn.title = this.is3D ? 'Переключить в 2D плоский вид' : 'Переключить в 3D перспективный вид (MapsEV)';
+      const dict3d = I18N[window.CURRENT_LANG || 'ru'] || I18N.ru;
+      btn.title = this.is3D ? dict3d.switchTo2D : dict3d.switchTo3D;
     }
     if (label) {
       label.textContent = this.is3D ? '3D' : '2D';
@@ -1018,7 +1091,7 @@ class TeslaMapEngine {
       try {
         localStorage.setItem('tesla_map_3d_mode', '3d');
         localStorage.setItem('tesla_map_provider_v2', 'maplibre');
-      } catch (e) {}
+      } catch (e) { /* storage unavailable (private mode / quota): non-critical */ }
       const url = new URL(window.location.href);
       url.searchParams.set('provider', 'maplibre');
       window.location.href = url.toString();
@@ -1063,7 +1136,7 @@ class TeslaMapEngine {
       if (typeof localStorage !== 'undefined') {
         localStorage.setItem('tesla_map_theme', mode);
       }
-    } catch (e) {}
+    } catch (e) { /* storage unavailable (private mode / quota): non-critical */ }
 
     const isNight = this.isNightActive();
     this.lastIsNight = isNight;
@@ -1153,7 +1226,7 @@ class TeslaMapEngine {
   toggleVoice() {
     this.voiceEnabled = !this.voiceEnabled;
     if (!this.voiceEnabled && this.currentAudioVoice) {
-      try { this.currentAudioVoice.pause(); } catch (e) {}
+      try { this.currentAudioVoice.pause(); } catch (e) { /* already stopped */ }
       this.currentAudioVoice = null;
     }
     return this.voiceEnabled;
@@ -1308,6 +1381,8 @@ class TeslaMapEngine {
           this.carMarker.setLngLat([lng, lat]);
         } else if (this.provider === 'yandex') {
           this.carMarker.geometry.setCoordinates([lat, lng]);
+        } else if (this.provider === 'osm') {
+          this.carMarker.setLatLng([lat, lng]);
         }
       }
 
@@ -1321,6 +1396,8 @@ class TeslaMapEngine {
           });
         } else if (this.provider === 'yandex') {
           this.map.setCenter([lat, lng], this.navZoom, { duration: 0 });
+        } else if (this.provider === 'osm') {
+          this.map.setView([lat, lng], this.navZoom, { animate: false });
         }
       }
       this._lastPosUpdateCb = performance.now();
@@ -1488,7 +1565,7 @@ class TeslaMapEngine {
       if (this.followCar && !this.isUserPinching) {
         try {
           this.map.setCenter([displayLat, displayLng], this.map.getZoom(), { duration: 0, checkZoomRange: false });
-        } catch (e) {}
+        } catch (e) { /* Yandex map mid re-render: the next GPS fix recenters */ }
       }
     } else if (this.carMarker && window.L && this.provider === 'osm') {
       this.carMarker.setLatLng([displayLat, displayLng]);
@@ -1671,7 +1748,18 @@ class TeslaMapEngine {
 
       const activeStep = this.routeSteps[this.currentStepIndex] || this.routeSteps[this.routeSteps.length - 1];
       const isLastStep = (this.currentStepIndex >= this.routeSteps.length - 1);
-      const currentSpeedLimit = activeStep.speedLimit || 60;
+      // Step limits are a heuristic from street names; a speed camera on the route just
+      // ahead (OSM camera DB) is the only verified limit we have
+      let cameraLimit = null;
+      for (const cam of (this.routeCameras || [])) {
+        const ahead = cam.routeDist - vehicleRouteDist;
+        if (ahead > -CAMERA_LIMIT_BEHIND_M && ahead < CAMERA_LIMIT_AHEAD_M && cam.limit) {
+          cameraLimit = cam.limit;
+          break;
+        }
+      }
+      const currentSpeedLimit = cameraLimit || activeStep.speedLimit || 60;
+      const speedLimitSource = cameraLimit ? 'camera' : 'estimated';
 
       // Yandex & OSRM steps carry the maneuver at their START: the turn at the end of the
       // current step is the NEXT step's maneuver. The last step ends at the destination.
@@ -1725,6 +1813,7 @@ class TeslaMapEngine {
         modifier: activeModifier,
         type: maneuverType,
         speedLimit: currentSpeedLimit,
+        speedLimitSource,
         location: activeStep.location || null,
         lanes: activeLanes,
         laneDistanceMeters: activeLaneDist
@@ -1938,10 +2027,10 @@ class TeslaMapEngine {
 
             osc.start(now);
             osc.stop(now + 0.26);
-          } catch (e) {}
+          } catch (e) { /* no Web Audio either: the chime is skipped */ }
         });
       }
-    } catch (e) {}
+    } catch (e) { /* media playback unavailable: the chime is skipped */ }
   }
 
   // Strictly use our studio audio stream (/api/tts) for authentic, high-quality voice guidance
@@ -1951,7 +2040,7 @@ class TeslaMapEngine {
       this.playNavChime();
       setTimeout(() => {
         if (this.currentAudioVoice) {
-          try { this.currentAudioVoice.pause(); } catch (e) {}
+          try { this.currentAudioVoice.pause(); } catch (e) { /* already stopped */ }
           this.currentAudioVoice = null;
         }
         const lang = window.CURRENT_LANG || 'ru';
@@ -1975,43 +2064,10 @@ class TeslaMapEngine {
     }
   }
 
-  // Generate Vibrant Traffic Colored Segments (Exact Mapsev & Yandex Navigator: Green #10b981, Amber #f59e0b, Red #ef4444)
+  // Route coloring when no live traffic exists (OSRM fallback): one neutral segment.
+  // An invented green/amber/red pattern would show jams that aren't there.
   generateTrafficSegments(coordinates) {
-    const total = coordinates.length;
-    if (total < 4) {
-      return [{ coords: coordinates, color: '#10b981' }];
-    }
-
-    const segments = [];
-    const p1 = Math.floor(total * 0.38);
-    const p2 = Math.floor(total * 0.60);
-    const p3 = Math.floor(total * 0.78);
-
-    // Initial section: Free flow green
-    segments.push({
-      coords: coordinates.slice(0, p1 + 1),
-      color: '#10b981'
-    });
-
-    // Moderate slow section: Amber/yellow
-    segments.push({
-      coords: coordinates.slice(p1, p2 + 1),
-      color: '#f59e0b'
-    });
-
-    // Congestion jam section: Red
-    segments.push({
-      coords: coordinates.slice(p2, p3 + 1),
-      color: '#ef4444'
-    });
-
-    // Final arrival section: Free flow green
-    segments.push({
-      coords: coordinates.slice(p3),
-      color: '#10b981'
-    });
-
-    return segments.filter(s => s.coords.length >= 2);
+    return [{ coords: coordinates, color: NO_TRAFFIC_COLOR }];
   }
 
   // Dynamic Route Framing: Mathematically fits entire route (start to finish) inside screen
@@ -2127,7 +2183,7 @@ class TeslaMapEngine {
             maxZoom: 15.5
           }
         );
-      } catch (err) {}
+      } catch (err) { console.warn('[MapEngine] Leaflet fitBounds failed:', err.message); }
     }
   }
 
@@ -2286,7 +2342,9 @@ class TeslaMapEngine {
         summary: r.summary || (i === 0 ? (dict.fastest || 'Самый быстрый') : `${dict.alternative || 'Вариант'} ${i + 1}`),
         duration: this.formatNavDuration(r.duration),
         distance: this.formatNavDistance(r.distance),
-        diffMins: diffMins > 0 ? `+${this.formatNavDuration(diffMins, true)}` : `0 ${dict.min || 'мин'}`
+        diffMins: diffMins > 0 ? `+${this.formatNavDuration(diffMins, true)}` : `0 ${dict.min || 'мин'}`,
+        // Real traffic delay from Yandex (with vs. without traffic); null when unknown (OSRM)
+        trafficDelayMin: (isYandex && r.durationWithoutTraffic) ? Math.max(0, Math.round((r.duration - r.durationWithoutTraffic) / 60)) : null
       };
     });
 
@@ -2329,7 +2387,7 @@ class TeslaMapEngine {
     const etaMins = String(etaDate.getMinutes()).padStart(2, '0');
 
     const routeInfo = {
-      distance: distanceMeters >= 1000 ? `${(distanceMeters / 1000).toFixed(1)} км` : `${Math.round(distanceMeters)} м`,
+      distance: this.formatNavDistance(distanceMeters),
       duration: this.formatNavDuration(durationSec),
       eta: `${etaHours}:${etaMins}`,
       name: destination.name || 'Маршрут',
@@ -2705,7 +2763,7 @@ class TeslaMapEngine {
     this.totalDistance = 0;
     this.specialRoadPoints = [];
     if (this.currentAudioVoice) {
-      try { this.currentAudioVoice.pause(); } catch (e) {}
+      try { this.currentAudioVoice.pause(); } catch (e) { /* already stopped */ }
       this.currentAudioVoice = null;
     }
 

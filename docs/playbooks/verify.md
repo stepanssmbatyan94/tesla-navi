@@ -6,7 +6,8 @@ Prove a change works in the running app. Syntax checks are not verification.
 
 ```bash
 npm run check
-npm run verify                         # all checks, ~30 s, needs network + Google Chrome
+npm test                               # unit tests (node:test), ~1 s, no network
+npm run verify                         # all browser checks, ~45 s, needs network + Google Chrome
 npm run verify -- smoke maneuvers      # selected checks
 npm run verify -- route-layers --verbose
 ```
@@ -15,11 +16,17 @@ The runner (`scripts/verify/run.mjs`) starts its own server on port 8199 (`VERIF
 
 | Change touches | Checks |
 |---|---|
-| anything | `smoke` |
+| anything | `smoke` (and `npm test`) |
 | route steps, HUD, voice, `trackNavigationProgress`, server route parsing | `maneuvers` |
 | route rendering, theme/style, cancel/arrival | `route-layers` |
 | innerHTML/templates, realtime, phone packets, search/places | `security` |
+| GPS sources, `initTeslaCarGps`, `handleIncomingGps` | `dual-gps` |
+| UI strings, `I18N`, markup labels | `i18n` |
+| Yandex provider code paths | `yandex` |
+| map init, library loading, Leaflet paths | `fallback-cdn`, `fallback-webgl` |
 | `phone.html`, `phone-remote.js`, `realtime.js` | `phone` |
+
+`fallback-cdn` blocks the MapLibre script and `fallback-webgl` starts Chrome without WebGL, so they only run through the runner.
 
 What each check asserts is written at the top of its file in `scripts/verify/checks/`.
 

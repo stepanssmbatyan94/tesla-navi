@@ -15,8 +15,8 @@ Review a Tesla Navi diff for real defects. Wrong output here means a driver gets
 2. **Coordinate order.** Route geometry `[lng, lat]`; `updateCarPosition(lat, lng)`, `calculateDistance(lat1, lon1, …)`, `ymaps`, Leaflet take lat first. Check every boundary the diff crosses.
 3. **Map layer lifecycle.** Fixed ids, cleared via `clearMapLibreRouteLayers()`, no per-segment layers, runtime layers redrawn after `setStyle`/`style.load`, markers removed on cancel/arrival.
 4. **Untrusted text.** Phone packets, geocoder/Yandex/Photon names, YouTube titles/suggestions, saved places, logged values never reach `innerHTML`/`insertAdjacentHTML`/attribute templates without `escapeHtml()`; destination packets validated.
-5. **Navigation state.** Voice, route cameras and arrival only while `isNavigating`; rerouting only on real fixes; nothing double-fires per packet (packets arrive over Supabase and WS, deduped by `timestamp`).
-6. **Fake data.** New hardcoded traffic, ETA, counts, availability, ping, POI coordinates or video IDs presented as real are defects.
+5. **Navigation state.** Voice, route cameras and arrival only while `isNavigating`; rerouting only on real fixes; nothing double-fires per packet (packets arrive over Supabase and WS; exact repeats are dropped). Only one GPS source drives the car: phone first, car geolocation after 5 s of phone silence.
+6. **Fake data.** New hardcoded traffic, ETA, battery, counts, availability, ping, POI coordinates or video IDs presented as real are defects. Estimates (e.g. street-name speed limits) must look like estimates.
 7. **i18n & voice.** UI strings in all three dictionaries; voice prompts have Armenian clips and a `getArmenianAudio` mapping that doesn't shadow existing phrases.
 8. **Server.** Static serving limited to the allowlist; user-driven outbound fetches allowlisted (SSRF); external fetches have timeouts; caches bounded; new endpoints documented in `docs/API.md`.
 9. **MCU performance.** No per-frame/per-fix O(route × cameras) scans, no unbounded DOM growth, no layers/markers created per update.

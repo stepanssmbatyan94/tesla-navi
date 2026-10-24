@@ -9,7 +9,7 @@ The phone streams ~1 GPS fix per second to the car with minimal latency; no acco
 
 ## Decision
 
-Both pages join Supabase Broadcast channel `pair-<code>` and the server's in-memory `/ws?room=<code>` relay, send every message over both, and dedupe on the receiver by sender `timestamp`. The local relay reconnects with backoff.
+Both pages join Supabase Broadcast channel `pair-<code>` and the server's in-memory `/ws?room=<code>` relay, send every message over both, and drop exact repeats on the receiver (kind + `timestamp` + position), so a second phone or a skewed clock is never silenced. The local relay reconnects with backoff.
 
 ## Consequences
 

@@ -28,14 +28,15 @@ Details: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 | Area | What it does |
 |---|---|
 | Pairing | 6-char code + QR, Supabase Broadcast with a local WebSocket fallback, heartbeat and connection status |
-| Map | MapLibre GL vector map with MapsEV-style day/night/auto themes, 2D/3D buildings, heading-up / north-up, auto re-follow |
+| Map | MapLibre GL vector map with MapsEV-style day/night/auto themes, 2D/3D buildings, heading-up / north-up, auto re-follow; Yandex map option; automatic Leaflet/OSM fallback when MapLibre can't load or WebGL is missing |
 | Routing | Yandex live router with up to 3 alternatives and traffic-colored polylines, OSRM fallback, off-route rerouting |
-| Guidance | Maneuver HUD with countdown, lane arrows (OSRM lanes matched onto the Yandex route), progress bar with ETA |
+| Guidance | Maneuver HUD with countdown, lane arrows (OSRM lanes matched onto the Yandex route), progress bar with ETA, real traffic delay per route |
 | Voice | ru/en Microsoft Edge neural voices (Svetlana/Dmitry, Ava/Andrew), Armenian prerecorded Gor/Suzie, chime, mute |
-| Safety | ~185 speed cameras (Yerevan DB) announced only along the active route, overspeed indicator and chime |
+| Safety | ~185 speed cameras (Yerevan DB) announced only along the active route; camera limits are verified, other limits shown as estimates; overspeed chime on verified limits |
 | Places | Search (Yandex Suggest → Photon → Nominatim), Google/Yandex link and coordinate parsing, Home/Work, favorites, history |
 | Phone remote | GPS sharing with wake lock, address search, link paste, voice dictation, "Send to Tesla" |
-| Extras | Weather (Open-Meteo), YouTube search/player, EV charger list, traffic score badge |
+| Extras | Weather at the car's position (Open-Meteo), YouTube search/player, 105 EV charging stations from OpenStreetMap, Yerevan traffic score badge |
+| GPS | Phone GPS preferred; the car browser's own geolocation takes over automatically when the phone is silent |
 | Dev tools | `?mode=dev` simulator (preset routes, speeds, scrubbing) and diagnostics panel; `npm run verify` |
 
 Languages: Russian (default), Armenian, English.
@@ -56,7 +57,8 @@ Geolocation on a real phone needs HTTPS: use the production URL or a tunnel (`ng
 
 ```bash
 npm run check        # syntax check of all JS
-npm run verify       # headless end-to-end checks in system Chrome (~30 s, needs network)
+npm test             # unit tests (node:test, ~1 s, no network)
+npm run verify       # 10 headless browser checks in system Chrome (~45 s, needs network)
 ```
 
 ## Project structure

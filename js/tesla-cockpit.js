@@ -10,6 +10,11 @@ let chargersVisible = false;
 let pendingGpsFix = null;
 let hasReceivedRealGps = false;
 
+// GPS source arbitration: phone fixes win; the car's own geolocation is used only
+// when no phone fix arrived within this window (phone not paired, asleep, out of range)
+const PHONE_GPS_PRIORITY_MS = 5000;
+let lastPhoneGpsAt = 0;
+
 // YouTube Queue & Player State (Dynamic, no hardcoded tracks)
 let youtubeQueue = [];
 let currentTrackIndex = -1;
@@ -19,20 +24,26 @@ let currentYtQuery = '';
 let currentYtContinuationToken = null;
 let isYtLoadingMore = false;
 
-// Yerevan EV Supercharging Stations Hubs (CPS, Flash, PlugShare, Dalma)
-const EV_CHARGERS = [
-  { name: 'Dalma Garden Mall Supercharger', lat: 40.180200, lng: 44.482000, power: '150 kW', stalls: '4/6 свободно', address: 'Tsitsernakaberd Hwy, Yerevan' },
-  { name: 'Tesla Supercharger Yerevan (Flash)', lat: 40.192000, lng: 44.475000, power: '150 kW', stalls: '3/4 свободно', address: 'Halabyan St, Yerevan' },
-  { name: 'EV Motors Fast Hub (Kievyan St)', lat: 40.198500, lng: 44.493000, power: '120 kW', stalls: '2/2 свободно', address: 'Kievyan St 8, Yerevan' },
-  { name: 'CPS Electric Charging Hub (Halabyan)', lat: 40.187000, lng: 44.471000, power: '60 kW', stalls: '1/2 свободно', address: 'Halabyan St 38, Yerevan' },
-  { name: 'MegaMall Fast Charger Hub', lat: 40.196300, lng: 44.561000, power: '120 kW', stalls: '4/4 свободно', address: 'Gai Ave 16, Nor Nork' },
-  { name: 'Rio Mall EV Hub (Vahram Papazyan)', lat: 40.201200, lng: 44.508500, power: '60 kW', stalls: '2/2 свободно', address: 'Vahram Papazyan St 8, Yerevan' },
-  { name: 'Yerevan Mall Supercharger Hub', lat: 40.155800, lng: 44.501500, power: '120 kW', stalls: '3/4 свободно', address: 'Arshakunyats Ave 34/3, Yerevan' },
-  { name: 'SAS Foodland Fast Charger (Baghramyan)', lat: 40.191200, lng: 44.501500, power: '50 kW', stalls: '1/2 свободно', address: 'Baghramyan Ave 85, Yerevan' },
-  { name: 'Zvartnots Airport EV Supercharger', lat: 40.147500, lng: 44.398000, power: '120 kW', stalls: '4/6 свободно', address: 'Zvartnots International Airport' },
-  { name: 'Northern Avenue Hub (Center)', lat: 40.182200, lng: 44.514000, power: '50 kW', stalls: '2/2 свободно', address: 'Northern Ave, Yerevan' },
-  { name: 'Cascade Plaza EV Hub', lat: 40.191500, lng: 44.515200, power: '60 kW', stalls: '1/2 свободно', address: 'Antarayin St 160, Yerevan' }
-];
+const CHARGERS_LIST_LIMIT = 40;
+
+// EV charging stations: real OpenStreetMap data from /api/chargers (loaded on first use).
+// OSM has no live availability, so none is shown.
+let evChargers = [];
+let evChargersLoad = null;
+
+function loadEvChargers() {
+  if (!evChargersLoad) {
+    evChargersLoad = fetch('/api/chargers')
+      .then(res => res.json())
+      .then(data => { evChargers = Array.isArray(data.stations) ? data.stations : []; return evChargers; })
+      .catch(err => {
+        console.warn('EV chargers load error:', err);
+        evChargersLoad = null; // retry on next open
+        return evChargers;
+      });
+  }
+  return evChargersLoad;
+}
 
 // Escape untrusted text (geocoder/Yandex/YouTube results, phone packets, saved places)
 // before interpolating it into innerHTML templates
@@ -43,6 +54,12 @@ function escapeHtml(value) {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;');
+}
+
+// Translate a UI string for the current language (falls back to Russian, then the key)
+function tr(key) {
+  const dict = I18N[window.CURRENT_LANG || 'ru'] || I18N.ru;
+  return dict[key] || I18N.ru[key] || key;
 }
 
 // Global hooks
@@ -64,7 +81,7 @@ async function initTeslaCockpit() {
         const dummy = new AudioCtx();
         dummy.resume().then(() => dummy.close()).catch(() => {});
       }
-    } catch (e) {}
+    } catch (e) { /* autoplay unlock is best effort; audio retries on the next gesture */ }
     window.removeEventListener('pointerdown', unlockAudioPipeline);
     window.removeEventListener('touchstart', unlockAudioPipeline);
     window.removeEventListener('click', unlockAudioPipeline);
@@ -196,6 +213,14 @@ function applyLanguage(lang) {
 
   // 11. Recalculate Live Commute ETAs & Destination Chips
   updateCommuteEtas();
+
+  // 12. Phone remote QR follows the UI language
+  buildPairingQr();
+
+  // 13. Lists and labels rendered earlier in the previous language
+  const searchInputEl = document.getElementById('drawer-search-input');
+  if (!searchInputEl || !searchInputEl.value.trim()) renderSearchHistory();
+  if (typeof window.refreshYouTubeAccountUI === 'function') window.refreshYouTubeAccountUI();
 }
 
 // 1.5 Voice Management (Female 👩 / Male 👨 across RU, HY, EN)
@@ -258,6 +283,19 @@ function updateVoiceIndicator(voice) {
 
 // Speedometer & Overspeed Alert Manager
 let lastOverspeedChimeTime = 0;
+// 'camera' = limit of a speed camera on the route (OSM data), 'estimated' = street-name heuristic
+let currentSpeedLimitSource = 'estimated';
+
+function setSpeedLimitDisplay(limit, source) {
+  const limitEl = document.getElementById('speed-limit-val');
+  currentSpeedLimitSource = source === 'camera' ? 'camera' : 'estimated';
+  if (!limitEl) return;
+  if (limit) limitEl.textContent = limit;
+  const estimated = currentSpeedLimitSource !== 'camera';
+  limitEl.classList.toggle('speed-limit-estimated', estimated);
+  const dict = I18N[currentLang] || I18N.ru;
+  limitEl.title = estimated ? dict.speedLimitEstimated : dict.speedLimitCamera;
+}
 
 function updateSpeedometerDisplay(speedKmh) {
   const currentSpeed = Math.max(0, Math.round(speedKmh || 0));
@@ -271,8 +309,9 @@ function updateSpeedometerDisplay(speedKmh) {
   // Visual warning: red pulse starts as soon as exceeding limit (e.g. 61+ at limit 60)
   const isOverLimit = currentSpeed > speedLimit;
 
-  // Audio chime warning: strictly when speed exceeds limit + 10 km/h (e.g. 71+ at limit 60)
-  const isAudioWarning = currentSpeed >= (speedLimit + 11);
+  // Audio chime warning: strictly when speed exceeds limit + 10 km/h (e.g. 71+ at limit 60),
+  // and only for a verified (speed-camera) limit, never for a street-name estimate
+  const isAudioWarning = currentSpeedLimitSource === 'camera' && currentSpeed >= (speedLimit + 11);
 
   if (circleEl) {
     if (isOverLimit) {
@@ -290,6 +329,12 @@ function updateSpeedometerDisplay(speedKmh) {
       mapEngine.playNavChime();
     }
   }
+}
+
+// Age of a GPS fix for the telemetry panel ('—' when the clocks disagree or it's stale)
+function formatFixAge(ms) {
+  if (!Number.isFinite(ms) || ms < 0 || ms > 60000) return '—';
+  return ms < 1000 ? `${Math.round(ms)} ms` : `${(ms / 1000).toFixed(1)} s`;
 }
 
 function updateGpsStatusUI() {
@@ -312,6 +357,10 @@ function initTeslaCarGps() {
 
   navigator.geolocation.watchPosition(
     (pos) => {
+      // The paired phone is the more accurate source: while it streams, ignore the car's
+      // own fixes, otherwise the arrow alternates between two receivers and jumps around
+      if (Date.now() - lastPhoneGpsAt < PHONE_GPS_PRIORITY_MS) return;
+
       const coords = pos.coords;
       const speedKmh = coords.speed ? Math.round(coords.speed * 3.6) : 0;
       const heading = (coords.heading != null && !isNaN(coords.heading) && coords.heading > 0) ? coords.heading : null;
@@ -322,7 +371,7 @@ function initTeslaCarGps() {
 
       try {
         localStorage.setItem('tesla_last_coords', JSON.stringify({ lat: Number(coords.latitude), lng: Number(coords.longitude) }));
-      } catch (e) {}
+      } catch (e) { /* storage unavailable (private mode / quota): non-critical */ }
 
       // Update cluster speedometer with overspeed check
       updateSpeedometerDisplay(speedKmh);
@@ -334,8 +383,8 @@ function initTeslaCarGps() {
       const telAge = document.getElementById('tel-age');
       if (telLat) telLat.textContent = Number(coords.latitude).toFixed(4);
       if (telLng) telLng.textContent = Number(coords.longitude).toFixed(4);
-      if (telAcc) telAcc.textContent = `±${Math.round(coords.accuracy || 3)} м`;
-      if (telAge) telAge.textContent = `4 мс`;
+      if (telAcc) telAcc.textContent = `±${Math.round(coords.accuracy || 3)} ${tr('m')}`;
+      if (telAge) telAge.textContent = formatFixAge(Date.now() - pos.timestamp);
 
       // Pass directly to Map Engine
       if (mapEngine) {
@@ -346,7 +395,7 @@ function initTeslaCarGps() {
       console.log('[In-Car GPS] Geolocation status:', err.message);
       if (!hasReceivedRealGps) {
         const telAcc = document.getElementById('tel-accuracy');
-        if (telAcc) telAcc.textContent = 'Ожидание...';
+        if (telAcc) telAcc.textContent = tr('waitingGps');
         updateGpsStatusUI();
       }
     },
@@ -361,16 +410,11 @@ function initTeslaCarGps() {
 // 3. Realtime Phone Remote Pairing (Supabase Broadcast)
 function initPairing() {
   const urlParams = new URLSearchParams(window.location.search);
-  currentCode = (urlParams.get('code') || generateCode()).toUpperCase();
+  currentCode = (urlParams.get('code') || generatePairingCode()).toUpperCase();
 
   document.getElementById('pairing-code-display').textContent = currentCode;
 
-  // Build QR code URL pointing to phone remote
-  const basePath = window.location.pathname.replace(/\/index\.html$/, '').replace(/\/$/, '');
-  const phoneUrl = `${window.location.origin}${basePath}/phone.html?code=${currentCode}`;
-
-  const qrImg = document.getElementById('qr-image');
-  qrImg.src = `https://api.qrserver.com/v1/create-qr-code/?size=180x180&margin=0&color=0b0f17&bgcolor=ffffff&data=${encodeURIComponent(phoneUrl)}`;
+  buildPairingQr();
 
   realtimeClient = new TeslaRealtime({
     code: currentCode,
@@ -389,17 +433,20 @@ function initPairing() {
   realtimeClient.init();
 }
 
-function generateCode() {
-  const chars = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
-  let res = '';
-  for (let i = 0; i < 6; i++) {
-    res += chars.charAt(Math.floor(Math.random() * chars.length));
-  }
-  return res;
+
+// QR code for the phone remote; carries the car's UI language so the phone matches it
+function buildPairingQr() {
+  const qrImg = document.getElementById('qr-image');
+  if (!qrImg || !currentCode) return;
+  const basePath = window.location.pathname.replace(/\/index\.html$/, '').replace(/\/$/, '');
+  const phoneUrl = `${window.location.origin}${basePath}/phone.html?code=${currentCode}&lang=${currentLang}`;
+  qrImg.src = `https://api.qrserver.com/v1/create-qr-code/?size=180x180&margin=0&color=0b0f17&bgcolor=ffffff&data=${encodeURIComponent(phoneUrl)}`;
+  qrImg.dataset.phoneUrl = phoneUrl;
 }
 
 function handleIncomingGps(gps) {
   if (!gps || isNaN(gps.lat) || isNaN(gps.lng)) return;
+  lastPhoneGpsAt = Date.now();
   const speedKmh = Math.round((gps.speed || 0) * 3.6);
   updateSpeedometerDisplay(speedKmh);
 
@@ -409,7 +456,7 @@ function handleIncomingGps(gps) {
 
   try {
     localStorage.setItem('tesla_last_coords', JSON.stringify({ lat: Number(gps.lat), lng: Number(gps.lng) }));
-  } catch (e) {}
+  } catch (e) { /* storage unavailable (private mode / quota): non-critical */ }
 
   const telLat = document.getElementById('tel-lat');
   const telLng = document.getElementById('tel-lng');
@@ -417,8 +464,9 @@ function handleIncomingGps(gps) {
   const telAge = document.getElementById('tel-age');
   if (telLat) telLat.textContent = Number(gps.lat).toFixed(4);
   if (telLng) telLng.textContent = Number(gps.lng).toFixed(4);
-  if (telAcc) telAcc.textContent = `±${Math.round(gps.accuracy || 3)} м`;
-  if (telAge) telAge.textContent = `12 мс`;
+  if (telAcc) telAcc.textContent = `±${Math.round(gps.accuracy || 3)} ${tr('m')}`;
+  // Phone clock vs car clock: only meaningful when both are roughly in sync
+  if (telAge) telAge.textContent = gps.timestamp ? formatFixAge(Date.now() - gps.timestamp) : '—';
 
   if (mapEngine) {
     const rawHeading = (gps.heading != null && !isNaN(gps.heading) && gps.heading > 0) ? gps.heading : null;
@@ -516,8 +564,8 @@ function toggleFavoritePlace(place) {
   } else {
     userSavedPlaces.favorites.push({
       id: 'fav_' + Date.now(),
-      name: place.name || place.title || 'Избранное',
-      address: place.address || place.subtitle || 'Ереван',
+      name: place.name || place.title || tr('favorites'),
+      address: place.address || place.subtitle || '',
       lat: place.lat,
       lng: place.lng
     });
@@ -527,81 +575,38 @@ function toggleFavoritePlace(place) {
 
 let currentRouteInfo = null;
 
-// Dynamic Yerevan Traffic Score Calculation (UTC+4)
-function getLiveTrafficScore() {
-  const now = new Date();
-  const utcHours = now.getUTCHours();
-  const utcMinutes = now.getUTCMinutes();
-  const yerevanHour = (utcHours + 4 + (utcMinutes / 60)) % 24;
-
-  let score = 2;
-  let color = '#22c55e'; // Vibrant Green
-  let label = 'Дороги свободны';
-
-  if (yerevanHour >= 8.5 && yerevanHour < 10.5) {
-    score = 7;
-    color = '#ef4444'; // Red
-    label = 'Утренний час пик';
-  } else if (yerevanHour >= 17.0 && yerevanHour < 19.75) {
-    score = 8;
-    color = '#ef4444'; // Red
-    label = 'Вечерний час пик';
-  } else if (yerevanHour >= 13.0 && yerevanHour < 15.0) {
-    score = 5;
-    color = '#f59e0b'; // Amber
-    label = 'Умеренное движение';
-  } else if (yerevanHour >= 10.5 && yerevanHour < 17.0) {
-    score = 4;
-    color = '#eab308'; // Yellow
-    label = 'Обычный трафик';
-  } else if (yerevanHour >= 19.75 && yerevanHour < 21.0) {
-    score = 4;
-    color = '#eab308';
-    label = 'Трафик спадает';
-  } else {
-    // 21:00 - 08:30 (Matches 21:28 user drive photo!)
-    score = 2;
-    color = '#22c55e';
-    label = 'Свободно';
-  }
-
-  return { score, color, label };
-}
-
 let liveTrafficData = null;
 
 async function updateLiveTrafficBadge() {
   const badge = document.getElementById('traffic-score-badge');
   if (!badge) return;
+  const dict = I18N[window.CURRENT_LANG || 'ru'] || I18N.ru;
 
   const curLat = mapEngine?.currentPosition?.lat;
   const curLng = mapEngine?.currentPosition?.lng;
   const query = (curLat && curLng) ? `?lat=${curLat}&lng=${curLng}` : '';
 
+  liveTrafficData = null;
   try {
     const res = await fetch(`/api/traffic-yerevan${query}`);
     const data = await res.json();
-    if (data && data.success) {
+    if (data && data.success && data.available !== false && data.score != null) {
       liveTrafficData = data;
-      badge.textContent = data.outsideCity ? '🛣️' : data.score;
+      badge.textContent = data.score;
       badge.style.background = data.color;
       badge.style.boxShadow = `0 4px 14px ${data.color}90`;
-      if (data.outsideCity) {
-        badge.title = `Трасса / За городом: ${data.hint}`;
-      } else if (data.city && data.city !== 'Ереван') {
-        badge.title = `${data.city}: ${data.hint}`;
-      } else {
-        badge.title = `Пробки в Ереване: ${data.score} из 10 (${data.hint}) · Яндекс`;
-      }
+      badge.title = `${dict.trafficScoreTitle}: ${data.score}/10 (${data.hint}) · Yandex`;
       return;
     }
-  } catch (e) {}
+  } catch (e) {
+    console.warn('Traffic score fetch error:', e);
+  }
 
-  const traffic = getLiveTrafficScore();
-  badge.textContent = traffic.score;
-  badge.style.background = traffic.color;
-  badge.style.boxShadow = `0 4px 14px ${traffic.color}90`;
-  badge.title = `Пробки в Ереване: ${traffic.score} из 10 баллов (${traffic.label})`;
+  // No live score here (outside Yerevan or Yandex unavailable): show that, never a guess
+  badge.textContent = '—';
+  badge.style.background = '#94a3b8';
+  badge.style.boxShadow = 'none';
+  badge.title = dict.trafficUnavailable;
 }
 
 // 4. Map Engine Initialization
@@ -613,7 +618,7 @@ async function initMap() {
   }
   try {
     localStorage.setItem('tesla_map_provider_v2', activeProvider);
-  } catch (e) {}
+  } catch (e) { /* storage unavailable (private mode / quota): non-critical */ }
 
   let startCenter = CONFIG.defaultCenter;
   try {
@@ -624,7 +629,7 @@ async function initMap() {
         startCenter = { lat: parsed.lat, lng: parsed.lng, zoom: CONFIG.navigationZoom || 16.5 };
       }
     }
-  } catch (e) {}
+  } catch (e) { /* missing or corrupt saved position: start from the default center */ }
 
   if (pendingGpsFix) {
     startCenter = { lat: pendingGpsFix.lat, lng: pendingGpsFix.lng, zoom: CONFIG.navigationZoom || 16.5 };
@@ -693,6 +698,12 @@ async function initMap() {
   await mapEngine.init();
   window.mapEngine = mapEngine;
 
+  // The engine may have fallen back to another map library: show what is really running
+  const providerIndicator = document.getElementById('provider-indicator');
+  if (providerIndicator && mapEngine.provider !== activeProvider) {
+    providerIndicator.textContent = mapEngine.provider === 'osm' ? 'OSM' : (mapEngine.provider === 'yandex' ? 'ЯН' : 'ML');
+  }
+
   if (pendingGpsFix) {
     mapEngine.updateCarPosition(pendingGpsFix.lat, pendingGpsFix.lng, pendingGpsFix.heading, pendingGpsFix.speed, true);
   }
@@ -758,7 +769,7 @@ function initToolbarHandlers() {
           <path d="M19.07 4.93a10 10 0 0 1 0 14.14"></path>
         </svg>
       `;
-      btn.title = 'Звук включен';
+      btn.title = tr('soundOn');
     } else {
       btn.innerHTML = `
         <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="#0066ff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
@@ -766,7 +777,7 @@ function initToolbarHandlers() {
           <line x1="22" y1="2" x2="2" y2="22" stroke="#0066ff" stroke-width="2.6"></line>
         </svg>
       `;
-      btn.title = 'Звук выключен';
+      btn.title = tr('soundOff');
     }
   }
 
@@ -793,11 +804,11 @@ function initToolbarHandlers() {
   const trafficBadge = document.getElementById('traffic-score-badge');
   if (trafficBadge) {
     trafficBadge.addEventListener('click', () => {
-      if (liveTrafficData && liveTrafficData.success) {
-        alert(`🚦 Яндекс.Пробки Ереван\nБалл: ${liveTrafficData.score} из 10\nСитуация: ${liveTrafficData.hint}\nВремя обновления: ${liveTrafficData.time || 'сейчас'}\nИсточник: Официальный информер Яндекс`);
+      const dict = I18N[window.CURRENT_LANG || 'ru'] || I18N.ru;
+      if (liveTrafficData) {
+        alert(`🚦 ${dict.trafficScoreTitle}: ${liveTrafficData.score}/10\n${liveTrafficData.hint}\n${liveTrafficData.time || ''} · Yandex`);
       } else {
-        const traffic = getLiveTrafficScore();
-        alert(`🚦 Пробки в Ереване: ${traffic.score} из 10 баллов\n${traffic.label}\nВремя: UTC+4 (Ереван)`);
+        alert(`🚦 ${dict.trafficUnavailable}`);
       }
     });
   }
@@ -858,11 +869,14 @@ function initToolbarHandlers() {
       if (currentRouteInfo) {
         showNavigationHud(currentRouteInfo);
       } else if (mapEngine && mapEngine.activeRoute) {
+        // Built from the engine's own route data (this used to show an invented '15 min / 18:45')
+        const durationSec = mapEngine.activeRoute.durationSec || 0;
+        const etaDate = new Date(Date.now() + durationSec * 1000);
         const fallbackRoute = {
-          duration: '15 мин',
-          distance: `${((mapEngine.totalDistance || 1000) / 1000).toFixed(1)} км`,
-          eta: '18:45',
-          name: mapEngine.activeRoute.destination?.name || 'Маршрут',
+          duration: durationSec ? mapEngine.formatNavDuration(durationSec) : '—',
+          distance: mapEngine.formatNavDistance(mapEngine.totalRouteMeters || mapEngine.totalDistance || 0),
+          eta: durationSec ? `${String(etaDate.getHours()).padStart(2, '0')}:${String(etaDate.getMinutes()).padStart(2, '0')}` : '—',
+          name: mapEngine.activeRoute.destination?.name || tr('destination'),
           steps: mapEngine.routeSteps || [],
           trafficSegments: mapEngine.trafficSegments || []
         };
@@ -1051,8 +1065,8 @@ function initToolbarHandlers() {
   }
   if (btnToggleProvider) {
     btnToggleProvider.title = activeProv === 'yandex'
-      ? 'Карта: Яндекс (пробки). Нажмите для переключения на MapsEV MapLibre 3D'
-      : 'Карта: MapsEV MapLibre 3D. Нажмите для переключения на Яндекс';
+      ? tr('providerYandexTitle')
+      : tr('providerMaplibreTitle');
 
     btnToggleProvider.addEventListener('click', () => {
       const currentUrlProv = new URLSearchParams(window.location.search).get('provider');
@@ -1060,7 +1074,7 @@ function initToolbarHandlers() {
       const nextProv = (cur === 'yandex') ? 'maplibre' : 'yandex';
       try {
         localStorage.setItem('tesla_map_provider_v2', nextProv);
-      } catch (e) {}
+      } catch (e) { /* storage unavailable (private mode / quota): non-critical */ }
       const url = new URL(window.location.href);
       url.searchParams.set('provider', nextProv);
       window.location.href = url.toString();
@@ -1084,13 +1098,13 @@ function initToolbarHandlers() {
   if (btnToggle2D3D) {
     btnToggle2D3D.classList.toggle('is-3d', isInitial3D);
     if (btn3DModeLabel) btn3DModeLabel.textContent = isInitial3D ? '3D' : '2D';
-    btnToggle2D3D.title = isInitial3D ? 'Переключить в 2D плоский вид' : 'Переключить в 3D перспективный вид';
+    btnToggle2D3D.title = isInitial3D ? tr('switchTo2D') : tr('switchTo3D');
     btnToggle2D3D.addEventListener('click', () => {
       if (mapEngine && typeof mapEngine.toggle2D3D === 'function') {
         const is3D = mapEngine.toggle2D3D();
         btnToggle2D3D.classList.toggle('is-3d', is3D);
         if (btn3DModeLabel) btn3DModeLabel.textContent = is3D ? '3D' : '2D';
-        btnToggle2D3D.title = is3D ? 'Переключить в 2D плоский вид' : 'Переключить в 3D перспективный вид';
+        btnToggle2D3D.title = is3D ? tr('switchTo2D') : tr('switchTo3D');
       }
     });
   }
@@ -1529,13 +1543,13 @@ function openEditPlaceModal(targetType, existingPlace = null) {
   if (nameWrap) nameWrap.classList.toggle('hidden', !isFav);
 
   if (targetType === 'home') {
-    titleEl.textContent = hasExisting ? 'Настройка адреса: Дом 🏠' : 'Добавить адрес: Дом 🏠';
+    titleEl.textContent = hasExisting ? tr('placeTitleEditHome') : tr('placeTitleAddHome');
     addrInput.value = currentEditTarget.place?.address || '';
   } else if (targetType === 'work') {
-    titleEl.textContent = hasExisting ? 'Настройка адреса: Работа 💼' : 'Добавить адрес: Работа 💼';
+    titleEl.textContent = hasExisting ? tr('placeTitleEditWork') : tr('placeTitleAddWork');
     addrInput.value = currentEditTarget.place?.address || '';
   } else {
-    titleEl.textContent = hasExisting ? 'Изменить избранное ⭐' : 'Добавить в избранное ⭐';
+    titleEl.textContent = hasExisting ? tr('placeTitleEditFavorite') : tr('placeTitleAddFavorite');
     nameInput.value = currentEditTarget.place?.name || '';
     addrInput.value = currentEditTarget.place?.address || '';
   }
@@ -1625,7 +1639,7 @@ function initEditPlaceModalHandlers() {
   if (btnCurrentGps) {
     btnCurrentGps.addEventListener('click', () => {
       const cur = mapEngine ? mapEngine.currentPosition : { lat: 40.1776, lng: 44.5125 };
-      const currentAddr = `Ереван (${Number(cur.lat).toFixed(4)}, ${Number(cur.lng).toFixed(4)})`;
+      const currentAddr = `${tr('myLocation')} (${Number(cur.lat).toFixed(4)}, ${Number(cur.lng).toFixed(4)})`;
       currentEditTarget.selectedLocation = {
         lat: cur.lat,
         lng: cur.lng,
@@ -1643,7 +1657,7 @@ function initEditPlaceModalHandlers() {
 
       const addrVal = addrInput.value.trim();
       if (!addrVal) {
-        alert('Пожалуйста, введите адрес');
+        alert(tr('enterAddress'));
         return;
       }
 
@@ -1655,14 +1669,14 @@ function initEditPlaceModalHandlers() {
 
       if (currentEditTarget.type === 'home') {
         userSavedPlaces.home = {
-          name: 'Дом',
+          name: tr('home'),
           address: addrVal,
           lat: loc.lat,
           lng: loc.lng
         };
       } else if (currentEditTarget.type === 'work') {
         userSavedPlaces.work = {
-          name: 'Работа',
+          name: tr('work'),
           address: addrVal,
           lat: loc.lat,
           lng: loc.lng
@@ -1712,6 +1726,10 @@ function initEditPlaceModalHandlers() {
 }
 
 // 6. Search & Autocomplete Handlers with Persistent Search History
+
+// Category chips search the geocoder near the car (Yandex Suggest works best with Russian terms)
+const CATEGORY_SEARCH_QUERIES = { parking: 'парковка', carwash: 'автомойка', food: 'ресторан', coffee: 'кофейня' };
+const CATEGORY_SEARCH_RADIUS_M = 30000;
 const SEARCH_HISTORY_KEY = 'tesla_search_history';
 
 function getSearchHistory() {
@@ -1784,7 +1802,7 @@ function renderSearchHistory() {
   if (history.length === 0) {
     resultsList.innerHTML = `
       <div style="text-align: center; color: #94a3b8; padding: 28px 14px; font-size: 13px;">
-        История поиска пуста
+        ${escapeHtml(tr('historyEmpty'))}
       </div>
     `;
     return;
@@ -1794,7 +1812,7 @@ function renderSearchHistory() {
 
   history.forEach((h, idx) => {
     const distMeters = mapEngine ? mapEngine.calculateDistance(cur.lat, cur.lng, h.lat, h.lng) : 1000;
-    const distStr = distMeters >= 1000 ? `${(distMeters / 1000).toFixed(1)} км` : `${Math.round(distMeters)} м`;
+    const distStr = mapEngine ? mapEngine.formatNavDistance(distMeters) : '';
     const isStarred = isLocationInFavorites(h.lat, h.lng, h.name);
 
     const item = document.createElement('div');
@@ -1809,10 +1827,10 @@ function renderSearchHistory() {
       </div>
       <div style="display: flex; align-items: center; gap: 6px;">
         <div class="item-dist">${distStr}</div>
-        <button class="item-star-btn ${isStarred ? 'starred' : ''}" title="${isStarred ? 'Удалить из избранного' : 'Добавить в избранное'}">
+        <button class="item-star-btn ${isStarred ? 'starred' : ''}" title="${isStarred ? tr('removeFavorite') : tr('addToFavorites')}">
           ${isStarred ? '⭐' : '☆'}
         </button>
-        <button class="btn-hist-action" title="Удалить из истории" style="font-size: 12px; padding: 2px 6px;">✕</button>
+        <button class="btn-hist-action" title="${tr('removeFromHistory')}" style="font-size: 12px; padding: 2px 6px;">✕</button>
       </div>
     `;
 
@@ -1859,8 +1877,11 @@ function initSearchHandlers() {
   renderSearchHistory();
 
   // Autocomplete typing with Yandex-powered geocoder
-  searchInput.addEventListener('input', () => {
+  searchInput.addEventListener('input', (e) => {
     clearTimeout(debounceTimer);
+    // Typing by the user ends a category search started from a chip
+    if (e.isTrusted) delete searchInput.dataset.category;
+    const isCategorySearch = searchInput.dataset.category === '1';
     const query = searchInput.value.trim();
     const sectionTitle = document.getElementById('drawer-section-title');
 
@@ -1871,7 +1892,7 @@ function initSearchHandlers() {
     }
 
     if (sectionTitle) {
-      sectionTitle.textContent = 'Результаты поиска';
+      sectionTitle.textContent = tr('searchResults');
     }
 
     if (query.length < 2) return;
@@ -1881,7 +1902,14 @@ function initSearchHandlers() {
         const cur = mapEngine ? mapEngine.currentPosition : { lat: 40.1776, lng: 44.5125 };
         const url = `/api/geocode?q=${encodeURIComponent(query)}&lat=${cur.lat}&lng=${cur.lng}`;
         const res = await fetch(url);
-        const items = await res.json();
+        let items = await res.json();
+        if (isCategorySearch && Array.isArray(items) && mapEngine) {
+          // Category chips mean "near me": drop far matches, nearest first
+          items = items
+            .map(it => ({ ...it, _d: mapEngine.calculateDistance(cur.lat, cur.lng, it.lat, it.lng) }))
+            .filter(it => it._d <= CATEGORY_SEARCH_RADIUS_M)
+            .sort((a, b) => a._d - b._d);
+        }
 
         resultsList.innerHTML = '';
 
@@ -1894,7 +1922,7 @@ function initSearchHandlers() {
 
             // Calculate distance from current vehicle location
             const distMeters = mapEngine ? mapEngine.calculateDistance(cur.lat, cur.lng, lat, lng) : 1000;
-            const distStr = distMeters >= 1000 ? `${(distMeters / 1000).toFixed(1)} км` : `${Math.round(distMeters)} м`;
+            const distStr = mapEngine ? mapEngine.formatNavDistance(distMeters) : '';
 
             const isStarred = isLocationInFavorites(lat, lng, title);
             const item = document.createElement('div');
@@ -1909,7 +1937,7 @@ function initSearchHandlers() {
               </div>
               <div style="display: flex; align-items: center; gap: 8px;">
                 <div class="item-dist">${distStr}</div>
-                <button class="item-star-btn ${isStarred ? 'starred' : ''}" title="${isStarred ? 'Удалить из избранного' : 'Добавить в избранное'}">
+                <button class="item-star-btn ${isStarred ? 'starred' : ''}" title="${isStarred ? tr('removeFavorite') : tr('addToFavorites')}">
                   ${isStarred ? '⭐' : '☆'}
                 </button>
               </div>
@@ -1949,17 +1977,12 @@ function initSearchHandlers() {
         openChargingStationsDrawer();
         return;
       }
-      let target = null;
-      if (type === 'parking') target = { name: 'Парковка / Parking Center', lat: 40.186500, lng: 44.473000 };
-      else if (type === 'carwash') target = { name: 'Premium Car Wash Yerevan', lat: 40.184500, lng: 44.478000 };
-      else if (type === 'food') target = { name: 'Ресторан / Dining Yerevan', lat: 40.184000, lng: 44.480000 };
-      else if (type === 'coffee') target = { name: 'Coffee House Yerevan', lat: 40.185500, lng: 44.485000 };
-
-      if (target) {
-        searchDrawer.classList.add('hidden');
-        addToSearchHistory(target);
-        startNavigationTo(target);
-      }
+      // Real places near the car via the geocoder (these chips used to jump to invented points)
+      const query = CATEGORY_SEARCH_QUERIES[type];
+      if (!query) return;
+      searchInput.value = query;
+      searchInput.dataset.category = '1';
+      searchInput.dispatchEvent(new Event('input'));
     });
   });
 }
@@ -2049,12 +2072,18 @@ function showRouteAlternativesDrawer(route) {
 
   // Update card detail tags (Traffic lights & Alternative labels)
   const dict = (typeof I18N !== 'undefined' && I18N[currentLang]) ? I18N[currentLang] : (I18N ? I18N.ru : {});
-  const card0Tag = document.querySelector('#route-card-0 .card-tag');
-  if (card0Tag) card0Tag.textContent = `8 ${dict.trafficLights || 'светофоров'}`;
-  const card1Tag = document.querySelector('#route-card-1 .card-tag');
-  if (card1Tag) card1Tag.textContent = `${dict.alternative || 'Альтернатива'} 1`;
-  const card2Tag = document.querySelector('#route-card-2 .card-tag');
-  if (card2Tag) card2Tag.textContent = `${dict.alternative || 'Альтернатива'} 2`;
+  // Card tag: the real delay caused by traffic (Yandex), otherwise a plain label
+  [r0, r1, r2].forEach((r, i) => {
+    const tag = document.querySelector(`#route-card-${i} .card-tag`);
+    if (!tag || !r) return;
+    if (r.trafficDelayMin > 0) {
+      tag.textContent = `+${mapEngine ? mapEngine.formatNavDuration(r.trafficDelayMin, true) : r.trafficDelayMin} ${dict.trafficDelay}`;
+    } else if (r.trafficDelayMin === 0) {
+      tag.textContent = dict.noTrafficDelay;
+    } else {
+      tag.textContent = i === 0 ? '' : `${dict.alternative || 'Альтернатива'} ${i}`;
+    }
+  });
 
   const goTextEl = document.querySelector('#btn-start-route-nav .go-text');
   if (goTextEl) goTextEl.textContent = dict.go || 'Поехали';
@@ -2118,12 +2147,8 @@ function renderTrafficProgressBar(segments) {
   if (!barContainer) return;
   barContainer.innerHTML = '';
 
-  const segs = (segments && segments.length > 0) ? segments : [
-    { coords: new Array(40), color: '#10b981' },
-    { coords: new Array(25), color: '#f59e0b' },
-    { coords: new Array(15), color: '#ef4444' },
-    { coords: new Array(20), color: '#10b981' }
-  ];
+  // Without traffic data the bar is one neutral segment (never an invented jam pattern)
+  const segs = (segments && segments.length > 0) ? segments : [{ coords: [0, 1], color: NO_TRAFFIC_COLOR }];
 
   const totalPoints = segs.reduce((sum, s) => sum + (s.coords ? s.coords.length : 1), 0);
 
@@ -2199,8 +2224,7 @@ function updateManeuverHud(m) {
 
   // Update dynamic speed limit circle (60 in city, 90 on highway/outside Yerevan)
   if (m.speedLimit) {
-    const limitEl = document.getElementById('speed-limit-val');
-    if (limitEl) limitEl.textContent = m.speedLimit;
+    setSpeedLimitDisplay(m.speedLimit, m.speedLimitSource);
   }
 
   // Real Lane Guidance matching Yandex Navigator (Screenshots 4 & 5)
@@ -2317,7 +2341,7 @@ function getLaneColumnsHtml(lanesOrModifier) {
       const stateClass = isActive ? 'is-active' : 'is-faded';
       const svg = getSingleLaneSvg(lane.indications, isActive);
       const dot = isActive ? '<span class="lane-active-dot"></span>' : '';
-      return `<div class="lane-col-item ${stateClass}" title="Полоса ${idx + 1}">${svg}${dot}</div>`;
+      return `<div class="lane-col-item ${stateClass}" title="${tr('lane')} ${idx + 1}">${svg}${dot}</div>`;
     }).join('');
   }
 
@@ -2331,60 +2355,60 @@ function getLaneColumnsHtml(lanesOrModifier) {
 
   if (isSlightLeft) {
     return `
-      <div class="lane-col-item is-active" title="Ваша полоса: Держитесь левее">
+      <div class="lane-col-item is-active">
         ${getSingleLaneSvg(['slight left'], true)}
         <span class="lane-active-dot"></span>
       </div>
-      <div class="lane-col-item is-faded" title="Другая полоса: Прямо">
+      <div class="lane-col-item is-faded">
         ${getSingleLaneSvg(['straight'], false)}
       </div>
     `;
   } else if (isSlightRight) {
     return `
-      <div class="lane-col-item is-faded" title="Другая полоса: Прямо">
+      <div class="lane-col-item is-faded">
         ${getSingleLaneSvg(['straight'], false)}
       </div>
-      <div class="lane-col-item is-active" title="Ваша полоса: Держитесь правее">
+      <div class="lane-col-item is-active">
         ${getSingleLaneSvg(['slight right'], true)}
         <span class="lane-active-dot"></span>
       </div>
     `;
   } else if (isLeft) {
     return `
-      <div class="lane-col-item is-active" title="Ваша полоса: Поворот налево">
+      <div class="lane-col-item is-active">
         ${getSingleLaneSvg(['left'], true)}
         <span class="lane-active-dot"></span>
       </div>
-      <div class="lane-col-item is-faded" title="Другая полоса: Прямо">
+      <div class="lane-col-item is-faded">
         ${getSingleLaneSvg(['straight'], false)}
       </div>
     `;
   } else if (isRight) {
     return `
-      <div class="lane-col-item is-faded" title="Другая полоса: Прямо">
+      <div class="lane-col-item is-faded">
         ${getSingleLaneSvg(['straight'], false)}
       </div>
-      <div class="lane-col-item is-active" title="Ваша полоса: Поворот направо">
+      <div class="lane-col-item is-active">
         ${getSingleLaneSvg(['right'], true)}
         <span class="lane-active-dot"></span>
       </div>
     `;
   } else if (isUTurn) {
     return `
-      <div class="lane-col-item is-active" title="Ваша полоса: Разворот">
+      <div class="lane-col-item is-active">
         ${getSingleLaneSvg(['uturn'], true)}
         <span class="lane-active-dot"></span>
       </div>
-      <div class="lane-col-item is-faded" title="Другая полоса: Прямо">
+      <div class="lane-col-item is-faded">
         ${getSingleLaneSvg(['straight'], false)}
       </div>
     `;
   } else {
     return `
-      <div class="lane-col-item is-active" title="Полоса 1: Прямо">
+      <div class="lane-col-item is-active">
         ${getSingleLaneSvg(['straight'], true)}
       </div>
-      <div class="lane-col-item is-active" title="Полоса 2: Прямо">
+      <div class="lane-col-item is-active">
         ${getSingleLaneSvg(['straight'], true)}
       </div>
     `;
@@ -2419,6 +2443,7 @@ function renderLaneGuidance(m) {
 }
 
 function cancelActiveNavigation() {
+  setSpeedLimitDisplay(null, 'estimated');
   document.body.classList.remove('navigating');
   document.body.classList.remove('route-options-open');
   document.getElementById('quick-dest-bar')?.classList.remove('hidden');
@@ -2445,6 +2470,8 @@ function cancelActiveNavigation() {
 }
 
 function showArrivalModal(dest) {
+  // Navigation is over: a camera limit from the route must not keep driving the overspeed chime
+  setSpeedLimitDisplay(null, 'estimated');
   document.body.classList.remove('navigating');
   document.body.classList.remove('route-options-open');
   document.getElementById('quick-dest-bar')?.classList.remove('hidden');
@@ -2461,7 +2488,8 @@ function showArrivalModal(dest) {
 function toggleEvChargers(show) {
   const btnQuick = document.getElementById('btn-quick-chargers');
   if (btnQuick) btnQuick.classList.toggle('active', !!show);
-  if (!mapEngine || !mapEngine.map) return;
+  // Pins use maplibregl.Marker; on the Yandex/Leaflet maps the charger list drawer still works
+  if (!mapEngine || !mapEngine.map || mapEngine.provider !== 'maplibre') return;
   chargersVisible = !!show;
   document.getElementById('btn-toggle-chargers')?.classList.toggle('active', chargersVisible);
 
@@ -2475,24 +2503,29 @@ function toggleEvChargers(show) {
   activeChargersMarkers.forEach(m => m.remove());
   activeChargersMarkers = [];
 
-  EV_CHARGERS.forEach(charger => {
-    const el = document.createElement('div');
-    el.className = 'tesla-dest-pin';
-    el.innerHTML = `
-      <div style="width: 32px; height: 32px; border-radius: 50%; background: #10b981; border: 2.5px solid #fff; display: grid; place-items: center; color: #fff; font-size: 14px; font-weight: 800; box-shadow: 0 4px 12px rgba(16,185,129,0.5); cursor: pointer;">
-        ⚡
-      </div>
-    `;
+  loadEvChargers().then(() => {
+    if (!chargersVisible || activeChargersMarkers.length) return;
+    const dict = I18N[window.CURRENT_LANG || 'ru'] || I18N.ru;
+    evChargers.forEach(charger => {
+      const el = document.createElement('div');
+      el.className = 'tesla-dest-pin';
+      el.title = charger.name || dict.chargingStationUnnamed;
+      el.innerHTML = `
+        <div style="width: 32px; height: 32px; border-radius: 50%; background: #10b981; border: 2.5px solid #fff; display: grid; place-items: center; color: #fff; font-size: 14px; font-weight: 800; box-shadow: 0 4px 12px rgba(16,185,129,0.5); cursor: pointer;">
+          ⚡
+        </div>
+      `;
 
-    el.addEventListener('click', () => {
-      startNavigationTo({ name: charger.name, lat: charger.lat, lng: charger.lng });
+      el.addEventListener('click', () => {
+        startNavigationTo({ name: charger.name || dict.chargingStationUnnamed, lat: charger.lat, lng: charger.lng });
+      });
+
+      const marker = new window.maplibregl.Marker({ element: el })
+        .setLngLat([charger.lng, charger.lat])
+        .addTo(mapEngine.map);
+
+      activeChargersMarkers.push(marker);
     });
-
-    const marker = new window.maplibregl.Marker({ element: el })
-      .setLngLat([charger.lng, charger.lat])
-      .addTo(mapEngine.map);
-
-    activeChargersMarkers.push(marker);
   });
 }
 
@@ -2560,52 +2593,68 @@ function closeChargingStationsDrawer() {
   document.getElementById('btn-toggle-chargers')?.classList.remove('active');
 }
 
-function renderChargingStationsList() {
+async function renderChargingStationsList() {
   const listEl = document.getElementById('charging-stations-list');
   if (!listEl) return;
-  listEl.innerHTML = '';
-
-  const cur = mapEngine ? mapEngine.currentPosition : { lat: 40.1872, lng: 44.5152 };
   const lang = window.CURRENT_LANG || 'ru';
   const dict = (typeof I18N !== 'undefined' && I18N[lang]) ? I18N[lang] : (I18N ? I18N.ru : {});
 
-  // Calculate distances and sort
-  const chargersWithDist = EV_CHARGERS.map(c => {
-    const distMeters = mapEngine ? mapEngine.calculateDistance(cur.lat, cur.lng, c.lat, c.lng) : 1200;
-    return { ...c, distMeters };
-  });
+  if (!evChargers.length) {
+    listEl.innerHTML = `<div style="padding: 24px 16px; text-align: center; color: #94a3b8; font-size: 13px;">${escapeHtml(dict.loading)}</div>`;
+    await loadEvChargers();
+  }
+  listEl.innerHTML = '';
+  if (!evChargers.length) {
+    listEl.innerHTML = `<div style="padding: 24px 16px; text-align: center; color: #94a3b8; font-size: 13px;">${escapeHtml(dict.chargersUnavailable)}</div>`;
+    return;
+  }
 
-  chargersWithDist.sort((a, b) => a.distMeters - b.distMeters);
+  const cur = mapEngine ? mapEngine.currentPosition : null;
+  const chargersWithDist = evChargers.map(c => ({
+    ...c,
+    distMeters: (mapEngine && cur) ? mapEngine.calculateDistance(cur.lat, cur.lng, c.lat, c.lng) : null
+  }));
+  chargersWithDist.sort((a, b) => (a.distMeters ?? Infinity) - (b.distMeters ?? Infinity));
 
-  chargersWithDist.forEach(charger => {
-    const distStr = mapEngine
-      ? mapEngine.formatNavDistance(charger.distMeters)
-      : (charger.distMeters >= 1000 ? `${(charger.distMeters / 1000).toFixed(1)} км` : `${Math.round(charger.distMeters)} м`);
+  chargersWithDist.slice(0, CHARGERS_LIST_LIMIT).forEach(charger => {
+    const distStr = charger.distMeters != null ? mapEngine.formatNavDistance(charger.distMeters) : '';
+    const name = charger.name || dict.chargingStationUnnamed;
+    const details = [
+      charger.operator && charger.operator !== charger.name ? charger.operator : null,
+      charger.sockets && charger.sockets.length ? charger.sockets.join(' · ') : null,
+      charger.capacity ? `${dict.chargerSpots}: ${charger.capacity}` : null,
+      charger.openingHours
+    ].filter(Boolean).join(' · ');
 
     const card = document.createElement('div');
     card.className = 'ev-charger-card';
     card.innerHTML = `
       <div class="ev-charger-top">
-        <div class="ev-charger-name">⚡ ${escapeHtml(charger.name)}</div>
-        <span class="ev-charger-power">${charger.power}</span>
+        <div class="ev-charger-name">⚡ ${escapeHtml(name)}</div>
+        ${charger.maxPowerKw ? `<span class="ev-charger-power">${escapeHtml(charger.maxPowerKw)} kW</span>` : ''}
       </div>
-      <div style="font-size: 12px; color: #64748b; line-height: 1.3;">${escapeHtml(charger.address)}</div>
+      <div style="font-size: 12px; color: #64748b; line-height: 1.3;">${escapeHtml(charger.address || details)}</div>
       <div class="ev-charger-meta">
-        <span class="ev-stalls-free">● ${charger.stalls}</span>
+        <span style="font-size: 12px; color: #64748b;">${escapeHtml(charger.address ? details : '')}</span>
         <div style="display: flex; align-items: center; gap: 8px;">
-          <span style="font-weight: 600; color: #1e293b;">${distStr}</span>
-          <button class="btn-ev-route-go" type="button">${dict.btnRoute || 'Маршрут'}</button>
+          <span style="font-weight: 600; color: #1e293b;">${escapeHtml(distStr)}</span>
+          <button class="btn-ev-route-go" type="button">${escapeHtml(dict.btnRoute || 'Маршрут')}</button>
         </div>
       </div>
     `;
 
     card.addEventListener('click', () => {
       closeChargingStationsDrawer();
-      startNavigationTo({ name: charger.name, lat: charger.lat, lng: charger.lng, address: charger.address });
+      startNavigationTo({ name, lat: charger.lat, lng: charger.lng, address: charger.address || details });
     });
 
     listEl.appendChild(card);
   });
+
+  const credit = document.createElement('div');
+  credit.style.cssText = 'padding: 10px 16px 16px; font-size: 11px; color: #94a3b8; text-align: center;';
+  credit.textContent = dict.chargersSource;
+  listEl.appendChild(credit);
 }
 
 // 9. Weather (Open-Meteo Real Forecast for Yerevan) & YouTube Music
@@ -2641,7 +2690,7 @@ function initWeatherAndMusic() {
       isDragging = true;
       try {
         handle.setPointerCapture(e.pointerId);
-      } catch (err) {}
+      } catch (err) { /* pointer already released */ }
       startX = e.clientX;
       startY = e.clientY;
 
@@ -2678,7 +2727,7 @@ function initWeatherAndMusic() {
       isDragging = false;
       try {
         handle.releasePointerCapture(e.pointerId);
-      } catch (err) {}
+      } catch (err) { /* pointer already released */ }
       element.style.transition = '';
       if (element.id === 'music-mini-player') {
         try {
@@ -2686,7 +2735,7 @@ function initWeatherAndMusic() {
             left: element.style.left,
             top: element.style.top
           }));
-        } catch (err) {}
+        } catch (err) { /* storage unavailable (private mode / quota): non-critical */ }
       }
     };
 
@@ -2721,7 +2770,7 @@ function initWeatherAndMusic() {
         miniPlayer.style.right = 'auto';
       }
     }
-  } catch (err) {}
+  } catch (err) { /* missing or corrupt saved position: keep the default */ }
 
   const ytIdleScreen = document.getElementById('yt-idle-screen');
   const ytNowTitle = document.getElementById('yt-now-title');
@@ -2795,29 +2844,30 @@ function initWeatherAndMusic() {
     }, 1000);
   }
 
-  // Account Identity (Stepan Smbatyan - Screenshot 5)
-  let ytUser = localStorage.getItem('tesla_yt_user') || 'Stepan Smbatyan';
+  // YouTube account label (a display name only: nothing is signed in)
+  let ytUser = localStorage.getItem('tesla_yt_user') || '';
 
   function updateAccountUI() {
-    if (ytUserNameText) ytUserNameText.textContent = ytUser || 'Войти в YouTube';
+    if (ytUserNameText) ytUserNameText.textContent = ytUser || tr('ytSignIn');
     if (btnYtAccountToggle) {
       btnYtAccountToggle.textContent = ytUser
-        ? `Disconnect YouTube · ${ytUser}`
-        : 'Connect YouTube Account';
+        ? `${tr('ytDisconnect')} · ${ytUser}`
+        : tr('ytConnect');
     }
   }
   updateAccountUI();
+  window.refreshYouTubeAccountUI = updateAccountUI;
 
   if (btnYtAccountToggle) {
     btnYtAccountToggle.addEventListener('click', () => {
       if (ytUser) {
-        if (confirm(`Отключить аккаунт YouTube (${ytUser})?`)) {
+        if (confirm(`${tr('ytDisconnectConfirm')} (${ytUser})?`)) {
           ytUser = '';
           localStorage.removeItem('tesla_yt_user');
           updateAccountUI();
         }
       } else {
-        const name = prompt('Введите имя вашего аккаунта YouTube:', 'Stepan Smbatyan');
+        const name = prompt(tr('ytEnterName'), '');
         if (name && name.trim()) {
           ytUser = name.trim();
           localStorage.setItem('tesla_yt_user', ytUser);
@@ -2946,106 +2996,88 @@ function initWeatherAndMusic() {
       id: '6CZLCZZNc90',
       title: 'Джем – Garik - indz el tar (official lyrics video)',
       channel: 'Garik Papoyan',
-      duration: '3:10',
-      meta: 'Джем • 185 тыс. просмотров'
+      duration: '3:10'
     },
     {
       id: 'OLqjgBoPV9E',
       title: 'ArmComedy 1439 - COP 17, Էփշթեյն և Ամուլսար',
       channel: 'ArmComedy',
-      duration: '30:13',
-      meta: '10 тыс. просмотров • 2 ч назад'
+      duration: '30:13'
     },
     {
       id: '04HS6MkhOr4',
       title: 'Պարոդիա - Լիլի Հովեր',
       channel: 'HD Production',
-      duration: '3:52',
-      meta: '14 тыс. просмотров • 2 ч назад'
+      duration: '3:52'
     },
     {
       id: 'vPNsZM2y7bw',
       title: '🚨Նոր ավտոյիս վրա ԱՎՏՈԲՈՒՍԻ մատոռ⚡The Long Drive #104',
       channel: 'Saint-Hov 🇦🇲',
-      duration: '13:51',
-      meta: '114 тыс. просмотров • 4 мес. назад'
+      duration: '13:51'
     },
     {
       id: '5bFiccd8lCI',
       title: 'When Young Lionel Messi Substituted & SHOCKED Pep Guardiola',
       channel: 'VALENTINO PRODUCTIONS',
-      duration: '12:44',
-      meta: '1.2 млн просмотров • 1 мес. назад'
+      duration: '12:44'
     },
     {
       id: 'mFRh6wVyMaE',
       title: 'Brunette - Bac kapuyt achqerd',
       channel: 'Brunette',
-      duration: '3:36',
-      meta: '2.4 млн просмотров'
+      duration: '3:36'
     },
     {
       id: 'TPjN6N8TgNI',
       title: 'Super Sako - Mi Gna ft. Hayko (Official Audio)',
       channel: 'Super Sako',
-      duration: '3:22',
-      meta: '320 млн просмотров'
+      duration: '3:22'
     },
     {
       id: 'z3wqyffIosw',
       title: 'Сделал 1 кг филамента для 3D-принтера из мусорных бутылок ♻️',
       channel: 'Modelmen Life',
-      duration: '9:12',
-      meta: '145 тыс. просмотров • 10 дн. назад'
+      duration: '9:12'
     },
     {
       id: 'ayMA_IeEp2Q',
       title: '#Corner Mundial #1. Աշխարհի առաջնությունը՝ Օգնյեն Չանչարևիչի հետ',
       channel: 'Corner Football Armenia',
-      duration: '53:43',
-      meta: '38 тыс. просмотров'
+      duration: '53:43'
     },
     {
       id: 'rOgehCKt-VA',
       title: 'Ռոմանոս Պետրոսյանի հանձնարարականով Երևանի Քրիստափորի փողոցի փտած ...',
       channel: 'Shamshyan.com',
-      duration: '8:36',
-      meta: '1.1 тыс. просмотров • 6 ч назад'
+      duration: '8:36'
     }
   ];
 
   const CATEGORY_FEEDS = {
     all: HOME_RECOMMENDATIONS,
     music: [
-      { id: '6CZLCZZNc90', title: 'Джем – Garik - indz el tar', channel: 'Garik Papoyan', duration: '3:10', meta: 'Джем • 185 тыс.' },
-      { id: 'mFRh6wVyMaE', title: 'Brunette - Bac kapuyt achqerd', channel: 'Brunette', duration: '3:36', meta: '2.4 млн просмотров' },
-      { id: 'TPjN6N8TgNI', title: 'Super Sako - Mi Gna ft. Hayko', channel: 'Super Sako', duration: '3:22', meta: '320 млн просмотров' },
-      { id: 'Z1bS3aT_r24', title: 'Garik & Sona - Lusi', channel: 'Garik & Sona', duration: '4:12', meta: '5.1 млн просмотров' },
-      { id: 'kLp_Hh684HQ', title: 'Aram MP3 - Not Alone', channel: 'Aram MP3', duration: '3:02', meta: '12 млн просмотров' }
+      { id: '6CZLCZZNc90', title: 'Джем – Garik - indz el tar', channel: 'Garik Papoyan', duration: '3:10' },
+      { id: 'mFRh6wVyMaE', title: 'Brunette - Bac kapuyt achqerd', channel: 'Brunette', duration: '3:36' },
+      { id: 'TPjN6N8TgNI', title: 'Super Sako - Mi Gna ft. Hayko', channel: 'Super Sako', duration: '3:22' }
     ],
     jams: [
-      { id: '6CZLCZZNc90', title: 'Джем – Garik - indz el tar (official lyrics video)', channel: 'Garik Papoyan', duration: '3:10', meta: 'Джем • 185 тыс.' },
-      { id: '1QnCj2g8g_g', title: 'Garik Papoyan - Jam Session Live Acoustic', channel: 'Garik Papoyan', duration: '24:15', meta: 'Акустический джем' },
-      { id: '8JkL99qX1rU', title: 'Armenian Street Music & Jam Acoustic', channel: 'Yerevan Jam', duration: '18:40', meta: 'Live Session' }
+      { id: '6CZLCZZNc90', title: 'Джем – Garik - indz el tar (official lyrics video)', channel: 'Garik Papoyan', duration: '3:10' }
     ],
     armcomedy: [
-      { id: 'OLqjgBoPV9E', title: 'ArmComedy 1439 - COP 17, Էփշթեյն և Ամուլսար', channel: 'ArmComedy', duration: '30:13', meta: '10 тыс. • 2 ч назад' },
-      { id: '04HS6MkhOr4', title: 'Պարոդիա - Լիլի Հովեր', channel: 'HD Production', duration: '3:52', meta: '14 тыс. • 2 ч назад' },
-      { id: 'Kq06w4ZkEeo', title: 'ArmComedy 1438', channel: 'ArmComedy', duration: '28:40', meta: '52 тыс. просмотров' },
-      { id: 'a4Xp_BfX9aI', title: 'Ruben Yesayan - Stand Up Yerevan', channel: 'Ruben Yesayan', duration: '16:22', meta: '85 тыс. просмотров' }
+      { id: 'OLqjgBoPV9E', title: 'ArmComedy 1439 - COP 17, Էփշթեյն և Ամուլսար', channel: 'ArmComedy', duration: '30:13' },
+      { id: '04HS6MkhOr4', title: 'Պարոդիա - Լիլի Հովեր', channel: 'HD Production', duration: '3:52' }
     ],
     auto: [
-      { id: 'vPNsZM2y7bw', title: '🚨Նոր ավտոյիս վրա ԱՎՏՈԲՈՒՍԻ մատոռ⚡The Long Drive #104', channel: 'Saint-Hov 🇦🇲', duration: '13:51', meta: '114 тыс. • 4 мес. назад' },
-      { id: 'z3wqyffIosw', title: 'Сделал 1 кг филамента для 3D-принтера из мусорных бутылок ♻️', channel: 'Modelmen Life', duration: '9:12', meta: '145 тыс. • 10 дн. назад' },
-      { id: 'K7nFz2u5RkQ', title: 'Tesla Model 3 / Model Y Hidden Tricks & Tips', channel: 'Tesla Drivers', duration: '14:20', meta: '220 тыс. просмотров' }
+      { id: 'vPNsZM2y7bw', title: '🚨Նոր ավտոյիս վրա ԱՎՏՈԲՈՒՍԻ մատոռ⚡The Long Drive #104', channel: 'Saint-Hov 🇦🇲', duration: '13:51' },
+      { id: 'z3wqyffIosw', title: 'Сделал 1 кг филамента для 3D-принтера из мусорных бутылок ♻️', channel: 'Modelmen Life', duration: '9:12' }
     ],
     football: [
-      { id: '5bFiccd8lCI', title: 'When Young Lionel Messi Substituted & SHOCKED Pep Guardiola', channel: 'VALENTINO PRODUCTIONS', duration: '12:44', meta: '1.2 млн • 1 мес. назад' },
-      { id: 'ayMA_IeEp2Q', title: '#Corner Mundial #1. Աշխարհի առաջնությունը՝ Օգնյեն Չանչարևիչի հետ', channel: 'Corner Football Armenia', duration: '53:43', meta: '38 тыс. просмотров' }
+      { id: '5bFiccd8lCI', title: 'When Young Lionel Messi Substituted & SHOCKED Pep Guardiola', channel: 'VALENTINO PRODUCTIONS', duration: '12:44' },
+      { id: 'ayMA_IeEp2Q', title: '#Corner Mundial #1. Աշխարհի առաջնությունը՝ Օգնյեն Չանչարևիչի հետ', channel: 'Corner Football Armenia', duration: '53:43' }
     ],
     news: [
-      { id: 'rOgehCKt-VA', title: 'Երևանի Քրիստափորի փողոցի փտած ...', channel: 'Shamshyan.com', duration: '8:36', meta: '1.1 тыс. • 6 ч назад' },
-      { id: '9QvH0rWwL8M', title: 'PanArmenian News Today Highlights', channel: 'PanArmenian TV', duration: '15:10', meta: 'Новости дня' }
+      { id: 'rOgehCKt-VA', title: 'Երևանի Քրիստափորի փողոցի փտած ...', channel: 'Shamshyan.com', duration: '8:36' }
     ]
   };
 
@@ -3072,14 +3104,14 @@ function initWeatherAndMusic() {
       });
       if (history.length > 40) history = history.slice(0, 40);
       localStorage.setItem('tesla_yt_history', JSON.stringify(history));
-    } catch (e) {}
+    } catch (e) { /* storage unavailable (private mode / quota): non-critical */ }
   }
 
   function clearYouTubeHistory() {
     try {
       localStorage.removeItem('tesla_yt_history');
       loadYouTubeCategory('history');
-    } catch (e) {}
+    } catch (e) { /* storage unavailable (private mode / quota): non-critical */ }
   }
 
   function createResultItemElement(track, idx) {
@@ -3117,7 +3149,7 @@ function initWeatherAndMusic() {
     if (!ytResultsList) return;
     ytResultsList.innerHTML = '';
     if (!tracks || tracks.length === 0) {
-      ytResultsList.innerHTML = '<div style="text-align: center; color: #94a3b8; padding: 24px 10px; font-size: 13px;">Ничего не найдено</div>';
+      ytResultsList.innerHTML = '<div style="text-align: center; color: #94a3b8; padding: 24px 10px; font-size: 13px;">' + escapeHtml(tr('nothingFound')) + '</div>';
       return;
     }
     appendRecommendations(tracks, 0);
@@ -3132,8 +3164,8 @@ function initWeatherAndMusic() {
       const histSec = document.createElement('div');
       histSec.className = 'yt-section-header';
       histSec.innerHTML = `
-        <span>Недавно прослушано</span>
-        <button class="yt-clear-history-btn" id="btn-clear-yt-hist">Очистить</button>
+        <span>${escapeHtml(tr('recentlyPlayed'))}</span>
+        <button class="yt-clear-history-btn" id="btn-clear-yt-hist">${escapeHtml(tr('clear'))}</button>
       `;
       ytResultsList.appendChild(histSec);
 
@@ -3145,7 +3177,7 @@ function initWeatherAndMusic() {
       const recSec = document.createElement('div');
       recSec.className = 'yt-section-header';
       recSec.style.marginTop = '8px';
-      recSec.innerHTML = `<span>Рекомендовано для вас</span>`;
+      recSec.innerHTML = `<span>${escapeHtml(tr('recommended'))}</span>`;
       ytResultsList.appendChild(recSec);
     }
 
@@ -3168,7 +3200,7 @@ function initWeatherAndMusic() {
       ytResultsList.innerHTML = `
         <div style="text-align: center; color: #94a3b8; padding: 36px 16px; font-size: 13px; line-height: 1.5;">
           <div style="font-size: 28px; margin-bottom: 6px;">🎧</div>
-          История пуста.<br>Включайте музыку и видео в поиске или рекомендациях, и они сохранятся здесь.
+          ${escapeHtml(tr('playHistoryEmpty'))}
         </div>
       `;
       return;
@@ -3177,8 +3209,8 @@ function initWeatherAndMusic() {
     const histSec = document.createElement('div');
     histSec.className = 'yt-section-header';
     histSec.innerHTML = `
-      <span>История воспроизведения (${history.length})</span>
-      <button class="yt-clear-history-btn" id="btn-clear-all-hist">Очистить всё</button>
+      <span>${escapeHtml(tr('playHistory'))} (${history.length})</span>
+      <button class="yt-clear-history-btn" id="btn-clear-all-hist">${escapeHtml(tr('clearAll'))}</button>
     `;
     ytResultsList.appendChild(histSec);
 
@@ -3244,7 +3276,7 @@ function initWeatherAndMusic() {
       loaderEl = document.createElement('div');
       loaderEl.id = 'yt-infinite-loader';
       loaderEl.style.cssText = 'text-align: center; padding: 12px; color: #94a3b8; font-size: 12px; font-weight: 500;';
-      loaderEl.innerHTML = '<span style="display:inline-block; animation: spin 1s infinite linear;">↻</span> Загрузка...';
+      loaderEl.innerHTML = '<span style="display:inline-block; animation: spin 1s infinite linear;">↻</span> ' + escapeHtml(tr('loading'));
       ytResultsList.appendChild(loaderEl);
     }
 
@@ -3319,7 +3351,7 @@ function initWeatherAndMusic() {
     } catch (err) {
       console.warn('YouTube search error:', err);
     } finally {
-      if (btnYtSearchGo) btnYtSearchGo.textContent = 'Search';
+      if (btnYtSearchGo) btnYtSearchGo.textContent = tr('search');
     }
   }
 
@@ -3505,16 +3537,43 @@ function initWeatherAndMusic() {
   if (btnMiniPrev) btnMiniPrev.addEventListener('click', playPrevTrack);
 }
 
+// WMO weather codes (Open-Meteo) → icon + localized description
+const WEATHER_CODES = [
+  { codes: [0], icon: '☀️', night: '🌙', text: { ru: 'Ясно', hy: 'Պարզ', en: 'Clear' } },
+  { codes: [1, 2], icon: '🌤️', night: '☁️', text: { ru: 'Переменная облачность', hy: 'Մասամբ ամպամած', en: 'Partly cloudy' } },
+  { codes: [3], icon: '☁️', text: { ru: 'Пасмурно', hy: 'Ամպամած', en: 'Overcast' } },
+  { codes: [45, 48], icon: '🌫️', text: { ru: 'Туман', hy: 'Մառախուղ', en: 'Fog' } },
+  { codes: [51, 53, 55, 56, 57], icon: '🌦️', text: { ru: 'Морось', hy: 'Մանրամաղ անձրև', en: 'Drizzle' } },
+  { codes: [61, 63, 65, 66, 67, 80, 81, 82], icon: '🌧️', text: { ru: 'Дождь', hy: 'Անձրև', en: 'Rain' } },
+  { codes: [71, 73, 75, 77, 85, 86], icon: '🌨️', text: { ru: 'Снег', hy: 'Ձյուն', en: 'Snow' } },
+  { codes: [95, 96, 99], icon: '⛈️', text: { ru: 'Гроза', hy: 'Ամպրոպ', en: 'Thunderstorm' } }
+];
+
+function describeWeather(code, isDay = true) {
+  const lang = window.CURRENT_LANG || 'ru';
+  const entry = WEATHER_CODES.find(w => w.codes.includes(code));
+  if (!entry) return { icon: '🌡️', text: '' };
+  return { icon: (!isDay && entry.night) ? entry.night : entry.icon, text: entry.text[lang] || entry.text.ru };
+}
+
 async function loadLiveYerevanWeather() {
+  // Forecast for where the car is (Yerevan center until the first fix)
+  const pos = (mapEngine && mapEngine.currentPosition) || CONFIG.defaultCenter;
+  const lat = Number(pos.lat).toFixed(3);
+  const lng = Number(pos.lng).toFixed(3);
   try {
-    const res = await fetch('https://api.open-meteo.com/v1/forecast?latitude=40.18&longitude=44.51&current=temperature_2m,relative_humidity_2m,weather_code,wind_speed_10m&hourly=temperature_2m,weather_code&timezone=auto');
+    const res = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}&current=temperature_2m,relative_humidity_2m,weather_code,wind_speed_10m,is_day,uv_index&hourly=temperature_2m,weather_code,is_day&timezone=auto&forecast_days=1`);
     const data = await res.json();
+    const dict = I18N[window.CURRENT_LANG || 'ru'] || I18N.ru;
 
     if (data.current) {
       const temp = Math.round(data.current.temperature_2m);
-      document.getElementById('weather-desc').textContent = `Облачно · ${temp}°C`;
+      const now = describeWeather(data.current.weather_code, data.current.is_day === 1);
+      document.getElementById('weather-desc').textContent = `${now.icon} ${now.text} · ${temp}°C`;
       document.getElementById('weather-humidity').textContent = `${data.current.relative_humidity_2m}%`;
-      document.getElementById('weather-wind').textContent = `${Math.round(data.current.wind_speed_10m)} км/ч`;
+      document.getElementById('weather-wind').textContent = `${Math.round(data.current.wind_speed_10m)} ${dict.kmh}`;
+      const uvEl = document.getElementById('weather-uv');
+      if (uvEl) uvEl.textContent = data.current.uv_index != null ? Math.round(data.current.uv_index) : '—';
     }
 
     if (data.hourly && data.hourly.time) {
@@ -3522,19 +3581,23 @@ async function loadLiveYerevanWeather() {
       row.innerHTML = '';
       const times = [9, 12, 15, 18, 21];
       times.forEach(hour => {
-        const temp = Math.round(data.hourly.temperature_2m[hour] || 15);
+        const temp = data.hourly.temperature_2m[hour];
+        if (temp == null) return;
+        const w = describeWeather(data.hourly.weather_code[hour], data.hourly.is_day[hour] === 1);
         const col = document.createElement('div');
         col.className = 'weather-hour-col';
         col.innerHTML = `
           <span>${String(hour).padStart(2, '0')}:00</span>
-          <span>${hour < 18 ? '☀️' : '🌙'}</span>
-          <span class="weather-hour-temp">${temp}°</span>
+          <span title="${escapeHtml(w.text)}">${w.icon}</span>
+          <span class="weather-hour-temp">${Math.round(temp)}°</span>
         `;
         row.appendChild(col);
       });
     }
   } catch (e) {
     console.warn('Weather fetch error:', e);
+    const dict = I18N[window.CURRENT_LANG || 'ru'] || I18N.ru;
+    document.getElementById('weather-desc').textContent = dict.weatherUnavailable;
   }
 }
 
@@ -3613,7 +3676,7 @@ function initDevMode() {
     const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
     btnVoiceSearch.addEventListener('click', () => {
       if (!SpeechRec) {
-        alert('Голосовой ввод не поддерживается браузером Tesla. Используйте клавиатуру.');
+        alert(tr('voiceUnsupported'));
         console.warn('SpeechRecognition API not supported in this browser.');
         return;
       }
