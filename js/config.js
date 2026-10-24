@@ -151,6 +151,7 @@ const I18N = {
     speedLimit: 'Ограничение',
     speedLimitEstimated: 'Оценка по типу дороги, не знак',
     speedLimitCamera: 'Ограничение камеры на маршруте',
+    speedCameraMarker: 'Камера контроля скорости',
     speedLimitOsm: 'Ограничение по данным OpenStreetMap',
     cameraAhead: 'Камера / Светофор',
     recenter: 'В центр',
@@ -368,6 +369,7 @@ const I18N = {
     speedLimit: 'Սահմանափակում',
     speedLimitEstimated: 'Գնահատում ըստ ճանապարհի տեսակի, ոչ նշան',
     speedLimitCamera: 'Երթուղու տեսախցիկի սահմանափակում',
+    speedCameraMarker: 'Արագության վերահսկման տեսախցիկ',
     speedLimitOsm: 'Սահմանափակում ըստ OpenStreetMap-ի',
     cameraAhead: 'Տեսախցիկ / Լուսացույց',
     recenter: 'Կենտրոն',
@@ -585,6 +587,7 @@ const I18N = {
     speedLimit: 'Speed Limit',
     speedLimitEstimated: 'Estimated from road type, not a sign',
     speedLimitCamera: 'Speed camera limit on route',
+    speedCameraMarker: 'Speed camera',
     speedLimitOsm: 'Speed limit from OpenStreetMap',
     cameraAhead: 'Speed Camera / Signal',
     recenter: 'Recenter',
@@ -681,4 +684,19 @@ const I18N = {
     networkError: 'Network error',
     coordsPoint: 'Coordinates point'
   }
+};
+
+// Yandex traffic hints have no Armenian version (the XML carries ru, en, uk, tr…), so the
+// known phrases are translated here, keyed by the Russian hint (ё → е). An unknown phrase
+// is left out in Armenian rather than shown in Russian.
+const YANDEX_TRAFFIC_HINTS_HY = {
+  'дороги свободны': 'Ճանապարհներն ազատ են',
+  'дороги почти свободны': 'Ճանապարհները գրեթե ազատ են',
+  'местами затруднения': 'Տեղ-տեղ դժվարություններ',
+  'движение плотное': 'Երթևեկությունը խիտ է',
+  'движение затруднено': 'Երթևեկությունը դժվարացած է',
+  'серьезные пробки': 'Լուրջ խցանումներ',
+  'многокилометровые пробки': 'Բազմակիլոմետրանոց խցանումներ',
+  'город стоит': 'Քաղաքը կանգնած է',
+  'пешком быстрее': 'Ոտքով ավելի արագ է'
 };

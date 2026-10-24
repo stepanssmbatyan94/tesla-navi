@@ -7,6 +7,7 @@ let selectedDestination = null;
 let currentLang = 'ru';
 let activeChargersMarkers = [];
 let chargersVisible = false;
+let liveTrafficData = null; // last Yandex score for the badge (declared early: applyLanguage reads it)
 let pendingGpsFix = null;
 let hasReceivedRealGps = false;
 
@@ -177,6 +178,11 @@ function applyLanguage(lang) {
     const key = el.dataset.i18nTitle;
     if (dict[key]) el.title = dict[key];
   });
+  // the traffic badge title carries the live score and hint, not just its label
+  const trafficBadgeEl = document.getElementById('traffic-score-badge');
+  if (trafficBadgeEl && liveTrafficData) trafficBadgeEl.title = trafficBadgeTitle(liveTrafficData, lang);
+  // camera markers already on the map (MapLibre) carry their limit for the same reason
+  document.querySelectorAll('.camera-map-badge[data-limit]').forEach(el => { el.title = speedCameraTitle(el.dataset.limit); });
 
   // 4. Input placeholders [data-i18n-placeholder]
   document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
@@ -578,7 +584,23 @@ function toggleFavoritePlace(place) {
 
 let currentRouteInfo = null;
 
-let liveTrafficData = null;
+
+// The Yandex hint in the UI language: ru/en straight from Yandex, hy from our translations
+// of the known Russian phrases. null when there is none for that language.
+function trafficHintText(data, lang) {
+  const hints = (data && data.hints) || { ru: data && data.hint };
+  if (lang === 'hy') {
+    const key = String(hints.ru || '').trim().toLowerCase().replace(/ё/g, 'е');
+    return YANDEX_TRAFFIC_HINTS_HY[key] || null;
+  }
+  return (lang === 'en' ? hints.en : hints.ru) || null;
+}
+
+function trafficBadgeTitle(data, lang) {
+  const dict = I18N[lang] || I18N.ru;
+  const hint = trafficHintText(data, lang);
+  return `${dict.trafficScoreTitle}: ${data.score}/10${hint ? ` (${hint})` : ''} · Yandex`;
+}
 
 async function updateLiveTrafficBadge() {
   const badge = document.getElementById('traffic-score-badge');
@@ -598,7 +620,7 @@ async function updateLiveTrafficBadge() {
       badge.textContent = data.score;
       badge.style.background = data.color;
       badge.style.boxShadow = `0 4px 14px ${data.color}90`;
-      badge.title = `${dict.trafficScoreTitle}: ${data.score}/10 (${data.hint}) · Yandex`;
+      badge.title = trafficBadgeTitle(data, window.CURRENT_LANG || 'ru');
       return;
     }
   } catch (e) {
@@ -812,7 +834,8 @@ function initToolbarHandlers() {
     trafficBadge.addEventListener('click', () => {
       const dict = I18N[window.CURRENT_LANG || 'ru'] || I18N.ru;
       if (liveTrafficData) {
-        alert(`🚦 ${dict.trafficScoreTitle}: ${liveTrafficData.score}/10\n${liveTrafficData.hint}\n${liveTrafficData.time || ''} · Yandex`);
+        const hint = trafficHintText(liveTrafficData, window.CURRENT_LANG || 'ru');
+        alert(`🚦 ${dict.trafficScoreTitle}: ${liveTrafficData.score}/10\n${hint ? hint + '\n' : ''}${liveTrafficData.time || ''} · Yandex`);
       } else {
         alert(`🚦 ${dict.trafficUnavailable}`);
       }

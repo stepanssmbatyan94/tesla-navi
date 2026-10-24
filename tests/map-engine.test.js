@@ -187,3 +187,15 @@ test('routes without traffic data get one neutral segment, never an invented jam
   assert.equal(segs.length, 1);
   assert.equal(segs[0].color, '#3b82f6');
 });
+
+test('speed-camera marker tooltip follows the UI language and never invents a limit', () => {
+  const ctx = loadScripts(createBrowserContext(), ['js/config.js', 'js/maps/map-engine.js']);
+  const title = get(ctx, 'speedCameraTitle');
+  ctx.CURRENT_LANG = 'hy';
+  assert.equal(title(60), 'Արագության վերահսկման տեսախցիկ 60 կմ/ժ');
+  ctx.CURRENT_LANG = 'en';
+  assert.equal(title(90), 'Speed camera 90 km/h');
+  assert.equal(title(''), 'Speed camera');
+  ctx.CURRENT_LANG = 'ru';
+  assert.equal(title(60), 'Камера контроля скорости 60 км/ч');
+});
