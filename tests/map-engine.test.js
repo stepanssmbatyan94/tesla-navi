@@ -287,3 +287,36 @@ test('the 300 m prompt names only a real street, never the destination for an un
   const far = spoken.filter(t => /^Через 300 метров/.test(t));
   assert.deepEqual(far, ['Через 300 метров поверните налево', 'Через 300 метров поверните направо на Named Avenue'], JSON.stringify(spoken));
 });
+
+test('lanes: every lane the movement fits is highlighted, the maneuver junction wins from 300 m', () => {
+  const { ctx, engine, maneuvers } = newEngine();
+  const highlight = get(ctx, 'highlightLanesForTurn');
+  const lanes = inds => inds.map(i => ({ indications: i.split(';'), valid: true }));
+  const active = ls => JSON.parse(JSON.stringify(ls)).map(l => (l.valid ? 1 : 0)).join('');
+  // owner's photo 1: OSRM marked all four lanes; going left only the left lane fits
+  const four = lanes(['left', 'straight', 'straight', 'straight;right']);
+  assert.equal(active(highlight(four, 'left')), '1000');
+  assert.equal(active(highlight(four, 'straight')), '0111');
+  // owner's photo 2: OSRM marked only the middle lane; the left one goes straight too
+  assert.equal(active(highlight([{ indications: ['straight'], valid: false }, { indications: ['straight'], valid: true }, { indications: ['right'], valid: false }], 'straight')), '110');
+  // no exact arrow: near ones; roundabouts keep OSRM's choice
+  assert.equal(active(highlight(lanes(['slight left', 'straight']), 'left')), '10');
+  assert.equal(active(highlight([{ indications: ['straight'], valid: false }, { indications: ['right'], valid: true }], 'roundabout')), '01');
+
+  // pass-through junction at 100 m, the left turn's junction at 400 m (maneuver point)
+  engine.applyRouteData(routeData({ steps: [
+    { name: 'Start Street', modifier: 'straight', action: 'STRAIGHT', distance: 400, location: [COORDS[0][0], LAT] },
+    { name: 'Griboyedov Street', modifier: 'left', action: 'LEFT', distance: 600, location: [at(400).lng, LAT] }
+  ], laneIntersections: [
+    { location: [at(100).lng, LAT], outBearing: 90, lanes: lanes(['left', 'straight', 'straight', 'straight;right']) },
+    { location: [at(390).lng, LAT], outBearing: 90, lanes: lanes(['left', 'left', 'straight', 'right']) }
+  ] }), DEST, 0);
+  engine.isNavigating = true;
+  driveTo(engine, 0); driveTo(engine, 20);
+  let m = maneuvers.at(-1);
+  assert.equal(active(m.lanes), '0111', 'at 80 m before the pass-through junction: its straight lanes');
+  for (let x = 30; x <= 160; x += 10) driveTo(engine, x);
+  m = maneuvers.at(-1);
+  assert.equal(active(m.lanes), '1100', 'within 300 m of the left turn: its left lanes');
+  assert.ok(Math.abs(m.laneDistanceMeters - 230) <= 15, String(m.laneDistanceMeters));
+});

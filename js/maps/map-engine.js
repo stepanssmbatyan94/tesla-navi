@@ -4,6 +4,35 @@
 // different direction, belong to another path and are dropped
 const LANE_MATCH_MAX_DIST_M = 20;
 const LANE_MATCH_MAX_BEARING_DIFF = 35;
+// Lanes of the maneuver's own junction appear from this far and win over pass-through junctions
+const LANE_MANEUVER_SHOW_M = 300;
+const LANE_AT_MANEUVER_BEFORE_M = 40; // a lane junction this close before/after the maneuver
+const LANE_AT_MANEUVER_AFTER_M = 15;  // point is the maneuver's junction
+
+// Lane arrows that fit a movement (OSRM indications: uturn, sharp/slight left/right, straight,
+// none), best first: exact arrows, then near ones when the junction has no exact arrow
+const LANE_TURN_INDICATIONS = {
+  left: [['left', 'sharp left'], ['slight left']],
+  right: [['right', 'sharp right'], ['slight right']],
+  'slight left': [['slight left'], ['left'], ['straight', 'none']],
+  'slight right': [['slight right'], ['right'], ['straight', 'none']],
+  straight: [['straight'], ['none', 'slight left', 'slight right']],
+  'u-turn': [['uturn'], ['left', 'sharp left']]
+};
+
+// Highlight every lane the movement can be made from (like Yandex: the others stay visible but
+// dimmed). OSRM's own 'valid' marks one preferred lane or, between maneuvers, every lane, so it
+// is used only when no lane arrow fits the movement (e.g. roundabouts).
+function highlightLanesForTurn(lanes, turn) {
+  if (!Array.isArray(lanes) || !lanes.length) return lanes;
+  const groups = LANE_TURN_INDICATIONS[String(turn || 'straight').toLowerCase()];
+  if (!groups) return lanes;
+  for (const group of groups) {
+    const fits = lanes.map(l => (l.indications || []).some(i => group.includes(String(i).toLowerCase())));
+    if (fits.some(Boolean)) return lanes.map((l, i) => ({ ...l, valid: fits[i] }));
+  }
+  return lanes;
+}
 
 // Map libraries loaded on demand (MapLibre itself is a deferred <script> in index.html)
 const MAP_LIBRARIES = {
@@ -1877,28 +1906,32 @@ class TeslaMapEngine {
         activeDist = Math.max(0, Math.round((activeStep.endRouteDist || totalDist) - vehicleRouteDist));
       }
 
-      // Search for the closest upcoming lane intersection along route (within 220m)
+      // Lanes to show: the junction of the upcoming maneuver first (from 300 m), otherwise the
+      // nearest junction ahead (within 220 m) that the route passes straight through
       let upcomingLaneInter = null;
       let upcomingLaneDist = Infinity;
-
+      let laneTurn = 'straight';
+      const maneuverAt = isLastStep ? null : activeStep.endRouteDist;
       if (this.laneIntersections && this.laneIntersections.length > 0) {
-        for (const li of this.laneIntersections) {
-          const dAhead = (li.routeDist != null ? li.routeDist : 0) - vehicleRouteDist;
-          if (dAhead >= -15 && dAhead <= 220) {
-            upcomingLaneInter = li;
-            upcomingLaneDist = Math.max(0, Math.round(dAhead));
-            break;
+        if (maneuverAt != null && maneuverAt - vehicleRouteDist <= LANE_MANEUVER_SHOW_M) {
+          const atManeuver = this.laneIntersections.find(li => li.routeDist >= maneuverAt - LANE_AT_MANEUVER_BEFORE_M &&
+            li.routeDist <= maneuverAt + LANE_AT_MANEUVER_AFTER_M && li.routeDist - vehicleRouteDist >= -15);
+          if (atManeuver) {
+            upcomingLaneInter = atManeuver;
+            laneTurn = maneuverModifier;
           }
         }
+        if (!upcomingLaneInter) {
+          upcomingLaneInter = this.laneIntersections.find(li => {
+            const dAhead = li.routeDist - vehicleRouteDist;
+            return dAhead >= -15 && dAhead <= 220;
+          }) || null;
+        }
+        if (upcomingLaneInter) upcomingLaneDist = Math.max(0, Math.round(upcomingLaneInter.routeDist - vehicleRouteDist));
       }
 
-      const activeLanes = (upcomingLaneInter && upcomingLaneDist <= 220)
-        ? upcomingLaneInter.lanes
-        : (activeDist <= 220 ? ((nextStep && nextStep.lanes) || null) : null);
-
-      const activeLaneDist = (upcomingLaneInter && upcomingLaneDist <= 220)
-        ? upcomingLaneDist
-        : activeDist;
+      const activeLanes = upcomingLaneInter ? highlightLanesForTurn(upcomingLaneInter.lanes, laneTurn) : null;
+      const activeLaneDist = upcomingLaneInter ? upcomingLaneDist : activeDist;
 
       // The Yandex maneuver stays authoritative: OSRM only contributes lane arrows. Its step
       // modifier is repeated on every pass-through junction, which made the HUD flip left/right
