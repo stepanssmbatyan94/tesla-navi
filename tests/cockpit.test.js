@@ -29,3 +29,20 @@ test('traffic hint follows the UI language: Yandex ru/en, our Armenian, never Ru
   assert.equal(title(data, 'hy'), 'Խցանումներ: 4/10 (Տեղ-տեղ դժվարություններ) · Yandex');
   assert.equal(title({ score: 7, hints: { ru: 'Новая фраза' } }, 'hy'), 'Խցանումներ: 7/10 · Yandex');
 });
+
+test('lane guidance shows only real lane data, never invented lanes', () => {
+  const pill = { innerHTML: '', classList: { hidden: true, add() { this.hidden = true; }, remove() { this.hidden = false; }, toggle() {}, contains() { return this.hidden; } } };
+  const ctx = createBrowserContext();
+  ctx.document.readyState = 'loading';
+  ctx.document.getElementById = id => (id === 'lane-guidance-pill' ? pill : null);
+  loadScripts(ctx, ['js/config.js', 'js/tesla-cockpit.js']);
+  const render = get(ctx, 'renderLaneGuidance');
+  render({ modifier: 'left', distanceMeters: 80, lanes: [] }); // a turn without OSM lanes
+  assert.equal(pill.classList.hidden, true, 'no "one left, one right" made up');
+  render({ modifier: 'left', laneDistanceMeters: 90, lanes: [{ valid: true, indications: ['left'] }, { valid: true, indications: ['left'] }, { valid: false, indications: ['right'] }, { valid: false, indications: ['right'] }] });
+  assert.equal(pill.classList.hidden, false);
+  assert.equal((pill.innerHTML.match(/lane-col-item/g) || []).length, 4);
+  assert.equal((pill.innerHTML.match(/is-active/g) || []).length, 2);
+  render({ modifier: 'left', laneDistanceMeters: 400, lanes: [{ valid: true, indications: ['left'] }] });
+  assert.equal(pill.classList.hidden, true, 'too far from the junction');
+});
