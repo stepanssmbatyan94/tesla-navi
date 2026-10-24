@@ -422,6 +422,9 @@ function parseYandexTrafficXml(xmlText) {
 // Yandex returns no speed limits. The snapshot (refreshed by scripts/update_speed_limits.mjs)
 // is indexed on a grid; each route is sampled every 20 m and matched to the nearest OSM way
 // within 15 m that runs the same way, giving real limits per stretch of the route.
+// Most streets have no maxspeed tag (Yerevan: ~2 % of residential streets), and there the
+// Armenian traffic rules apply: 60 km/h in a built-up area, 90 outside. The snapshot carries a
+// ~100 m grid of built-up areas from OSM for that ('default' limits, never a guess per street).
 const SPEED_LIMIT_CELL_DEG = 0.01;          // ~1 km grid cells
 const SPEED_LIMIT_MATCH_M = 15;
 const SPEED_LIMIT_BEARING_TOLERANCE = 35;   // degrees between route and way direction
@@ -436,6 +439,13 @@ function loadSpeedLimitIndex(file = path.join(__dirname, 'data', 'speed-limits.j
   } catch (e) {
     console.warn('Speed-limit snapshot unavailable:', e.message);
     return index;
+  }
+  // Built-up grid: row -> [colFrom, colTo, ...] runs (see scripts/update_speed_limits.mjs)
+  if (data.urban && Array.isArray(data.urban.rows) && data.legalDefaults) {
+    const rows = new Map();
+    for (const [row, ...runs] of data.urban.rows) rows.set(row, runs);
+    index.urban = { south: data.urban.south, west: data.urban.west, cellDeg: data.urban.cellDeg, rows };
+    index.legalDefaults = data.legalDefaults;
   }
   const pad = 0.0002; // ~20 m: a way near a cell edge is also found from the neighbouring cell
   for (const way of data.ways || []) {
@@ -493,7 +503,28 @@ function matchSpeedLimit(index, lng, lat, bearing) {
   return best;
 }
 
-// Route polyline ([lng, lat]) -> [{ from, to, limit }] runs in metres along the route
+function isBuiltUp(urban, lng, lat) {
+  const runs = urban.rows.get(Math.floor((lat - urban.south) / urban.cellDeg));
+  if (!runs) return false;
+  const col = Math.floor((lng - urban.west) / urban.cellDeg);
+  for (let i = 0; i < runs.length; i += 2) {
+    if (col < runs[i]) return false;
+    if (col <= runs[i + 1]) return true;
+  }
+  return false;
+}
+
+// The limit the car must keep at a point: the matched OSM way's maxspeed ('osm'), otherwise
+// the legal default for a built-up area or the open road ('default'), or null without data.
+function speedLimitAt(index, lng, lat, bearing) {
+  const limit = matchSpeedLimit(index, lng, lat, bearing);
+  if (limit) return { limit, source: 'osm' };
+  if (!index.urban) return null;
+  const urban = isBuiltUp(index.urban, lng, lat);
+  return { limit: urban ? index.legalDefaults.urban : index.legalDefaults.rural, source: 'default', zone: urban ? 'urban' : 'rural' };
+}
+
+// Route polyline ([lng, lat]) -> [{ from, to, limit, source }] runs in metres along the route
 function speedLimitsForRoute(coords, index = speedLimitIndex || (speedLimitIndex = loadSpeedLimitIndex())) {
   if (!Array.isArray(coords) || coords.length < 2 || !index.size) return [];
   const runs = [];
@@ -508,11 +539,11 @@ function speedLimitsForRoute(coords, index = speedLimitIndex || (speedLimitIndex
     const bearing = bearingDeg(x1, y1, x2, y2);
     while (nextSample <= travelled + segLen) {
       const f = (nextSample - travelled) / segLen;
-      const limit = matchSpeedLimit(index, x1 + (x2 - x1) * f, y1 + (y2 - y1) * f, bearing);
-      if (limit && current && current.limit === limit && nextSample - current.to <= SPEED_LIMIT_SAMPLE_M * 1.5) {
+      const at = speedLimitAt(index, x1 + (x2 - x1) * f, y1 + (y2 - y1) * f, bearing);
+      if (at && current && current.limit === at.limit && current.source === at.source && nextSample - current.to <= SPEED_LIMIT_SAMPLE_M * 1.5) {
         current.to = nextSample;
-      } else if (limit) {
-        current = { from: nextSample, to: nextSample, limit };
+      } else if (at) {
+        current = { from: nextSample, to: nextSample, limit: at.limit, source: at.source };
         runs.push(current);
       }
       nextSample += SPEED_LIMIT_SAMPLE_M;
@@ -1064,9 +1095,9 @@ const server = http.createServer(async (req, res) => {
     }
     const index = speedLimitIndex || (speedLimitIndex = loadSpeedLimitIndex());
     // The car's heading lags after turns and is meaningless when stopped: nearest road wins
-    const limit = matchSpeedLimit(index, lng, lat, null);
+    const at = speedLimitAt(index, lng, lat, null);
     res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ limit: limit || null, source: limit ? 'osm' : 'none' }));
+    res.end(JSON.stringify(at || { limit: null, source: 'none' }));
     return;
   }
 
@@ -1426,6 +1457,7 @@ module.exports = {
   parseYandexRoutes,
   speedLimitsForRoute,
   loadSpeedLimitIndex,
+  speedLimitAt,
   parseYandexTrafficXml,
   getArmenianAudio,
   isAllowedMapLink,

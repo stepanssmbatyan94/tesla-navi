@@ -166,7 +166,29 @@ test('speedLimitsForRoute matches OSM ways running along the route, not crossing
   assert.ok(Math.abs(runs[1].from - 500) <= 30 && runs[1].to >= 990, JSON.stringify(runs));
 });
 
-test('/api/speed-limit returns the OSM limit of the nearest road from the shipped snapshot', async () => {
+test('speedLimitsForRoute fills untagged stretches with the legal default: 60 built-up, 90 outside', () => {
+  const os = require('node:os');
+  const { speedLimitsForRoute, loadSpeedLimitIndex } = require('../server.js');
+  const E = 1e5;
+  const lat = 40.2005; // centre of grid row 200 below
+  const lngPerKm = 1 / (111.32 * Math.cos(lat * Math.PI / 180));
+  // route: 2 km east from 44.5; a tagged 70 road covers its first 500 m
+  const route = [[44.50, lat], [44.50 + 2 * lngPerKm, lat]];
+  const file = path.join(os.tmpdir(), `speed-limits-default-${process.pid}.json`);
+  const firstUrbanCol = Math.floor((44.50 + lngPerKm - 44.0) / 0.001); // built-up from 1 km on
+  fs.writeFileSync(file, JSON.stringify({
+    legalDefaults: { urban: 60, rural: 90 },
+    ways: [[70, 0, 4450000, Math.round(lat * E), Math.round((44.50 + lngPerKm / 2) * E), Math.round(lat * E)]],
+    urban: { south: 40.0, west: 44.0, cellDeg: 0.001, rows: [[200, firstUrbanCol, firstUrbanCol + 5000]] }
+  }));
+  const runs = speedLimitsForRoute(route, loadSpeedLimitIndex(file));
+  fs.unlinkSync(file);
+  assert.deepEqual(runs.map(r => [r.limit, r.source]), [[70, 'osm'], [90, 'default'], [60, 'default']], JSON.stringify(runs));
+  assert.ok(Math.abs(runs[1].from - 500) <= 30 && Math.abs(runs[2].from - 1000) <= 100, JSON.stringify(runs));
+  assert.ok(runs[2].to >= 1990, JSON.stringify(runs));
+});
+
+test('/api/speed-limit returns the nearest road\'s OSM limit, else the legal default of the zone', async () => {
   const { server } = require('../server.js');
   await new Promise(resolve => server.listen(0, resolve));
   const base = `http://127.0.0.1:${server.address().port}/api/speed-limit`;
@@ -174,8 +196,11 @@ test('/api/speed-limit returns the OSM limit of the nearest road from the shippe
     // a point on the Yerevan-Sevan highway (M-4) tagged maxspeed=90 in OSM
     const highway = await (await fetch(`${base}?lat=40.271554&lng=44.598854`)).json();
     assert.deepEqual(highway, { limit: 90, source: 'osm' });
-    const nowhere = await (await fetch(`${base}?lat=40.3000&lng=44.3000`)).json();
-    assert.equal(nowhere.limit, null);
+    // no tagged road near: the legal default of the zone (the dash from the old snapshot is gone)
+    const yard = await (await fetch(`${base}?lat=40.1898&lng=44.4693`)).json(); // Yerevan service road
+    assert.deepEqual(yard, { limit: 60, source: 'default', zone: 'urban' });
+    const fields = await (await fetch(`${base}?lat=40.0600&lng=44.6500`)).json(); // between villages
+    assert.deepEqual(fields, { limit: 90, source: 'default', zone: 'rural' });
     assert.equal((await fetch(`${base}?lat=abc&lng=1`)).status, 400);
   } finally {
     server.closeAllConnections();
