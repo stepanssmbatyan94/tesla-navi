@@ -974,14 +974,16 @@ class TeslaMapEngine {
   }
 
   // Localized Step Maneuver Instruction Generator
-  formatStepInstruction(modifier, streetName) {
+  formatStepInstruction(modifier, streetName, exit = null) {
     const lang = (typeof window !== 'undefined' && window.CURRENT_LANG) || 'ru';
     const dict = (typeof I18N !== 'undefined' && I18N[lang]) ? I18N[lang] : (typeof I18N !== 'undefined' ? I18N.ru : {});
     const mod = (modifier || '').toLowerCase();
     const cleanName = (streetName || '').trim();
 
     let base = dict.continueStraight || 'Двигайтесь прямо';
-    if (mod.includes('slight left') || mod.includes('keep left') || mod.includes('fork left') || mod.includes('bear left') || mod.includes('левее')) {
+    if (mod.includes('roundabout')) {
+      base = this.roundaboutText(exit, lang);
+    } else if (mod.includes('slight left') || mod.includes('keep left') || mod.includes('fork left') || mod.includes('bear left') || mod.includes('левее')) {
       base = dict.keepLeft || 'Держитесь левее';
     } else if (mod.includes('slight right') || mod.includes('keep right') || mod.includes('fork right') || mod.includes('bear right') || mod.includes('правее')) {
       base = dict.keepRight || 'Держитесь правее';
@@ -1002,6 +1004,14 @@ class TeslaMapEngine {
       return `${base} ${ontoWord} ${cleanName}`;
     }
     return base;
+  }
+
+  // "At the roundabout, take exit 2" in the UI language; just "Roundabout" without an exit number
+  roundaboutText(exit, lang = (typeof window !== 'undefined' && window.CURRENT_LANG) || 'ru') {
+    const dict = I18N[lang] || I18N.ru;
+    if (!exit) return dict.roundabout || 'Круговое движение';
+    const n = lang === 'hy' ? ((dict.ordinals && dict.ordinals[exit - 1]) || `${exit}-րդ`) : exit;
+    return (dict.roundaboutExit || 'На круговом движении {n}-й съезд').replace('{n}', n);
   }
 
   // Smart Maneuver & Route Distance Quantization (Localized: м / մ / m, км / կմ / km)
@@ -1842,7 +1852,9 @@ class TeslaMapEngine {
       const nextStep = isLastStep ? null : this.routeSteps[this.currentStepIndex + 1];
       const maneuverModifier = nextStep ? (nextStep.modifier || 'straight') : 'straight';
       const maneuverType = nextStep ? (nextStep.type || 'turn') : 'arrive';
-      const maneuverStreet = nextStep ? (nextStep.name || dest.name) : dest.name;
+      // a roundabout shows the street after the exit (on the ring itself it has another name)
+      const maneuverStreet = nextStep ? (nextStep.exitStreet || nextStep.name || dest.name) : dest.name;
+      const maneuverExit = nextStep ? (nextStep.exit || null) : null;
 
       // Distance to upcoming maneuver continuously counts down to 0
       let activeDist = 0;
@@ -1879,7 +1891,7 @@ class TeslaMapEngine {
       // modifier is repeated on every pass-through junction, which made the HUD flip left/right
       const activeModifier = maneuverModifier;
 
-      const stepInstruction = this.formatStepInstruction(activeModifier, maneuverStreet);
+      const stepInstruction = this.formatStepInstruction(activeModifier, maneuverStreet, maneuverExit);
 
       this.onManeuverUpdate({
         distance: this.formatNavDistance(activeDist),
@@ -1888,6 +1900,7 @@ class TeslaMapEngine {
         street: maneuverStreet,
         modifier: activeModifier,
         type: maneuverType,
+        exit: maneuverExit,
         speedLimit: currentSpeedLimit,
         speedLimitSource,
         location: activeStep.location || null,
@@ -1897,18 +1910,23 @@ class TeslaMapEngine {
 
       // Voice announcements with reliable wide windows (350m-100m and 85m-15m)
       // The arrival itself is announced separately within 25m of the destination
+      // Entering a roundabout already announced its exit: no second prompt for the exit itself
+      if (nextStep && /LEAVE_ROUNDABOUT/.test(nextStep.action || '') && /ENTER_ROUNDABOUT/.test(activeStep.action || '')) {
+        activeStep.spoken300 = activeStep.spokenImmediate = true;
+      }
       if (this.voiceEnabled && nextStep) {
         if (activeDist <= 350 && activeDist >= 100 && !activeStep.spoken300) {
           activeStep.spoken300 = true;
           const lang = window.CURRENT_LANG || 'ru';
-          const turnText = this.getTurnSpeech(maneuverModifier);
+          const turnText = this.getTurnSpeech(maneuverModifier, maneuverExit);
           let phrase = '';
           if (lang === 'en') {
             const streetText = nextStep.name ? ` onto ${nextStep.name}` : '';
             phrase = `In 300 meters ${turnText.toLowerCase()}${streetText}`;
           } else if (lang === 'hy') {
             const mod = maneuverModifier.toLowerCase();
-            if (mod.includes('uturn') || mod.includes('u-turn')) phrase = 'dist_250_uturn';
+            if (mod.includes('roundabout')) phrase = 'dist_250_roundabout';
+            else if (mod.includes('uturn') || mod.includes('u-turn')) phrase = 'dist_250_uturn';
             else if (mod.includes('slight left') || mod.includes('keep left') || mod.includes('fork left')) phrase = 'dist_250_keep_left';
             else if (mod.includes('slight right') || mod.includes('keep right') || mod.includes('fork right')) phrase = 'dist_250_keep_right';
             else if (mod.includes('left')) phrase = 'dist_250_left';
@@ -1921,7 +1939,7 @@ class TeslaMapEngine {
           this.speakVoice(phrase);
         } else if (activeDist <= 85 && activeDist >= 15 && !activeStep.spokenImmediate) {
           activeStep.spokenImmediate = true;
-          this.speakVoice(this.getTurnSpeech(maneuverModifier));
+          this.speakVoice(this.getTurnSpeech(maneuverModifier, maneuverExit));
         }
       }
     }
@@ -2091,10 +2109,12 @@ class TeslaMapEngine {
     }
   }
 
-  getTurnSpeech(modifier) {
+  getTurnSpeech(modifier, exit = null) {
     const lang = window.CURRENT_LANG || 'ru';
     const dict = I18N[lang] || I18N.ru;
     const mod = (modifier || '').toLowerCase();
+    // before left/right: "roundabout" must never fall through to "continue straight"
+    if (mod.includes('roundabout')) return this.roundaboutText(exit, lang);
     if (mod.includes('slight left') || mod.includes('keep left') || mod.includes('bear left') || mod.includes('fork left') || mod.includes('левее')) {
       return dict.voiceKeepLeft || 'Держитесь левее';
     }
@@ -2375,10 +2395,12 @@ class TeslaMapEngine {
     if (primaryRoute.steps && primaryRoute.steps.length > 0) {
       this.routeSteps = primaryRoute.steps.map(s => ({
         name: s.name || destination.name,
-        instruction: s.instruction || this.formatStepInstruction(s.modifier, s.name),
+        instruction: s.instruction || this.formatStepInstruction(s.modifier, s.exitStreet || s.name, s.exit),
         action: s.action || '',
         modifier: s.modifier || 'straight',
         type: s.type || 'turn',
+        exit: s.exit || null,
+        exitStreet: s.exitStreet || '',
         location: s.location, // [lng, lat]
         distance: s.distance,
         duration: s.duration,
