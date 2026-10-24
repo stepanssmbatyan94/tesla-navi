@@ -710,6 +710,12 @@ async function initMap() {
     onRouteCalculated: (route) => {
       showRouteAlternativesDrawer(route);
     },
+    // rerouted while driving: keep navigating on the new (fastest) route, no route choice
+    onRerouted: (route) => {
+      currentRouteInfo = route;
+      document.getElementById('route-alternatives-drawer')?.classList.add('hidden');
+      showNavigationHud(route);
+    },
     onManeuverUpdate: (maneuver) => {
       updateManeuverHud(maneuver);
     },

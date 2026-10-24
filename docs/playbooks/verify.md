@@ -18,6 +18,7 @@ The runner (`scripts/verify/run.mjs`) starts its own server on port 8199 (`VERIF
 |---|---|
 | anything | `smoke` (and `npm test`) |
 | route steps, HUD, voice, `trackNavigationProgress`, server route parsing | `maneuvers` |
+| off-route rerouting, `recalculateRoute`, navigation HUD refresh | `reroute` |
 | route rendering, theme/style, cancel/arrival | `route-layers` |
 | innerHTML/templates, realtime, phone packets, search/places | `security` |
 | GPS sources, `initTeslaCarGps`, `handleIncomingGps` | `dual-gps` |

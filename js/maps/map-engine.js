@@ -223,6 +223,8 @@ class TeslaMapEngine {
     this.center = options.center || CONFIG.defaultCenter;
     this.navZoom = CONFIG.navigationZoom || 16.5;
     this.onRouteCalculated = options.onRouteCalculated || (() => {});
+    // a reroute while driving: the new route is taken as is, never offered as a choice
+    this.onRerouted = options.onRerouted || (() => {});
     this.onArrival = options.onArrival || (() => {});
     this.onManeuverUpdate = options.onManeuverUpdate || (() => {});
     this.onUserPan = options.onUserPan || (() => {});
@@ -2270,7 +2272,8 @@ class TeslaMapEngine {
     }
   }
 
-  // Automatic Off-Route Rerouting from current road (authentic Yandex Navigator behaviour)
+  // Off the route while driving: ask again from where the car is and drive on with the route Yandex
+  // ranks first (fastest with live traffic). No route options are offered mid-drive.
   async recalculateRoute(lat, lng) {
     if (!this.activeRoute || !this.activeRoute.destination || this.isRerouting) return;
     this.isRerouting = true;
@@ -2288,9 +2291,10 @@ class TeslaMapEngine {
       const data = await res.json();
 
       if (data && data.success && data.routes && data.routes.length > 0) {
-        const routeInfo = this.applyRouteData(data, dest);
+        const routeInfo = this.applyRouteData(data, dest, 0);
         if (routeInfo) {
-          this.onRouteCalculated(routeInfo);
+          if (this.isNavigating) this.onRerouted(routeInfo);
+          else this.onRouteCalculated(routeInfo);
         }
         console.log('[MapEngine] Route recalculated successfully with Yandex live data.');
       }
