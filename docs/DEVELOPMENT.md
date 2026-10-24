@@ -49,12 +49,13 @@ ngrok http 8085              # open https://<id>.ngrok.app/?code=… in the car,
 ├── css/                       tesla-display.css (car), phone-remote.css (phone)
 ├── styles/                    mapsev-day.json, mapsev-night.json, sprites/
 ├── sounds/                    nav-chime.wav, hy/{gor,suzie}/*.mp3 (+ legacy hy/*.mp3)
-├── data/                      yerevan-cameras-clean.json, ev-chargers.json (served via /api), yerevan-cameras.json (raw)
+├── data/                      yerevan-cameras-clean.json, ev-chargers.json, speed-limits.json (served via /api), yerevan-cameras.json (raw)
 ├── tests/                     npm test: node:test unit tests; helpers/browser-context.js loads js/*.js in a vm
 ├── scripts/
 │   ├── verify/run.mjs         npm run verify runner (headless Chrome, per-check blocking/flags)
 │   ├── verify/checks/*.js     Page checks (also pasteable into a browser console)
 │   ├── update_chargers.mjs    Refresh data/ev-chargers.json from OpenStreetMap
+│   ├── update_speed_limits.mjs  Refresh data/speed-limits.json (OSM maxspeed) from OpenStreetMap
 │   └── generate_*.py          Armenian voice pack generators
 ├── docs/                      ARCHITECTURE, API, DEPLOYMENT, DEVELOPMENT, adr/, playbooks/
 ├── AGENTS.md                  AI agent instructions (CLAUDE.md, GEMINI.md, .github/ point here)
@@ -97,6 +98,7 @@ Git-ignored, local only: `node_modules/`, `refs/` (reference screenshots/photos)
 | New voice prompt | [playbooks/add-voice-phrase.md](playbooks/add-voice-phrase.md) |
 | New static asset folder | `PUBLIC_DIRS` in `server.js` |
 | Refresh charging stations | `node scripts/update_chargers.mjs` (Overpass, ~1 min), commit `data/ev-chargers.json` |
+| Refresh speed limits | `node scripts/update_speed_limits.mjs` (Overpass, ~1-2 min), `npm run verify -- speed-limits`, commit `data/speed-limits.json` |
 | Map-provider code | branch on `mapEngine.provider` (`maplibre` / `yandex` / `osm`) → `verify -- yandex fallback-cdn fallback-webgl` |
 
 ## Debugging

@@ -52,6 +52,10 @@ Builds driving routes.
           "speedLimitSource": "estimated"
         }
       ],
+      "speedLimits": [
+        { "from": 0, "to": 1840, "limit": 60 },
+        { "from": 1840, "to": 9620, "limit": 90 }
+      ],
       "laneIntersections": [
         { "location": [44.51, 40.19], "outBearing": 182, "lanes": [{ "valid": true, "indications": ["left"] }], "name": "…", "modifier": "left", "type": "turn" }
       ],
@@ -64,10 +68,11 @@ Builds driving routes.
 - Routes are sorted fastest first (`duration` includes traffic, seconds; `distance` meters).
 - **Step semantics:** a step's `modifier`/`action`/`location` describe the maneuver at the **start** of the step; `distance` is the length driven after it. The turn at the end of step `k` is `steps[k+1]`.
 - `modifier` ∈ `straight | left | right | slight left | slight right | u-turn | roundabout`.
-- `speedLimit` is a heuristic (60 city, 70 named fast avenues, 90 highways / > 14 km from Yerevan center, 110 North–South highway), not map data; `speedLimitSource` is always `"estimated"`. The client upgrades it to a verified limit only near a route speed camera.
+- `speedLimits` are real OpenStreetMap `maxspeed` values matched to the route geometry (`data/speed-limits.json`): runs in meters along the route; gaps mean OSM has no limit there. Matching samples every 20 m, takes the nearest tagged road within 15 m whose direction is within 35° (one-way roads only in their direction), and pads runs by 10 m.
+- `speedLimit` per step is a heuristic (60 city, 70 named fast avenues, 90 highways / > 14 km from Yerevan center, 110 North–South highway), not map data; `speedLimitSource` is always `"estimated"`. The client uses it only where `speedLimits` has no run, and a route speed camera's limit overrides both.
 - `laneIntersections` come from OSRM for its own route; the client keeps only junctions on the Yandex route (≤ 20 m, `outBearing` within 35°).
 
-**OSRM fallback** (`source: "osrm"`): the raw OSRM `route/v1/driving` response (`routes[].geometry.coordinates`, `legs[0].steps[].maneuver`, …) plus `laneIntersections` per route.
+**OSRM fallback** (`source: "osrm"`): the raw OSRM `route/v1/driving` response (`routes[].geometry.coordinates`, `legs[0].steps[].maneuver`, …) plus `laneIntersections` and `speedLimits` per route.
 
 Errors: `400 {"error":"Missing or invalid coordinates"}` (each must be a finite number within lat/lng range), `500 {"error": "<message>"}`.
 
@@ -109,6 +114,16 @@ Returns `audio/mpeg`.
 ## `GET /api/speed-cameras`
 
 `[{ "id": 130041119, "lat": 40.1637, "lng": 44.4187, "limit": 60, "direction": 120, "name": "Камера 60 км/ч" }]` — from `data/yerevan-cameras-clean.json`, `Cache-Control: max-age=86400`.
+
+## `GET /api/speed-limit`
+
+The OpenStreetMap `maxspeed` of the nearest tagged road (within 15 m, any direction) — the sign while driving without a route.
+
+| Param | Notes |
+|---|---|
+| `lat`, `lng` | required, finite and in range (`400` otherwise) |
+
+Response: `{ "limit": 60, "source": "osm" }`, or `{ "limit": null, "source": "none" }` when no tagged road is that close.
 
 ## `GET /api/chargers`
 

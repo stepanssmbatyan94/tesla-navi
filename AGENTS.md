@@ -17,9 +17,10 @@ npm install            # Node >= 20
 npm start              # http://localhost:8085 (PORT env overrides; Cloud Run sets 8080)
 npm run check          # node --check on all server/client JS
 npm test               # unit tests (node:test, no network), ~1 s
-npm run verify         # 10 headless browser checks (system Chrome, live network), ~45 s
+npm run verify         # 11 headless browser checks (system Chrome, live network), ~45 s
 npm run verify -- smoke maneuvers --verbose
 node scripts/update_chargers.mjs   # refresh the OSM charging-station snapshot (~1 min)
+node scripts/update_speed_limits.mjs  # refresh the OSM speed-limit snapshot (~1-2 min)
 ```
 
 Manual URLs: car screen `/?code=TEST01`, simulator/diagnostics `/?mode=dev`, phone `/phone?code=TEST01`; params `provider=maplibre|yandex`, `theme=day|night|auto`.
@@ -37,10 +38,11 @@ js/phone-remote.js        Phone page: GPS watcher, wake lock, destination search
 css/                      Car + phone styles
 styles/                   MapLibre day/night styles + sprites (tiles: OpenFreeMap)
 sounds/                   nav chime + Armenian clips sounds/hy/{gor,suzie}/<key>.mp3
-data/                     Speed-camera DB and OSM charging stations (served only via /api/*)
+data/                     Speed-camera DB, OSM charging stations and speed limits (served only via /api/*)
 tests/                    Unit tests (node:test); browser scripts load in a vm with DOM stubs
 scripts/verify/           npm run verify runner + page checks
 scripts/update_chargers.mjs  Refreshes data/ev-chargers.json from OpenStreetMap
+scripts/update_speed_limits.mjs  Refreshes data/speed-limits.json (OSM maxspeed) from OpenStreetMap
 .github/workflows/ci.yml  CI: check + unit tests (blocking), browser checks (non-blocking)
 scripts/generate_*.py     Armenian voice pack generators (piper; model in models/, git-ignored)
 docs/                     Architecture, API, deployment, development, ADRs, playbooks
@@ -73,7 +75,7 @@ Not served and not for agents to modify casually: `refs/` (personal reference ph
 5. **Map layers** use fixed ids (`route-alt*`, `route-full`, `route-casing`, `route-traffic`, `route-traveled*`) with data-driven colors; never one layer per segment; clear via `clearMapLibreRouteLayers()`. `setStyle` (theme switch) drops runtime layers → redraw on `style.load` (`lastRouteRender`).
 6. **Realtime packets arrive twice** (Supabase + local WS) and `realtime.js` drops exact repeats (kind + timestamp + lat/lng). Anything new on the channel needs a `timestamp`.
 7. **One GPS source at a time.** Phone fixes win; the car browser's own geolocation is used only when no phone fix arrived within 5 s (`PHONE_GPS_PRIORITY_MS`).
-8. **Speed limits.** Step limits are a street-name heuristic (`speedLimitSource: 'estimated'`, dashed sign, no chime); only a route speed camera's limit is verified (`'camera'`) and may trigger the overspeed chime.
+8. **Speed limits.** Priority: a route speed camera within 200 m ahead (`'camera'`) > the OSM `maxspeed` run the car is on (`route.speedLimits`, `'osm'`) > the step's street-name heuristic (`'estimated'`, dashed sign). Without a route the sign shows the nearest road's OSM limit (`/api/speed-limit`) or a dash `—` when unknown — never a made-up number. The overspeed chime fires only on `'camera'`/`'osm'` limits.
 9. **Map providers.** `provider` must name the library actually running: `maplibre`, `yandex` (loaded on demand) or `osm` (Leaflet fallback when MapLibre can't load or start). Provider-specific code branches on it.
 
 ## Rules

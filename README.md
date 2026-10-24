@@ -32,7 +32,7 @@ Details: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 | Routing | Yandex live router with up to 3 alternatives and traffic-colored polylines, OSRM fallback, off-route rerouting |
 | Guidance | Maneuver HUD with countdown, lane arrows (OSRM lanes matched onto the Yandex route), progress bar with ETA, real traffic delay per route |
 | Voice | ru/en Microsoft Edge neural voices (Svetlana/Dmitry, Ava/Andrew), Armenian prerecorded Gor/Suzie, chime, mute |
-| Safety | ~185 speed cameras (Yerevan DB) announced only along the active route; camera limits are verified, other limits shown as estimates; overspeed chime on verified limits |
+| Safety | ~185 speed cameras (Yerevan DB) announced only along the active route; road limits from OpenStreetMap `maxspeed` (camera limit wins near a camera; street-name estimate, dashed, only where OSM has none); overspeed chime on camera/OSM limits |
 | Places | Search (Yandex Suggest → Photon → Nominatim), Google/Yandex link and coordinate parsing, Home/Work, favorites, history |
 | Phone remote | GPS sharing with wake lock, address search, link paste, voice dictation, "Send to Tesla" |
 | Extras | Weather at the car's position (Open-Meteo), YouTube search/player, 105 EV charging stations from OpenStreetMap, Yerevan traffic score badge |
@@ -58,7 +58,7 @@ Geolocation on a real phone needs HTTPS: use the production URL or a tunnel (`ng
 ```bash
 npm run check        # syntax check of all JS
 npm test             # unit tests (node:test, ~1 s, no network)
-npm run verify       # 10 headless browser checks in system Chrome (~45 s, needs network)
+npm run verify       # 11 headless browser checks in system Chrome (~45 s, needs network)
 ```
 
 ## Project structure
@@ -68,7 +68,7 @@ server.js                 HTTP server, /api/*, /ws relay, static allowlist
 index.html, phone.html    Car screen and phone remote pages
 js/                       config + i18n, realtime, map engine, car UI, phone UI
 css/  styles/  sounds/    Styles, MapLibre map styles + sprites, audio
-data/                     Speed-camera database
+data/                     Speed-camera database, OSM charging stations and speed limits
 scripts/                  verify runner + checks, Armenian voice generators
 docs/                     Architecture, API, deployment, development, ADRs, playbooks
 AGENTS.md                 Instructions for AI coding agents (CLAUDE.md / GEMINI.md import it)

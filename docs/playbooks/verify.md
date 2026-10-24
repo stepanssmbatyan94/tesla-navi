@@ -21,6 +21,7 @@ The runner (`scripts/verify/run.mjs`) starts its own server on port 8199 (`VERIF
 | route rendering, theme/style, cancel/arrival | `route-layers` |
 | innerHTML/templates, realtime, phone packets, search/places | `security` |
 | GPS sources, `initTeslaCarGps`, `handleIncomingGps` | `dual-gps` |
+| speed-limit sign, `/api/speed-limit`, `speedLimits`, `data/speed-limits.json` | `speed-limits` |
 | UI strings, `I18N`, markup labels | `i18n` |
 | Yandex provider code paths | `yandex` |
 | map init, library loading, Leaflet paths | `fallback-cdn`, `fallback-webgl` |
