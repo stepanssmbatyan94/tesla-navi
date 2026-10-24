@@ -6,7 +6,7 @@
 // PASS (the returned `pass` field): the route's limits cover >= 95 % of samples and the sign
 //       shows that limit and source at >= 95 % of them; free driving on a tagged road shows its
 //       OSM limit, and on an untagged Yerevan service road the urban default 60 (no dash);
-//       the page's first GPS fix already shows a limit.
+//       the page's first GPS fix, and the stop after cancelling the route, already show a limit.
 // Usage: paste into a browser-tool JS console (returns a promise) or run `npm run verify`.
 (async () => {
   const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -46,6 +46,8 @@
   const longRun = runs.filter(r => r.source !== 'default').sort((a, b) => (b.to - b.from) - (a.to - a.from))[0];
   const freePoint = longRun ? me.getPositionAtDistance((longRun.from + longRun.to) / 2) : null;
   cancelActiveNavigation();
+  // free driving again: the sign comes back for the spot the car stands on, without moving
+  for (let i = 0; i < 20 && currentSpeedLimitSource === 'estimated'; i++) await sleep(150);
   const afterCancel = sign();
 
   let freeDriving = null;
@@ -63,7 +65,7 @@
   localStorage.removeItem('tesla_search_history');
   return {
     pass: samples > 0 && covered / samples >= 0.95 && matched / covered >= 0.95 &&
-      afterCancel.text === '—' && !!freeDriving && Number(freeDriving.text) === freeDriving.expected && freeDriving.source === 'osm' &&
+      afterCancel.text !== '—' && !!freeDriving && Number(freeDriving.text) === freeDriving.expected && freeDriving.source === 'osm' &&
       yerevanYard.text === '60' && yerevanYard.source === 'default' && firstFix.text !== '—',
     samples, covered, legalDefaultSamples: defaults, signMatches: matched, mismatches: mismatches.slice(0, 4), firstFix, afterCancel, freeDriving, yerevanYard
   };

@@ -2806,6 +2806,10 @@ class TeslaMapEngine {
     this.routeSteps = [];
     this.routeCameras = [];
     this.routeSpeedLimits = [];
+    // Back to free driving: the UI cleared the sign, so look the limit up again right here,
+    // even if the car hasn't moved the usual 80 m since the last free-driving lookup
+    this._freeLimitQuery = null;
+    if (this.hasRealFix && this.currentPosition) this.updateFreeDrivingSpeedLimit(this.currentPosition.lat, this.currentPosition.lng);
     this.spokenDistanceThresholds = {};
     this.laneIntersections = [];
     this.currentStepIndex = 0;

@@ -215,3 +215,16 @@ test('the very first GPS fix already looks up the free-driving speed limit', asy
   assert.match(requests[0], /^\/api\/speed-limit\?lat=40\.189800&lng=44\.469300$/);
   assert.deepEqual(JSON.parse(JSON.stringify(limits)), [{ limit: 60, source: 'default' }]); // vm-realm objects
 });
+
+test('cancelling the route looks the free-driving limit up again without moving', async () => {
+  const { ctx, engine } = newEngine();
+  const requests = [];
+  ctx.fetch = async url => { requests.push(url); return { ok: true, json: async () => ({ limit: 60, source: 'osm' }) }; };
+  engine.updateCarPosition(LAT, LNG0, 90, 0, true); // first fix: one lookup
+  await new Promise(resolve => setImmediate(resolve));
+  engine.applyRouteData(routeData(), DEST, 0);
+  engine.isNavigating = true;
+  engine.cancelRoute(); // same spot, well within 80 m of the last lookup
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(requests.length, 2);
+});
