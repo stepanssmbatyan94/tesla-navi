@@ -87,7 +87,7 @@ Not served and not for agents to modify casually: `refs/` (personal reference ph
 - **Cache busters:** changing files loaded by `index.html`/`phone.html` → bump every `?v=` in that page.
 - No empty `catch (e) {}` in new code. Match surrounding style: classic scripts, globals, 2-space indent, comments explain *why*.
 - Keep the MCU budget: no per-frame/per-fix O(route × cameras) scans, no unbounded DOM growth, no layers/markers per update.
-- No `backdrop-filter` or CSS `filter` over the map and no endless CSS animations while nothing happens (the map repaints constantly: measured as most of the idle CPU); no always-on `requestAnimationFrame` loops. Static assets go through the server's compression/cache (`?v=` = immutable).
+- No `backdrop-filter` or CSS `filter` over the map and no endless CSS animations while nothing happens (the map repaints constantly: measured as most of the idle CPU); no always-on `requestAnimationFrame` loops. The map renders at the screen's own pixel ratio up to 2 (`MAP_MAX_PIXEL_RATIO`): a cap of 1 looked blurry in the car. Static assets go through the server's compression/cache (`?v=` = immutable).
 
 ## Definition of done
 

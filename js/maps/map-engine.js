@@ -154,10 +154,10 @@ const STEP_ADVANCE_PAST_JUNCTION_M = 8;
 const FREE_DRIVE_LIMIT_MIN_MOVE_M = 80;
 const FREE_DRIVE_LIMIT_MIN_INTERVAL_MS = 4000;
 const FREE_DRIVE_LIMIT_BUSY_RETRY_MS = 500;
-// The map draws at most 1 device pixel per CSS pixel: on a 2x screen MapLibre otherwise renders a
-// 4x larger canvas and loads the @2x sprite (~3x the bytes). Car screens run at ~1x anyway; raise
-// this for sharper labels on high-DPI screens at the cost of GPU work.
-const MAP_MAX_PIXEL_RATIO = 1;
+// The map draws at the screen's own sharpness up to 2 device pixels per CSS pixel. A cap of 1
+// made it visibly blurry on the owner's screen; 3x phone screens stay at 2 (a 2.25x smaller canvas
+// than native). Each step up costs GPU work: 2x renders 4x the pixels of 1x.
+const MAP_MAX_PIXEL_RATIO = 2;
 // Heading-up car position on screen: MapLibre pads the top by 28 %, so the car sits at 64 %
 const YANDEX_HEADING_UP_CAR_Y = 0.64;
 
