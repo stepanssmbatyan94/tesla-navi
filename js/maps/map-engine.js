@@ -327,12 +327,18 @@ class TeslaMapEngine {
     return { lat, lng, heading };
   }
 
-  // Start continuous 60fps dead-reckoning loop for real-time motion during live driving
+  // 60 fps dead reckoning between position updates, for the developer simulator only. The loop
+  // stops itself when the simulator isn't running (it used to wake the MCU 60 times a second for
+  // nothing) and updateCarPosition starts it again once the simulator runs.
   startMotionExtrapolator() {
     if (this.extrapolatorAnimId) return;
     let lastTime = performance.now();
 
     const loop = (now) => {
+      if (!window.IS_SIMULATOR_RUNNING) {
+        this.extrapolatorAnimId = null;
+        return;
+      }
       const dt = Math.min(0.08, (now - lastTime) / 1000);
       lastTime = now;
 
@@ -1575,6 +1581,7 @@ class TeslaMapEngine {
 
   // Primary Position Update Handler with Movement Bearing & Road Snapping
   updateCarPosition(lat, lng, rawHeading = 0, speed = 0, isRealFix = true) {
+    if (window.IS_SIMULATOR_RUNNING && !this.extrapolatorAnimId) this.startMotionExtrapolator();
     // 0. Instant Snap on First Real GPS Fix (Bypass smoothing from arbitrary initial center)
     if (!this.hasRealFix && isRealFix) {
       this.hasRealFix = true;
