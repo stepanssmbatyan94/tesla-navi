@@ -82,7 +82,7 @@ Git-ignored, local only: `node_modules/`, `refs/` (reference screenshots/photos)
 - **Cache busters.** Bump every `?v=` in `index.html` / `phone.html` when files they load change — the Tesla browser caches hard.
 - **i18n.** Add keys to `I18N.ru`, `I18N.hy`, `I18N.en`; render via `data-i18n`, `data-i18n-title`, `data-i18n-placeholder` or `I18N[lang]` lookups. `applyLanguage()` re-renders dynamic UI.
 - **Escaping.** External/untrusted text → `escapeHtml()` or `textContent`.
-- **Voice.** `mapEngine.speakVoice(text)`; ru/en go to Edge TTS, Armenian needs a clip ([playbooks/add-voice-phrase.md](playbooks/add-voice-phrase.md)).
+- **Voice.** `mapEngine.speakVoice(text)`; ru/en go to Google Cloud TTS (locally run the server with `GOOGLE_TTS_ACCESS_TOKEN=$(gcloud auth print-access-token) GOOGLE_TTS_PROJECT=<project>`, otherwise ru/en voice is unavailable), Armenian needs a clip ([playbooks/add-voice-phrase.md](playbooks/add-voice-phrase.md)).
 - **Map layers.** Add sources/layers with fixed ids, remove them in `clearMapLibreRouteLayers()` (or an equivalent), redraw after `setStyle`.
 - **Server endpoints.** One `if (pathname === '/api/…')` block per endpoint in `server.js`; timeouts on external fetches; document it in [API.md](API.md).
 

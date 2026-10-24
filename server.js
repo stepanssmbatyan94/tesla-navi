@@ -12,11 +12,59 @@ try {
   console.warn('msedge-tts not loaded:', e.message);
 }
 
-// In-memory LRU cache for synthesized neural audio (fast 0ms repeats)
+// --- Neural voices for ru/en --------------------------------------------------------------
+// 1. Google Cloud Text-to-Speech: official API, enabled in the GCP project. On Cloud Run the
+//    service account's token comes from the metadata server; locally set GOOGLE_TTS_ACCESS_TOKEN
+//    (e.g. `gcloud auth print-access-token`) and GOOGLE_TTS_PROJECT (quota project).
+// 2. Microsoft Edge read-aloud (msedge-tts): an unofficial endpoint that Microsoft locked behind
+//    a new Sec-MS-GEC token on 2026-10-13 (403 / "Unexpected server response: 200" since).
+//    Kept only as a fallback in case it opens again.
+// In-memory LRU cache for synthesized audio (instant repeats)
 const ttsAudioCache = new Map();
 const TTS_CACHE_MAX_ENTRIES = 300;
 const TTS_MAX_TEXT_LENGTH = 300;
 const voiceClients = new Map();
+const GOOGLE_TTS_VOICES = {
+  ru: { female: 'ru-RU-Chirp3-HD-Kore', male: 'ru-RU-Chirp3-HD-Charon' },
+  en: { female: 'en-US-Chirp3-HD-Aoede', male: 'en-US-Chirp3-HD-Charon' }
+};
+const EDGE_TTS_VOICES = {
+  ru: { female: 'ru-RU-SvetlanaNeural', male: 'ru-RU-DmitryNeural' },
+  en: { female: 'en-US-AvaNeural', male: 'en-US-AndrewNeural' }
+};
+let googleTtsToken = null; // { value, expiresAt }
+
+function ttsGender(voiceChoice) {
+  return ['male', 'dmitry', 'andrew'].includes(voiceChoice) ? 'male' : 'female';
+}
+
+async function getGoogleTtsToken() {
+  if (process.env.GOOGLE_TTS_ACCESS_TOKEN) return process.env.GOOGLE_TTS_ACCESS_TOKEN;
+  if (googleTtsToken && googleTtsToken.expiresAt > Date.now() + 60000) return googleTtsToken.value;
+  if (!process.env.K_SERVICE) return null; // not on Cloud Run: no metadata server
+  const res = await fetchUpstream('http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/token',
+    { headers: { 'Metadata-Flavor': 'Google' } }, 3000);
+  if (!res.ok) throw new Error(`metadata token HTTP ${res.status}`);
+  const data = await res.json();
+  googleTtsToken = { value: data.access_token, expiresAt: Date.now() + (data.expires_in || 300) * 1000 };
+  return googleTtsToken.value;
+}
+
+async function synthesizeGoogleSpeech(text, voiceChoice, lang) {
+  const token = await getGoogleTtsToken();
+  if (!token) throw new Error('Google TTS not configured (no Cloud Run service account or GOOGLE_TTS_ACCESS_TOKEN)');
+  const name = GOOGLE_TTS_VOICES[lang === 'en' ? 'en' : 'ru'][ttsGender(voiceChoice)];
+  const headers = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
+  if (process.env.GOOGLE_TTS_PROJECT) headers['x-goog-user-project'] = process.env.GOOGLE_TTS_PROJECT;
+  const res = await fetchUpstream('https://texttospeech.googleapis.com/v1/text:synthesize', {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ input: { text }, voice: { languageCode: name.slice(0, 5), name }, audioConfig: { audioEncoding: 'MP3' } })
+  }, 8000);
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok || !data.audioContent) throw new Error(`Google TTS HTTP ${res.status}: ${(data.error && data.error.message) || 'no audio'}`);
+  return Buffer.from(data.audioContent, 'base64');
+}
 
 async function getOrCreateVoiceClient(voice) {
   if (voiceClients.has(voice)) {
@@ -31,44 +79,20 @@ async function getOrCreateVoiceClient(voice) {
   return tts;
 }
 
-async function synthesizeNeuralSpeech(text, voiceChoice = 'auto', lang = 'ru') {
-  let voice;
-  if (lang === 'en') {
-    voice = (voiceChoice === 'male' || voiceChoice === 'andrew' || voiceChoice === 'dmitry') ? 'en-US-AndrewNeural' : 'en-US-AvaNeural';
-  } else {
-    voice = (voiceChoice === 'male' || voiceChoice === 'dmitry') ? 'ru-RU-DmitryNeural' : 'ru-RU-SvetlanaNeural';
-  }
-  const cacheKey = `${voice}:${text}`;
-  if (ttsAudioCache.has(cacheKey)) {
-    // Re-insert to mark as recently used (Map keeps insertion order)
-    const cached = ttsAudioCache.get(cacheKey);
-    ttsAudioCache.delete(cacheKey);
-    ttsAudioCache.set(cacheKey, cached);
-    return cached;
-  }
-
+async function synthesizeEdgeSpeech(text, voiceChoice, lang) {
+  const voice = EDGE_TTS_VOICES[lang === 'en' ? 'en' : 'ru'][ttsGender(voiceChoice)];
   const tts = await getOrCreateVoiceClient(voice);
   const { audioStream } = tts.toStream(text);
-
   return new Promise((resolve, reject) => {
     const chunks = [];
     const timeout = setTimeout(() => {
       voiceClients.delete(voice);
       reject(new Error('TTS timeout'));
     }, 12000);
-
     audioStream.on('data', chunk => chunks.push(chunk));
     audioStream.on('end', () => {
       clearTimeout(timeout);
-      const buffer = Buffer.concat(chunks);
-      if (buffer.length > 0) {
-        ttsAudioCache.set(cacheKey, buffer);
-        // Bounded cache: /api/tts takes arbitrary text, so evict the oldest entries
-        while (ttsAudioCache.size > TTS_CACHE_MAX_ENTRIES) {
-          ttsAudioCache.delete(ttsAudioCache.keys().next().value);
-        }
-      }
-      resolve(buffer);
+      resolve(Buffer.concat(chunks));
     });
     audioStream.on('error', err => {
       clearTimeout(timeout);
@@ -78,21 +102,35 @@ async function synthesizeNeuralSpeech(text, voiceChoice = 'auto', lang = 'ru') {
   });
 }
 
-// Guaranteed Neural TTS with single retry - NEVER fall back to robotic legacy voices
-async function getOrSynthesizeSpeech(text, voiceChoice = 'auto', lang = 'ru') {
-  try {
-    return await synthesizeNeuralSpeech(text, voiceChoice, lang);
-  } catch (err) {
-    console.warn('[NeuralTTS] Initial attempt failed, retrying once...', err.message);
-    let voice;
-    if (lang === 'en') {
-      voice = (voiceChoice === 'male' || voiceChoice === 'andrew' || voiceChoice === 'dmitry') ? 'en-US-AndrewNeural' : 'en-US-AvaNeural';
-    } else {
-      voice = (voiceChoice === 'male' || voiceChoice === 'dmitry') ? 'ru-RU-DmitryNeural' : 'ru-RU-SvetlanaNeural';
-    }
-    voiceClients.delete(voice);
-    return await synthesizeNeuralSpeech(text, voiceChoice, lang);
+// ru/en speech: Google first, then Edge; cached per voice and text
+async function synthesizeNeuralSpeech(text, voiceChoice = 'auto', lang = 'ru') {
+  const cacheKey = `${lang === 'en' ? 'en' : 'ru'}:${ttsGender(voiceChoice)}:${text}`;
+  if (ttsAudioCache.has(cacheKey)) {
+    // Re-insert to mark as recently used (Map keeps insertion order)
+    const cached = ttsAudioCache.get(cacheKey);
+    ttsAudioCache.delete(cacheKey);
+    ttsAudioCache.set(cacheKey, cached);
+    return cached;
   }
+  let buffer;
+  try {
+    buffer = await synthesizeGoogleSpeech(text, voiceChoice, lang);
+  } catch (googleErr) {
+    console.warn('[NeuralTTS] Google TTS failed, trying Edge:', googleErr.message);
+    try {
+      buffer = await synthesizeEdgeSpeech(text, voiceChoice, lang);
+    } catch (edgeErr) {
+      throw new Error(`Google: ${googleErr.message}; Edge: ${edgeErr.message}`);
+    }
+  }
+  if (buffer.length > 0) {
+    ttsAudioCache.set(cacheKey, buffer);
+    // Bounded cache: /api/tts takes arbitrary text, so evict the oldest entries
+    while (ttsAudioCache.size > TTS_CACHE_MAX_ENTRIES) {
+      ttsAudioCache.delete(ttsAudioCache.keys().next().value);
+    }
+  }
+  return buffer;
 }
 
 const PORT = process.env.PORT || 8085;
@@ -1011,7 +1049,7 @@ const server = http.createServer(async (req, res) => {
     }
 
     try {
-      const audioBuf = await getOrSynthesizeSpeech(text, voice, lang);
+      const audioBuf = await synthesizeNeuralSpeech(text, voice, lang);
       res.writeHead(200, {
         'Content-Type': 'audio/mpeg',
         'Content-Length': audioBuf.byteLength,
@@ -1595,6 +1633,7 @@ module.exports = {
   speedLimitsForRoute,
   loadSpeedLimitIndex,
   speedLimitAt,
+  synthesizeNeuralSpeech,
   laneViaPoints,
   extractLaneIntersections,
   parseYandexTrafficXml,

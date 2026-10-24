@@ -37,7 +37,7 @@ flowchart TB
   API --> YR["Yandex Maps<br/>router, suggest, org pages, traffic XML"]
   API --> OSRM["router.project-osrm.org<br/>lanes + fallback routes"]
   API --> GEO["Photon, Nominatim"]
-  API --> TTS["Microsoft Edge neural TTS"]
+  API --> TTS["Google Cloud TTS (Edge read-aloud fallback)"]
   API --> YT["YouTube search/suggest"]
   ENG --> TILES["OpenFreeMap tiles + glyphs"]
   UI --> OM["Open-Meteo, QR server, YouTube embed"]
@@ -54,7 +54,7 @@ Single `http.createServer` handler plus a `ws` WebSocketServer on `/ws`. No fram
 | Static files | Only `index.html`, `phone.html` and `css/ js/ styles/ sounds/` (`PUBLIC_FILES`/`PUBLIC_DIRS`); dotfiles and traversal rejected. `/` and `/map` → `index.html`, `/phone*` → `phone.html`. |
 | `/api/route` | Fetches the Yandex Maps routes page and parses the embedded `state-view` JSON (`config.routerResponse.routes`): geometry, traffic colorization, segments → steps, speed-limit heuristic, speed-limit runs (`speedLimits`: OSM or legal default), route summaries. OSRM gives lane data (OSM `turn:lanes`), routed along each Yandex polyline via mid-stretch via points so the lanes belong to the junctions Yandex drives; its own route is the fallback router. |
 | `/api/geocode`, `/api/resolve-location` | Yandex Suggest (with word-order and language fallbacks) → org-page coordinates → Photon → Nominatim. `resolve-location` also expands Google/Yandex/Apple/2GIS share links (allowlisted hosts, redirects re-checked). |
-| `/api/tts` | ru/en via `msedge-tts` (LRU cache, 300 entries, text ≤ 300 chars); Armenian via prerecorded clips chosen by `getArmenianAudio()`, 404 for unknown phrases. |
+| `/api/tts` | ru/en via Google Cloud Text-to-Speech (Cloud Run service account token from the metadata server; `msedge-tts` as fallback; LRU cache, 300 entries, text ≤ 300 chars); Armenian via prerecorded clips chosen by `getArmenianAudio()`, 404 for unknown phrases. |
 | `/api/traffic-yerevan` | Yandex traffic score XML for Yerevan (60 s cache) with the ru/en hints (`parseYandexTrafficXml`); elsewhere `available: false` (no data, never a guess). |
 | `/api/speed-cameras` | Serves `data/yerevan-cameras-clean.json` (~185 cameras, OSM ids). |
 | `/api/speed-limit` | Limit at a point (free driving): nearest OSM-tagged road, else the legal default (60 built-up / 90 outside). Both this and `/api/route` use `data/speed-limits.json` (~37 000 tagged ways in a 0.01° grid, plus a ~100 m built-up grid from OSM residential and settlement outlines; refreshed by `scripts/update_speed_limits.mjs`). Only ~2 % of Yerevan's residential streets carry a maxspeed tag, hence the legal default. |
@@ -206,7 +206,7 @@ Details and commands: [DEPLOYMENT.md](DEPLOYMENT.md).
 | Yandex Maps (scraped page + suggest + XML) | Routes, traffic, geocoding, score | Routes fall back to OSRM (no traffic, neutral color); geocoding to Photon/Nominatim; the score badge shows a dash. Page format changes break parsing silently. |
 | OSRM public demo server | Lanes, fallback routes | No lane arrows; no fallback route. Rate-limited, no SLA. |
 | Supabase Realtime | Primary pairing channel | Local `/ws` only (per-instance, see 6). |
-| Microsoft Edge TTS (`msedge-tts`) | ru/en voice | Prompt fails (chime only); one retry. |
+| Google Cloud Text-to-Speech (API enabled in the GCP project) | ru/en voice | Falls back to Microsoft Edge read-aloud (`msedge-tts`, unofficial, locked by Microsoft since 2026-10-13); both down → chime only. |
 | OpenFreeMap tiles/glyphs | Base map | Blank map. |
 | CDNs (unpkg, jsdelivr, api-maps.yandex.ru) | MapLibre, Leaflet, supabase-js, Yandex JS | MapLibre unavailable → Leaflet/OSM map; Yandex JS unavailable → MapLibre; supabase-js unavailable → local `/ws` only. |
 | OpenStreetMap / Overpass | Charging-station and speed-limit snapshots (offline refresh) | Nothing at runtime; the snapshot just ages. |
@@ -217,6 +217,6 @@ Heuristic data that remains, and how it is presented: speed limits where OSM has
 ## 10. Testing strategy
 
 - `npm run check` — syntax.
-- `npm test` — 36 `node:test` unit tests, no network: server parsing (links, protobuf URIs, `parseYandexRoutes`), Armenian clip mapping, allowlist, rate limit, upstream timeout, OSM speed-limit matching and legal defaults; the map engine loaded in a `vm` with DOM stubs (maneuver = `steps[k+1]`, sign kept until the junction, silent preview, voice text, lane matching, speed-limit priority camera > OSM > legal default > estimate); realtime dedup and pairing codes; cockpit traffic-hint language.
+- `npm test` — 37 `node:test` unit tests, no network: server parsing (links, protobuf URIs, `parseYandexRoutes`), Armenian clip mapping, allowlist, rate limit, upstream timeout, OSM speed-limit matching and legal defaults; the map engine loaded in a `vm` with DOM stubs (maneuver = `steps[k+1]`, sign kept until the junction, silent preview, voice text, lane matching, speed-limit priority camera > OSM > legal default > estimate); realtime dedup and pairing codes; cockpit traffic-hint language.
 - `npm run verify` — 11 headless Chrome checks against a local server with live upstreams: smoke, maneuver vs. geometry (sign sampled down to 5 m before each turn), speed-limit sign vs. OSM, route layers + theme swap, XSS through the pairing channel, dual GPS, translations, Yandex provider, MapLibre-CDN-blocked and no-WebGL fallbacks, phone remote. See [playbooks/verify.md](playbooks/verify.md).
 - CI (`.github/workflows/ci.yml`): check + unit tests block merges; browser checks run but don't block (live upstreams from GitHub's network).
