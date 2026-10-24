@@ -1,5 +1,5 @@
 /* Tesla Phone Remote Stylesheet */
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600;700&family=Space+Grotesk:wght@600;700&display=swap');
+/* Web fonts are linked (non-blocking) from phone.html, see tesla-display.css */
 
 :root {
   --bg-dark: #0b0f17;

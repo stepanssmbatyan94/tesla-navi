@@ -56,6 +56,7 @@ ngrok http 8085              # open https://<id>.ngrok.app/?code=… in the car,
 │   ├── verify/checks/*.js     Page checks (also pasteable into a browser console)
 │   ├── update_chargers.mjs    Refresh data/ev-chargers.json from OpenStreetMap
 │   ├── update_speed_limits.mjs  Refresh data/speed-limits.json (OSM maxspeed + built-up areas) from OpenStreetMap
+│   ├── trim_map_sprites.py    Repack styles/sprites to the icons the map styles reference
 │   └── generate_*.py          Armenian voice pack generators
 ├── docs/                      ARCHITECTURE, API, DEPLOYMENT, DEVELOPMENT, adr/, playbooks/
 ├── AGENTS.md                  AI agent instructions (CLAUDE.md, GEMINI.md, .github/ point here)
@@ -99,6 +100,7 @@ Git-ignored, local only: `node_modules/`, `refs/` (reference screenshots/photos)
 | New static asset folder | `PUBLIC_DIRS` in `server.js` |
 | Refresh charging stations | `node scripts/update_chargers.mjs` (Overpass, ~1 min), commit `data/ev-chargers.json` |
 | Refresh speed limits | `node scripts/update_speed_limits.mjs` (Overpass, ~1-4 min, retries when busy), `npm run verify -- speed-limits`, commit `data/speed-limits.json` |
+| Add a map icon to a style | it must exist in the full sprite (git history before `trim_map_sprites.py`); restore it, then `python3 scripts/trim_map_sprites.py` and `zopflipng` |
 | Map-provider code | branch on `mapEngine.provider` (`maplibre` / `yandex` / `osm`) → `verify -- yandex fallback-cdn fallback-webgl` |
 
 ## Debugging

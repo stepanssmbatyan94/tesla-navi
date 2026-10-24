@@ -9,7 +9,9 @@
   <!-- Google Fonts: Inter + Noto Sans Armenian (Fixes tofu boxes in Tesla Chromium) -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600;700&family=Noto+Sans+Armenian:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <!-- Web fonts load without blocking the first paint (text shows in the system font, then swaps) -->
+  <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600;700&family=Noto+Sans+Armenian:wght@400;500;600;700;800&display=swap" onload="this.onload=null;this.rel='stylesheet'">
+  <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600;700&family=Noto+Sans+Armenian:wght@400;500;600;700;800&display=swap"></noscript>
 
   <!-- MapLibre GL 4.7.1 Vector Engine (Hardware-Accelerated 3D). Deferred so a slow CDN never blocks first paint;
        Yandex Maps JS and the Leaflet fallback are loaded on demand by map-engine.js -->
@@ -20,7 +22,7 @@
   <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.118.0"></script>
 
   <!-- Tesla Cockpit CSS -->
-  <link rel="stylesheet" href="css/tesla-display.css?v=82">
+  <link rel="stylesheet" href="css/tesla-display.css?v=83">
 </head>
 <body>
 
@@ -905,9 +907,9 @@
   </div>
 
   <!-- Scripts -->
-  <script src="js/config.js?v=82"></script>
-  <script src="js/realtime.js?v=82"></script>
-  <script src="js/maps/map-engine.js?v=82"></script>
-  <script src="js/tesla-cockpit.js?v=82"></script>
+  <script src="js/config.js?v=83"></script>
+  <script src="js/realtime.js?v=83"></script>
+  <script src="js/maps/map-engine.js?v=83"></script>
+  <script src="js/tesla-cockpit.js?v=83"></script>
 </body>
 </html>
