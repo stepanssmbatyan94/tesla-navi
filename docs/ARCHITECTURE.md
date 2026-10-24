@@ -59,7 +59,7 @@ Single `http.createServer` handler plus a `ws` WebSocketServer on `/ws`. No fram
 | `/api/speed-cameras` | Serves `data/yerevan-cameras-clean.json` (~185 cameras, OSM ids). |
 | `/api/chargers` | Serves `data/ev-chargers.json`: the 105 car charging stations OpenStreetMap has in Armenia (snapshot refreshed by `scripts/update_chargers.mjs`; Overpass is too slow to query per request). No availability data exists. |
 | `/api/yt-search`, `/api/yt-suggestions` | YouTube HTML/InnerTube scraping and Google suggest. |
-| Cross-cutting | Every upstream fetch has a 12 s deadline (`fetchUpstream`); `/api/*` is rate-limited per client IP (token bucket: burst 60, ~120/min, 429 + `Retry-After`). |
+| Cross-cutting | Every upstream fetch has a 12 s deadline (`fetchUpstream`); `/api/*` is rate-limited per client IP (last `X-Forwarded-For` entry; token bucket: burst 60, ~120/min, 429 + `Retry-After`; at most 10 000 tracked clients). |
 | `/ws?room=<code>` | Rooms in a process-local `Map`; every frame is relayed to the other members of the room, preserving text/binary type. |
 
 ### 3.2 Realtime — `js/realtime.js`
@@ -159,7 +159,7 @@ Per position update (`updateCarPosition(lat, lng, heading, speedKmh, isRealFix)`
    - Voice: "in 300 m …" between 350–100 m, immediate prompt between 85–15 m, once per step.
    - Lanes: nearest matched OSRM junction within 220 m ahead.
    - Cameras on the route: chime + voice once between 350–80 m; badge within 600 m.
-   - Speed limit: a route camera within 400 m ahead (50 m after) gives the verified limit; otherwise the step's street-name estimate, drawn as a dashed sign. The overspeed chime uses verified limits only.
+   - Speed limit: a route camera within 200 m ahead (50 m after) gives the verified limit; otherwise the step's street-name estimate, drawn as a dashed sign. The overspeed chime uses verified limits only.
    - Arrival within 25 m of the destination → arrival modal, route cancelled.
 8. While a route is only previewed (not navigating) only the free-driving camera check runs.
 

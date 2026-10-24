@@ -1,6 +1,6 @@
 # API Reference
 
-All endpoints are served by `server.js`. Responses are JSON unless noted. CORS is open (`Access-Control-Allow-Origin: *`). There is no authentication. `/api/*` is rate-limited per client IP (burst 60, ~120 requests/min): over the limit → `429 {"error":"Too many requests"}` with `Retry-After: 5`. Upstream calls time out after 12 s. Coordinates in route geometry are **`[lng, lat]`**; query parameters are named explicitly.
+All endpoints are served by `server.js`. Responses are JSON unless noted. CORS is open (`Access-Control-Allow-Origin: *`). There is no authentication. `/api/*` is rate-limited per client IP (the last `X-Forwarded-For` entry, which Cloud Run appends; burst 60, ~120 requests/min): over the limit → `429 {"error":"Too many requests"}` with `Retry-After: 5`. Upstream calls time out after 12 s. Coordinates in route geometry are **`[lng, lat]`**; query parameters are named explicitly.
 
 ## Pages and static files
 
@@ -69,7 +69,7 @@ Builds driving routes.
 
 **OSRM fallback** (`source: "osrm"`): the raw OSRM `route/v1/driving` response (`routes[].geometry.coordinates`, `legs[0].steps[].maneuver`, …) plus `laneIntersections` per route.
 
-Errors: `400 {"error":"Missing coordinates"}`, `500 {"error": "<message>"}`.
+Errors: `400 {"error":"Missing or invalid coordinates"}` (each must be a finite number within lat/lng range), `500 {"error": "<message>"}`.
 
 ## `GET /api/geocode`
 
