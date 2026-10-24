@@ -7,7 +7,11 @@ let selectedDestination = null;
 let currentLang = 'ru';
 let activeChargersMarkers = [];
 let chargersVisible = false;
-let liveTrafficData = null; // last Yandex score for the badge (declared early: applyLanguage reads it)
+let liveTrafficData = null;
+// Self-update: the car keeps this page open for days and would run old code after a deploy
+const APP_VERSION_POLL_MS = 120000;
+let loadedAppVersion = null;
+let appUpdatePending = false; // last Yandex score for the badge (declared early: applyLanguage reads it)
 let pendingGpsFix = null;
 let hasReceivedRealGps = false;
 
@@ -113,12 +117,44 @@ async function initTeslaCockpit() {
   } catch (mapErr) {
     console.error('MapEngine initialization error:', mapErr);
   }
+
+  // 6. Pick up new deploys (reloads only while idle, see checkForAppUpdate)
+  checkForAppUpdate();
+  setInterval(checkForAppUpdate, APP_VERSION_POLL_MS);
 }
 
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', initTeslaCockpit);
 } else {
   initTeslaCockpit();
+}
+
+// Reload once a newer revision is deployed, but never mid-trip: not while a route is built or
+// driven, music plays or the driver is typing; a pending update waits for the next idle check
+async function checkForAppUpdate() {
+  try {
+    const res = await fetch('/api/version', { cache: 'no-store' });
+    if (!res.ok) return false;
+    const { version } = await res.json();
+    if (!version) return false;
+    if (!loadedAppVersion) loadedAppVersion = version;
+    else if (version !== loadedAppVersion) appUpdatePending = true;
+  } catch (e) {
+    console.warn('App version check failed:', e.message);
+    return false;
+  }
+  if (appUpdatePending && isIdleForAppReload()) {
+    window.location.reload();
+    return true;
+  }
+  return false;
+}
+
+function isIdleForAppReload() {
+  // activeRoute covers the route preview too (selectedDestination survives an arrival)
+  const routeInProgress = !!(mapEngine && (mapEngine.isNavigating || mapEngine.activeRoute));
+  const typing = !!(document.activeElement && /^(INPUT|TEXTAREA)$/.test(document.activeElement.tagName || ''));
+  return !routeInProgress && !isMusicPlaying && !typing;
 }
 
 // 1. Language Management (RU, HY, EN - Default RU)

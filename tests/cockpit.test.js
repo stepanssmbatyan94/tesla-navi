@@ -46,3 +46,24 @@ test('lane guidance shows only real lane data, never invented lanes', () => {
   render({ modifier: 'left', laneDistanceMeters: 400, lanes: [{ valid: true, indications: ['left'] }] });
   assert.equal(pill.classList.hidden, true, 'too far from the junction');
 });
+
+test('the car page reloads after a deploy only while idle, never mid-route', async () => {
+  let reloads = 0;
+  let version = 'rev-1';
+  const ctx = createBrowserContext({
+    fetch: async () => ({ ok: true, json: async () => ({ version }) }),
+    location: { protocol: 'http:', host: 'localhost', search: '', origin: 'http://localhost', pathname: '/', reload: () => { reloads++; } }
+  });
+  ctx.document.readyState = 'loading';
+  loadScripts(ctx, ['js/config.js', 'js/tesla-cockpit.js']);
+  const check = get(ctx, 'checkForAppUpdate');
+  assert.equal(await check(), false, 'first answer is the loaded version');
+  assert.equal(await check(), false, 'same version: nothing to do');
+  version = 'rev-2';
+  get(ctx, 'mapEngine = { isNavigating: true, activeRoute: {} }');
+  assert.equal(await check(), false, 'new version while navigating: wait');
+  assert.equal(reloads, 0);
+  get(ctx, 'mapEngine = { isNavigating: false, activeRoute: null }');
+  assert.equal(await check(), true, 'route over: reload');
+  assert.equal(reloads, 1);
+});

@@ -117,6 +117,10 @@ Returns `audio/mpeg`.
 
 `[{ "id": 130041119, "lat": 40.1637, "lng": 44.4187, "limit": 60, "direction": 120, "name": "Камера 60 км/ч" }]` — from `data/yerevan-cameras-clean.json`, `Cache-Control: max-age=86400`.
 
+## `GET /api/version`
+
+`{ "version": "tesla-navi-00093-abc" }` — the Cloud Run revision (`K_REVISION`; locally `local-<start time>`), `Cache-Control: no-store`. The car page polls it every 2 minutes and reloads itself after a deploy, but only while idle: no route built or driven, no music playing, nothing being typed.
+
 ## `GET /api/speed-limit`
 
 The limit at a point — the sign while driving without a route: the OpenStreetMap limit of the nearest tagged road (within 15 m, any direction), otherwise the legal default of the zone.
