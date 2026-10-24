@@ -181,6 +181,8 @@ function applyLanguage(lang) {
   // the traffic badge title carries the live score and hint, not just its label
   const trafficBadgeEl = document.getElementById('traffic-score-badge');
   if (trafficBadgeEl && liveTrafficData) trafficBadgeEl.title = trafficBadgeTitle(liveTrafficData, lang);
+  // camera markers already on the map (MapLibre) carry their limit for the same reason
+  document.querySelectorAll('.camera-map-badge[data-limit]').forEach(el => { el.title = speedCameraTitle(el.dataset.limit); });
 
   // 4. Input placeholders [data-i18n-placeholder]
   document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {

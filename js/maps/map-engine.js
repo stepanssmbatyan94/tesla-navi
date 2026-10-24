@@ -48,6 +48,12 @@ function loadExternalStylesheet(href) {
   document.head.appendChild(link);
 }
 
+// Tooltip of a speed-camera marker in the UI language; no limit in the DB -> no number.
+function speedCameraTitle(limit) {
+  const dict = I18N[(typeof window !== 'undefined' && window.CURRENT_LANG) || 'ru'] || I18N.ru;
+  return limit ? `${dict.speedCameraMarker} ${limit} ${dict.kmh}` : dict.speedCameraMarker;
+}
+
 class TeslaMapEngine {
   constructor(containerId, options = {}) {
     this.containerId = containerId;
@@ -488,8 +494,9 @@ class TeslaMapEngine {
       routeCameras.forEach(point => {
         const el = document.createElement('div');
         el.className = 'map-speed-camera-pin';
+        const limit = Number(point.limit) || '';
         el.innerHTML = `
-          <div class="camera-map-badge" title="Камера контроля скорости ${point.limit || 60} км/ч">
+          <div class="camera-map-badge" data-limit="${limit}" title="${speedCameraTitle(limit)}">
             <svg viewBox="0 0 24 24" width="16" height="16" fill="#1e293b">
               <path d="M4 4h3l2-2h6l2 2h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2zm8 3a5 5 0 1 0 0 10 5 5 0 0 0 0-10zm0 2a3 3 0 1 1 0 6 3 3 0 0 1 0-6z"/>
             </svg>
@@ -513,7 +520,7 @@ class TeslaMapEngine {
 
       routeCameras.forEach(point => {
         const placemark = new window.ymaps.Placemark([point.lat, point.lng], {
-          hintContent: `Камера контроля скорости ${point.limit || 60} км/ч`
+          hintContent: speedCameraTitle(Number(point.limit) || '')
         }, {
           iconLayout: CamLayout,
           iconImageSize: [28, 28],
