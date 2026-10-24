@@ -32,7 +32,7 @@ Details: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 | Routing | Yandex live router with up to 3 alternatives and traffic-colored polylines, OSRM fallback, off-route rerouting |
 | Guidance | Maneuver HUD with countdown, lane arrows (OSRM lanes matched onto the Yandex route), progress bar with ETA, real traffic delay per route |
 | Voice | ru/en Microsoft Edge neural voices (Svetlana/Dmitry, Ava/Andrew), Armenian prerecorded Gor/Suzie, chime, mute |
-| Safety | ~185 speed cameras (Yerevan DB) announced only along the active route; road limits from OpenStreetMap `maxspeed` (camera limit wins near a camera; street-name estimate, dashed, only where OSM has none); overspeed chime on camera/OSM limits |
+| Safety | ~185 speed cameras (Yerevan DB) announced only along the active route; road limits from OpenStreetMap `maxspeed`, and where a street has no tag the legal default 60 in built-up areas / 90 outside (dashed); camera limit wins near a camera; overspeed chime on camera/OSM limits |
 | Places | Search (Yandex Suggest → Photon → Nominatim), Google/Yandex link and coordinate parsing, Home/Work, favorites, history |
 | Phone remote | GPS sharing with wake lock, address search, link paste, voice dictation, "Send to Tesla" |
 | Extras | Weather at the car's position (Open-Meteo), YouTube search/player, 105 EV charging stations from OpenStreetMap, Yerevan traffic score badge |

@@ -66,7 +66,7 @@ class TeslaMapEngine {
     this.onUserPan = options.onUserPan || (() => {});
     this.onProgressUpdate = options.onProgressUpdate || (() => {});
     this.onCameraAlert = options.onCameraAlert || (() => {});
-    // Free driving (no route): real OSM limit at the car's position, see updateFreeDrivingSpeedLimit
+    // Free driving (no route): OSM / legal-default limit at the car's position, see updateFreeDrivingSpeedLimit
     this.onSpeedLimit = options.onSpeedLimit || (() => {});
     this.onPositionUpdate = options.onPositionUpdate || (() => {});
 
@@ -1776,10 +1776,11 @@ class TeslaMapEngine {
           break;
         }
       }
-      // Then the OpenStreetMap maxspeed of the stretch the car is on (attached by /api/route)
-      const osmRun = cameraLimit ? null : (this.routeSpeedLimits || []).find(run => vehicleRouteDist >= run.from && vehicleRouteDist <= run.to);
-      const currentSpeedLimit = cameraLimit || (osmRun && osmRun.limit) || activeStep.speedLimit || 60;
-      const speedLimitSource = cameraLimit ? 'camera' : (osmRun ? 'osm' : 'estimated');
+      // Then the limit of the stretch the car is on (attached by /api/route): the OSM maxspeed,
+      // or the legal default of a built-up area / open road where OSM has no tag
+      const limitRun = cameraLimit ? null : (this.routeSpeedLimits || []).find(run => vehicleRouteDist >= run.from && vehicleRouteDist <= run.to);
+      const currentSpeedLimit = cameraLimit || (limitRun && limitRun.limit) || activeStep.speedLimit || 60;
+      const speedLimitSource = cameraLimit ? 'camera' : (limitRun ? (limitRun.source === 'default' ? 'default' : 'osm') : 'estimated');
 
       // Yandex & OSRM steps carry the maneuver at their START: the turn at the end of the
       // current step is the NEXT step's maneuver. The last step ends at the destination.
@@ -1916,7 +1917,7 @@ class TeslaMapEngine {
     }
   }
 
-  // Free driving: ask the server for the OSM limit where the car is, at most every
+  // Free driving: ask the server for the limit where the car is (OSM or legal default), at most every
   // FREE_DRIVE_LIMIT_MIN_MOVE_M of movement and FREE_DRIVE_LIMIT_MIN_INTERVAL_MS
   async updateFreeDrivingSpeedLimit(lat, lng) {
     const now = Date.now();
@@ -1930,7 +1931,9 @@ class TeslaMapEngine {
       const res = await fetch(`/api/speed-limit?lat=${lat.toFixed(6)}&lng=${lng.toFixed(6)}`);
       const data = await res.json();
       if (this.activeRoute) return; // a route started meanwhile: its limits take over
-      this.onSpeedLimit(data && data.limit ? { limit: data.limit, source: 'osm' } : { limit: null, source: 'estimated' });
+      this.onSpeedLimit(data && data.limit
+        ? { limit: data.limit, source: data.source === 'default' ? 'default' : 'osm' }
+        : { limit: null, source: 'estimated' });
     } catch (err) {
       console.warn('[MapEngine] Free-driving speed limit lookup failed:', err.message);
     } finally {
