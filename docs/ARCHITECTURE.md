@@ -52,12 +52,12 @@ Single `http.createServer` handler plus a `ws` WebSocketServer on `/ws`. No fram
 | Responsibility | Notes |
 |---|---|
 | Static files | Only `index.html`, `phone.html` and `css/ js/ styles/ sounds/` (`PUBLIC_FILES`/`PUBLIC_DIRS`); dotfiles and traversal rejected. `/` and `/map` → `index.html`, `/phone*` → `phone.html`. |
-| `/api/route` | Fetches the Yandex Maps routes page and parses the embedded `state-view` JSON (`config.routerResponse.routes`): geometry, traffic colorization, segments → steps, speed-limit heuristic, OSM speed-limit runs (`speedLimits`), route summaries. OSRM is queried in parallel for lane data and is the fallback router. |
+| `/api/route` | Fetches the Yandex Maps routes page and parses the embedded `state-view` JSON (`config.routerResponse.routes`): geometry, traffic colorization, segments → steps, speed-limit heuristic, speed-limit runs (`speedLimits`: OSM or legal default), route summaries. OSRM is queried in parallel for lane data and is the fallback router. |
 | `/api/geocode`, `/api/resolve-location` | Yandex Suggest (with word-order and language fallbacks) → org-page coordinates → Photon → Nominatim. `resolve-location` also expands Google/Yandex/Apple/2GIS share links (allowlisted hosts, redirects re-checked). |
 | `/api/tts` | ru/en via `msedge-tts` (LRU cache, 300 entries, text ≤ 300 chars); Armenian via prerecorded clips chosen by `getArmenianAudio()`, 404 for unknown phrases. |
 | `/api/traffic-yerevan` | Yandex traffic score XML for Yerevan (60 s cache) with the ru/en hints (`parseYandexTrafficXml`); elsewhere `available: false` (no data, never a guess). |
 | `/api/speed-cameras` | Serves `data/yerevan-cameras-clean.json` (~185 cameras, OSM ids). |
-| `/api/speed-limit` | Nearest OSM `maxspeed` road to a point (free driving). Both this and `/api/route` use `data/speed-limits.json` (~31 000 tagged ways, refreshed by `scripts/update_speed_limits.mjs`), indexed once in a 0.01° grid. |
+| `/api/speed-limit` | Limit at a point (free driving): nearest OSM-tagged road, else the legal default (60 built-up / 90 outside). Both this and `/api/route` use `data/speed-limits.json` (~37 000 tagged ways in a 0.01° grid, plus a ~100 m built-up grid from OSM residential and settlement outlines; refreshed by `scripts/update_speed_limits.mjs`). Only ~2 % of Yerevan's residential streets carry a maxspeed tag, hence the legal default. |
 | `/api/chargers` | Serves `data/ev-chargers.json`: the 105 car charging stations OpenStreetMap has in Armenia (snapshot refreshed by `scripts/update_chargers.mjs`; Overpass is too slow to query per request). No availability data exists. |
 | `/api/yt-search`, `/api/yt-suggestions` | YouTube HTML/InnerTube scraping and Google suggest. |
 | Cross-cutting | Every upstream fetch has a 12 s deadline (`fetchUpstream`); `/api/*` is rate-limited per client IP (last `X-Forwarded-For` entry; token bucket: burst 60, ~120/min, 429 + `Retry-After`; at most 10 000 tracked clients). |
@@ -160,10 +160,10 @@ Per position update (`updateCarPosition(lat, lng, heading, speedKmh, isRealFix)`
    - Voice: "in 300 m …" between 350–100 m, immediate prompt between 85–15 m, once per step.
    - Lanes: nearest matched OSRM junction within 220 m ahead.
    - Cameras on the route: chime + voice once between 350–80 m; badge within 600 m.
-   - Speed limit: a route camera within 200 m ahead (50 m after) gives its limit; otherwise the OSM `maxspeed` run at the car's route distance; otherwise the step's street-name estimate, drawn as a dashed sign. The overspeed chime uses camera/OSM limits only.
+   - Speed limit: a route camera within 200 m ahead (50 m after) gives its limit; otherwise the run at the car's route distance — the OSM limit (solid) or the legal default 60/90 (dashed); otherwise the step's street-name estimate (dashed). The overspeed chime uses camera/OSM limits only.
    - Arrival within 25 m of the destination → arrival modal, route cancelled.
 8. While a route is only previewed (not navigating) only the free-driving camera check runs.
-9. Without a route, a real GPS fix that moved ≥ 80 m (at most every 4 s) asks `/api/speed-limit` for the nearest road's OSM limit; no data → the sign shows `—` and no overspeed warning.
+9. Without a route, a real GPS fix that moved ≥ 80 m (at most every 4 s) asks `/api/speed-limit` (OSM limit or legal default); only without any data the sign shows `—` and no overspeed warning.
 
 Route rendering (MapLibre) uses a fixed set of sources/layers — alternatives, casing, one data-driven traffic layer, traveled line — and is replayed after day/night style swaps.
 
@@ -212,11 +212,11 @@ Details and commands: [DEPLOYMENT.md](DEPLOYMENT.md).
 | OpenStreetMap / Overpass | Charging-station and speed-limit snapshots (offline refresh) | Nothing at runtime; the snapshot just ages. |
 | Open-Meteo, YouTube, api.qrserver.com | Weather, music, QR | Feature unavailable. |
 
-Heuristic data that remains, and how it is presented: speed limits from street names where OSM has no `maxspeed` (dashed "estimate" sign, no chime); the YouTube home feed is a curated list of existing videos. Battery levels, charger availability, traffic guesses, ping/satellite labels and fixed POIs were removed.
+Heuristic data that remains, and how it is presented: speed limits where OSM has no tag use the legal default of the zone (dashed, no chime), the street-name estimate only outside the snapshot; the YouTube home feed is a curated list of existing videos. Battery levels, charger availability, traffic guesses, ping/satellite labels and fixed POIs were removed.
 
 ## 10. Testing strategy
 
 - `npm run check` — syntax.
-- `npm test` — 25 `node:test` unit tests, no network: server parsing (links, protobuf URIs, `parseYandexRoutes`), Armenian clip mapping, allowlist, rate limit, upstream timeout, OSM speed-limit matching; the map engine loaded in a `vm` with DOM stubs (maneuver = `steps[k+1]`, sign kept until the junction, silent preview, voice text, lane matching, speed-limit priority camera > OSM > estimate); realtime dedup and pairing codes; cockpit traffic-hint language.
+- `npm test` — 27 `node:test` unit tests, no network: server parsing (links, protobuf URIs, `parseYandexRoutes`), Armenian clip mapping, allowlist, rate limit, upstream timeout, OSM speed-limit matching and legal defaults; the map engine loaded in a `vm` with DOM stubs (maneuver = `steps[k+1]`, sign kept until the junction, silent preview, voice text, lane matching, speed-limit priority camera > OSM > legal default > estimate); realtime dedup and pairing codes; cockpit traffic-hint language.
 - `npm run verify` — 11 headless Chrome checks against a local server with live upstreams: smoke, maneuver vs. geometry (sign sampled down to 5 m before each turn), speed-limit sign vs. OSM, route layers + theme swap, XSS through the pairing channel, dual GPS, translations, Yandex provider, MapLibre-CDN-blocked and no-WebGL fallbacks, phone remote. See [playbooks/verify.md](playbooks/verify.md).
 - CI (`.github/workflows/ci.yml`): check + unit tests block merges; browser checks run but don't block (live upstreams from GitHub's network).

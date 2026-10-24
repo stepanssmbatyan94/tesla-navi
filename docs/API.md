@@ -53,8 +53,9 @@ Builds driving routes.
         }
       ],
       "speedLimits": [
-        { "from": 0, "to": 1840, "limit": 60 },
-        { "from": 1840, "to": 9620, "limit": 90 }
+        { "from": 0, "to": 1840, "limit": 60, "source": "osm" },
+        { "from": 1840, "to": 2310, "limit": 60, "source": "default" },
+        { "from": 2310, "to": 9620, "limit": 90, "source": "osm" }
       ],
       "laneIntersections": [
         { "location": [44.51, 40.19], "outBearing": 182, "lanes": [{ "valid": true, "indications": ["left"] }], "name": "…", "modifier": "left", "type": "turn" }
@@ -68,7 +69,7 @@ Builds driving routes.
 - Routes are sorted fastest first (`duration` includes traffic, seconds; `distance` meters).
 - **Step semantics:** a step's `modifier`/`action`/`location` describe the maneuver at the **start** of the step; `distance` is the length driven after it. The turn at the end of step `k` is `steps[k+1]`.
 - `modifier` ∈ `straight | left | right | slight left | slight right | u-turn | roundabout`.
-- `speedLimits` are real OpenStreetMap `maxspeed` values matched to the route geometry (`data/speed-limits.json`): runs in meters along the route; gaps mean OSM has no limit there. Matching samples every 20 m, takes the nearest tagged road within 15 m whose direction is within 35° (one-way roads only in their direction), and pads runs by 10 m.
+- `speedLimits` are runs `{ from, to, limit, source }` in meters along the route from `data/speed-limits.json`, sampled every 20 m. `source: "osm"`: the OpenStreetMap limit (`maxspeed`, or `maxspeed:type` `AM:urban`/`AM:rural`) of the nearest tagged road within 15 m whose direction is within 35° (one-way roads only in their direction). `source: "default"`: no tagged road there, so the legal default of the Armenian traffic rules — 60 in a built-up area (OSM residential/settlement outlines, ~100 m grid), 90 outside. Runs are padded by 10 m; gaps only outside the snapshot's bounding box.
 - `speedLimit` per step is a heuristic (60 city, 70 named fast avenues, 90 highways / > 14 km from Yerevan center, 110 North–South highway), not map data; `speedLimitSource` is always `"estimated"`. The client uses it only where `speedLimits` has no run, and a route speed camera's limit overrides both.
 - `laneIntersections` come from OSRM for its own route; the client keeps only junctions on the Yandex route (≤ 20 m, `outBearing` within 35°).
 
@@ -117,13 +118,13 @@ Returns `audio/mpeg`.
 
 ## `GET /api/speed-limit`
 
-The OpenStreetMap `maxspeed` of the nearest tagged road (within 15 m, any direction) — the sign while driving without a route.
+The limit at a point — the sign while driving without a route: the OpenStreetMap limit of the nearest tagged road (within 15 m, any direction), otherwise the legal default of the zone.
 
 | Param | Notes |
 |---|---|
 | `lat`, `lng` | required, finite and in range (`400` otherwise) |
 
-Response: `{ "limit": 60, "source": "osm" }`, or `{ "limit": null, "source": "none" }` when no tagged road is that close.
+Response: `{ "limit": 60, "source": "osm" }`; `{ "limit": 60, "source": "default", "zone": "urban" }` / `{ "limit": 90, "source": "default", "zone": "rural" }` when no tagged road is that close; `{ "limit": null, "source": "none" }` only without snapshot data.
 
 ## `GET /api/chargers`
 
