@@ -111,16 +111,17 @@ async function initTeslaCockpit() {
   // 4. Realtime Phone Pairing (Supabase Broadcast)
   initPairing();
 
-  // 5. Map Engine Initialization (MapLibre GL 3D Primary)
+  // 5. Pick up new deploys (reloads only while idle, see checkForAppUpdate); started before
+  // the map so a map that never finishes loading can't block the fix that repairs it
+  checkForAppUpdate();
+  setInterval(checkForAppUpdate, APP_VERSION_POLL_MS);
+
+  // 6. Map Engine Initialization (MapLibre GL 3D Primary)
   try {
     await initMap();
   } catch (mapErr) {
     console.error('MapEngine initialization error:', mapErr);
   }
-
-  // 6. Pick up new deploys (reloads only while idle, see checkForAppUpdate)
-  checkForAppUpdate();
-  setInterval(checkForAppUpdate, APP_VERSION_POLL_MS);
 }
 
 if (document.readyState === 'loading') {
