@@ -68,7 +68,7 @@ Not served and not for agents to modify casually: `refs/` (personal reference ph
 
 ## Invariants — break these and the driver gets wrong guidance
 
-1. **A route step's maneuver happens at the step START** (Yandex and OSRM alike). The turn at the end of step `k` is `steps[k+1]`; the HUD/voice countdown to the end of step `k` must announce `steps[k+1]`. The last step ends at the destination (arrival, not a turn).
+1. **A route step's maneuver happens at the step START** (Yandex and OSRM alike). The turn at the end of step `k` is `steps[k+1]`; the HUD/voice countdown to the end of step `k` must announce `steps[k+1]`. The last step ends at the destination (arrival, not a turn). A roundabout is two steps, `ENTER_ROUNDABOUT` + `LEAVE_ROUNDABOUT` ("take the 2nd exit"); both carry `exit` and the ENTER step `exitStreet`, so the sign and the voice give the exit number before the ring — never "continue straight".
 2. **Coordinate order.** Route geometry is `[lng, lat]`; `updateCarPosition(lat, lng, …)`, `calculateDistance(lat1, lon1, …)`, Yandex `ymaps` and Leaflet take `lat` first.
 3. **Yandex is authoritative** for routes and maneuvers. OSRM contributes lane arrows only, for junctions within 20 m of the Yandex polyline that OSRM leaves in the same direction.
 4. **Navigation state.** Turn prompts, route cameras and arrival fire only while `isNavigating`; route preview is silent. Rerouting only on real GPS fixes.
