@@ -1,0 +1,161 @@
+const test = require('node:test');
+const assert = require('node:assert/strict');
+const { createBrowserContext, loadScripts, get } = require('./helpers/browser-context');
+
+// A straight 1 km route heading east along lat 40.18, one point every 100 m
+const LAT = 40.18;
+const LNG0 = 44.50;
+const LNG_PER_100M = 100 / (111320 * Math.cos(LAT * Math.PI / 180));
+const COORDS = Array.from({ length: 11 }, (_, i) => [LNG0 + i * LNG_PER_100M, LAT]);
+const at = meters => ({ lat: LAT, lng: LNG0 + (meters / 100) * LNG_PER_100M });
+const DEST = { name: 'Destination', lat: LAT, lng: LNG0 + 10 * LNG_PER_100M };
+
+function routeData(extra = {}) {
+  return {
+    success: true,
+    source: 'yandex',
+    routes: [{
+      coordinates: COORDS,
+      distance: 1000,
+      duration: 600,
+      durationWithoutTraffic: 300,
+      segments: [{ type: 'FREE', color: '#82ea0d', coords: COORDS }],
+      steps: [
+        { modifier: 'straight', name: 'Start St', distance: 300, speedLimit: 60 },
+        { modifier: 'left', name: 'A St', distance: 400, speedLimit: 60 },
+        { modifier: 'right', name: 'B St', distance: 300, speedLimit: 60 }
+      ],
+      laneIntersections: [],
+      ...extra
+    }]
+  };
+}
+
+function newEngine() {
+  const ctx = loadScripts(createBrowserContext(), ['js/config.js', 'js/maps/map-engine.js']);
+  ctx.CURRENT_LANG = 'en';
+  const TeslaMapEngine = get(ctx, 'TeslaMapEngine');
+  const maneuvers = [];
+  const spoken = [];
+  const engine = new TeslaMapEngine('map', {
+    provider: 'test',
+    center: { lat: LAT, lng: LNG0 },
+    onManeuverUpdate: m => maneuvers.push(m)
+  });
+  engine.speakVoice = text => spoken.push(text);
+  engine.playNavChime = () => {};
+  return { ctx, engine, maneuvers, spoken };
+}
+
+function driveTo(engine, meters) {
+  const p = at(meters);
+  engine.updateCarPosition(p.lat, p.lng, 90, 40, true);
+}
+
+test('formatNavDistance / formatNavDuration round and localise', () => {
+  const { ctx, engine } = newEngine();
+  ctx.CURRENT_LANG = 'ru';
+  assert.equal(engine.formatNavDistance(12), '12 м');
+  assert.equal(engine.formatNavDistance(287), '290 м');
+  assert.equal(engine.formatNavDistance(1260), '1.3 км');
+  assert.equal(engine.formatNavDistance(25400), '25 км');
+  ctx.CURRENT_LANG = 'en';
+  assert.equal(engine.formatNavDistance(640), '650 m');
+  assert.equal(engine.formatNavDuration(171, true), '2 h 51 min');
+  assert.equal(engine.formatNavDuration(90), '2 min');
+});
+
+test('formatStepInstruction builds the localised maneuver text', () => {
+  const { ctx, engine } = newEngine();
+  assert.equal(engine.formatStepInstruction('left', 'A St'), 'Turn left onto A St');
+  assert.equal(engine.formatStepInstruction('slight right', ''), 'Keep right');
+  assert.equal(engine.formatStepInstruction('u-turn', 'X'), 'Make a U-turn');
+  ctx.CURRENT_LANG = 'ru';
+  assert.equal(engine.formatStepInstruction('right', 'Абовяна'), 'Поверните направо на Абовяна');
+});
+
+test('HUD announces the NEXT step: the turn at the end of step k is steps[k+1]', () => {
+  const { engine, maneuvers } = newEngine();
+  engine.applyRouteData(routeData(), DEST, 0);
+  // The last step ends at the polyline's measured length (~1000 m by haversine)
+  const ends = engine.routeSteps.map(s => s.endRouteDist);
+  [300, 700, 1000].forEach((expected, i) => assert.ok(Math.abs(ends[i] - expected) < 5, `step ${i} ends at ${ends[i]}`));
+  engine.isNavigating = true;
+  driveTo(engine, 150); // first real fix only snaps the camera
+  driveTo(engine, 200);
+  let m = maneuvers.at(-1);
+  assert.equal(m.modifier, 'left', 'on Start St the upcoming turn is the left onto A St');
+  assert.equal(m.street, 'A St');
+  assert.ok(Math.abs(m.distanceMeters - 100) <= 5);
+
+  driveTo(engine, 500);
+  m = maneuvers.at(-1);
+  assert.equal(m.modifier, 'right');
+  assert.equal(m.street, 'B St');
+
+  driveTo(engine, 850);
+  m = maneuvers.at(-1);
+  assert.equal(m.type, 'arrive', 'last step ends at the destination, not at a turn');
+  assert.equal(m.street, 'Destination');
+});
+
+test('route preview stays silent: no HUD updates, prompts or arrival before "Go"', () => {
+  const { engine, maneuvers, spoken } = newEngine();
+  let arrived = false;
+  engine.onArrival = () => { arrived = true; };
+  engine.applyRouteData(routeData(), DEST, 0);
+  engine.isNavigating = false;
+  for (let d = 100; d <= 1000; d += 50) driveTo(engine, d);
+  assert.equal(maneuvers.length, 0);
+  assert.equal(spoken.length, 0);
+  assert.equal(arrived, false);
+});
+
+test('voice prompts name the upcoming maneuver', () => {
+  const { engine, spoken } = newEngine();
+  engine.voiceEnabled = true;
+  engine.applyRouteData(routeData(), DEST, 0);
+  engine.isNavigating = true;
+  driveTo(engine, 10);
+  driveTo(engine, 20);   // 280 m before the left turn -> "in 300 m" prompt
+  driveTo(engine, 250);  // 50 m before -> immediate prompt
+  assert.equal(spoken[0], 'In 300 meters turn left onto A St');
+  assert.equal(spoken[1], 'Turn left');
+});
+
+test('OSRM lane junctions are kept only on the route and in the same direction', () => {
+  const { engine } = newEngine();
+  const p300 = at(300);
+  const lanes = [{ valid: true, indications: ['left'] }];
+  engine.applyRouteData(routeData({
+    laneIntersections: [
+      { location: [p300.lng, p300.lat], outBearing: 90, lanes, modifier: 'left' },          // on route, same direction
+      { location: [p300.lng, p300.lat], outBearing: 0, lanes, modifier: 'left' },           // on route, OSRM turns north
+      { location: [p300.lng, p300.lat + 0.001], outBearing: 90, lanes, modifier: 'left' }   // ~110 m off the route
+    ]
+  }), DEST, 0);
+  assert.equal(engine.laneIntersections.length, 1);
+  assert.equal(engine.laneIntersections[0].outBearing, 90);
+  assert.ok(Math.abs(engine.laneIntersections[0].routeDist - 300) < 5);
+});
+
+test('speed limit: a route camera ahead is verified, otherwise the step limit is an estimate', () => {
+  const { engine, maneuvers } = newEngine();
+  engine.applyRouteData(routeData(), DEST, 0);
+  engine.routeCameras = [{ type: 'camera', limit: 40, routeDist: 650 }];
+  engine.isNavigating = true;
+  driveTo(engine, 100);
+  driveTo(engine, 150);
+  assert.equal(maneuvers.at(-1).speedLimitSource, 'estimated');
+  assert.equal(maneuvers.at(-1).speedLimit, 60);
+  driveTo(engine, 400);
+  assert.equal(maneuvers.at(-1).speedLimitSource, 'camera');
+  assert.equal(maneuvers.at(-1).speedLimit, 40);
+});
+
+test('routes without traffic data get one neutral segment, never an invented jam', () => {
+  const { engine } = newEngine();
+  const segs = engine.generateTrafficSegments(COORDS);
+  assert.equal(segs.length, 1);
+  assert.equal(segs[0].color, '#3b82f6');
+});
