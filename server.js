@@ -163,12 +163,18 @@ function fetchUpstream(url, options = {}, timeoutMs = UPSTREAM_TIMEOUT_MS) {
 const RATE_LIMIT_CAPACITY = 60;           // burst
 const RATE_LIMIT_REFILL_PER_SEC = 2;      // sustained ~120 requests/minute
 const RATE_LIMIT_IDLE_MS = 5 * 60 * 1000;
+const RATE_LIMIT_MAX_CLIENTS = 10000;
 const rateBuckets = new Map();
 
 function clientIp(req) {
-  // Cloud Run puts the original client first in X-Forwarded-For
+  // Cloud Run's front end APPENDS the peer address to X-Forwarded-For; earlier entries are
+  // whatever the client sent and can be forged, so only the last one identifies the client
   const fwd = req.headers['x-forwarded-for'];
-  return (fwd ? String(fwd).split(',')[0] : req.socket.remoteAddress || 'unknown').trim();
+  if (fwd) {
+    const parts = String(fwd).split(',').map(p => p.trim()).filter(Boolean);
+    if (parts.length) return parts[parts.length - 1];
+  }
+  return (req.socket && req.socket.remoteAddress) || 'unknown';
 }
 
 function takeRateToken(ip) {
@@ -177,6 +183,10 @@ function takeRateToken(ip) {
   if (!bucket) {
     bucket = { tokens: RATE_LIMIT_CAPACITY, at: now };
     rateBuckets.set(ip, bucket);
+    // Bounded memory: drop the oldest-created buckets beyond the cap
+    while (rateBuckets.size > RATE_LIMIT_MAX_CLIENTS) {
+      rateBuckets.delete(rateBuckets.keys().next().value);
+    }
   }
   bucket.tokens = Math.min(RATE_LIMIT_CAPACITY, bucket.tokens + ((now - bucket.at) / 1000) * RATE_LIMIT_REFILL_PER_SEC);
   bucket.at = now;
@@ -1281,5 +1291,6 @@ module.exports = {
   isAllowedMapLink,
   fetchUpstream,
   takeRateToken,
+  clientIp,
   RATE_LIMIT_CAPACITY
 };

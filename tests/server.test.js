@@ -118,3 +118,10 @@ test('fetchUpstream aborts a hung upstream at its deadline', async () => {
   hung.closeAllConnections();
   hung.close();
 });
+
+test('clientIp uses the address Cloud Run appends, not client-supplied X-Forwarded-For entries', () => {
+  const { clientIp } = require('../server.js');
+  assert.equal(clientIp({ headers: { 'x-forwarded-for': '1.2.3.4' }, socket: {} }), '1.2.3.4');
+  assert.equal(clientIp({ headers: { 'x-forwarded-for': 'forged-1, forged-2, 203.0.113.7' }, socket: {} }), '203.0.113.7');
+  assert.equal(clientIp({ headers: {}, socket: { remoteAddress: '::1' } }), '::1');
+});
