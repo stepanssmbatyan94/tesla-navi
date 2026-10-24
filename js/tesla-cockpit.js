@@ -751,6 +751,8 @@ async function initMap() {
         if (traveledFill) traveledFill.style.width = `${pct}%`;
       }
     },
+    // fresh Yandex traffic during navigation: recolor the progress bar like the route line
+    onTrafficUpdate: segments => renderTrafficProgressBar(segments),
     onSpeedLimit: ({ limit, source }) => {
       setSpeedLimitDisplay(limit, source);
     },

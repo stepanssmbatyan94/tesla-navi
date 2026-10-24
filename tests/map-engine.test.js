@@ -348,3 +348,37 @@ test('lanes: unmarked lanes are the straight ones when no lane says straight', (
   assert.equal(active(highlight(lanes(['none', 'none', 'none', 'slight right']), 'straight')), '1110');
   assert.equal(active(highlight(lanes(['slight left', 'slight right']), 'straight')), '11');
 });
+
+test('live traffic: a fresh Yandex route along the same way recolors the rest and updates the time', async () => {
+  const { ctx, engine } = newEngine();
+  const progress = [];
+  const updates = [];
+  engine.onProgressUpdate = p => progress.push(p);
+  engine.onTrafficUpdate = s => updates.push(s);
+  engine.applyRouteData(routeData(), DEST, 0);
+  engine.isNavigating = true;
+  for (let m = 0; m <= 300; m += 20) driveTo(engine, m);
+
+  // Yandex from the car (300 m): same street, now a jam on it, 15 min left
+  const RED = '#ff4533';
+  ctx.fetch = async () => ({ json: async () => ({ success: true, source: 'yandex', routes: [
+    { coordinates: [[at(300).lng, LAT], ...COORDS.slice(4)], duration: 900, segments: [{ color: RED, coords: [[at(300).lng, LAT], ...COORDS.slice(4)] }] }
+  ] }) });
+  assert.equal(await engine.refreshRouteTraffic(), true);
+  const colors = JSON.parse(JSON.stringify(engine.trafficSegments)).map(s => [s.color, s.coords.length]);
+  assert.equal(colors[0][0], '#82ea0d', 'the driven part keeps its colour');
+  assert.equal(colors[colors.length - 1][0], RED, 'the rest shows the fresh jam');
+  assert.equal(updates.length, 1);
+  driveTo(engine, 400); driveTo(engine, 420);
+  const left = progress.filter(p => typeof p === 'object').at(-1);
+  // 15 min for the 700 m left at refresh time, scaled to ~580 m: ~12-13 min (was 600 s * 0.58 = 6 min)
+  assert.match(left.remainingDuration, /1[23]/, left.remainingDuration);
+
+  // Yandex now prefers another way: nothing changes
+  ctx.fetch = async () => ({ json: async () => ({ success: true, source: 'yandex', routes: [
+    { coordinates: [[44.60, 40.25], [44.61, 40.26]], duration: 300, segments: [{ color: '#82ea0d', coords: [[44.60, 40.25], [44.61, 40.26]] }] }
+  ] }) });
+  const before = JSON.stringify(engine.trafficSegments);
+  assert.equal(await engine.refreshRouteTraffic(), false);
+  assert.equal(JSON.stringify(engine.trafficSegments), before);
+});
