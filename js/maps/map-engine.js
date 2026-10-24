@@ -1932,9 +1932,11 @@ class TeslaMapEngine {
           activeStep.spoken300 = true;
           const lang = window.CURRENT_LANG || 'ru';
           const turnText = this.getTurnSpeech(maneuverModifier, maneuverExit);
+          // speak only a real street (after a roundabout's exit): never "turn left onto <destination>"
+          const voiceStreet = nextStep.exitStreet || nextStep.street || '';
           let phrase = '';
           if (lang === 'en') {
-            const streetText = nextStep.name ? ` onto ${nextStep.name}` : '';
+            const streetText = voiceStreet ? ` onto ${voiceStreet}` : '';
             phrase = `In 300 meters ${turnText.toLowerCase()}${streetText}`;
           } else if (lang === 'hy') {
             const mod = maneuverModifier.toLowerCase();
@@ -1946,7 +1948,7 @@ class TeslaMapEngine {
             else if (mod.includes('right')) phrase = 'dist_250_right';
             else phrase = 'dist_250_straight';
           } else {
-            const streetText = nextStep.name ? ` на ${nextStep.name}` : '';
+            const streetText = voiceStreet ? ` на ${voiceStreet}` : '';
             phrase = `Через 300 метров ${turnText.toLowerCase()}${streetText}`;
           }
           this.speakVoice(phrase);
@@ -2411,6 +2413,7 @@ class TeslaMapEngine {
     if (primaryRoute.steps && primaryRoute.steps.length > 0) {
       this.routeSteps = primaryRoute.steps.map(s => ({
         name: s.name || destination.name,
+        street: s.name || '', // the real street only: name falls back to the destination for the HUD
         instruction: s.instruction || this.formatStepInstruction(s.modifier, s.exitStreet || s.name, s.exit),
         action: s.action || '',
         modifier: s.modifier || 'straight',
