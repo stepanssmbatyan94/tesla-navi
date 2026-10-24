@@ -1,5 +1,7 @@
 const http = require('http');
 const fs = require('fs');
+const zlib = require('zlib');
+const crypto = require('crypto');
 const path = require('path');
 const { WebSocketServer } = require('ws');
 
@@ -150,6 +152,47 @@ const MIME_TYPES = {
   '.mp3': 'audio/mpeg',
   '.ogg': 'audio/ogg'
 };
+
+// --- Compression and caching -----------------------------------------------------------------
+// Text compresses 5-25x (scripts, styles, the map style and sprite index, route JSON). The car
+// browser revalidates or reuses: files loaded with ?v= are immutable for a year (index.html
+// bumps the number on every change), everything else is revalidated by a content ETag (304).
+const COMPRESSIBLE = /^(text\/|application\/(javascript|json)|image\/svg)/;
+const STATIC_CACHE_MAX = 200;
+const staticCache = new Map(); // filePath -> { mtimeMs, size, etag, raw, br, gzip }
+
+function pickEncoding(req) {
+  const accept = String(req.headers['accept-encoding'] || '');
+  if (/\bbr\b/.test(accept)) return 'br';
+  if (/\bgzip\b/.test(accept)) return 'gzip';
+  return null;
+}
+
+function compressBuffer(buf, encoding) {
+  return encoding === 'br'
+    ? zlib.brotliCompressSync(buf, { params: { [zlib.constants.BROTLI_PARAM_QUALITY]: 9 } })
+    : zlib.gzipSync(buf, { level: 9 });
+}
+
+// Small responses (< 1 KB) aren't worth compressing
+function sendCompressed(req, res, status, headers, body) {
+  const buf = Buffer.isBuffer(body) ? body : Buffer.from(String(body));
+  const encoding = buf.length >= 1024 && COMPRESSIBLE.test(headers['Content-Type'] || '') ? pickEncoding(req) : null;
+  const out = encoding ? compressBuffer(buf, encoding) : buf;
+  res.writeHead(status, { ...headers, ...(encoding ? { 'Content-Encoding': encoding } : {}), 'Vary': 'Accept-Encoding', 'Content-Length': out.length });
+  res.end(out);
+}
+
+function cachedStatic(filePath, stats) {
+  let entry = staticCache.get(filePath);
+  if (!entry || entry.mtimeMs !== stats.mtimeMs || entry.size !== stats.size) {
+    const raw = fs.readFileSync(filePath);
+    entry = { mtimeMs: stats.mtimeMs, size: stats.size, raw, etag: `"${crypto.createHash('sha1').update(raw).digest('base64url').slice(0, 20)}"` };
+    staticCache.set(filePath, entry);
+    while (staticCache.size > STATIC_CACHE_MAX) staticCache.delete(staticCache.keys().next().value);
+  }
+  return entry;
+}
 
 // Static files reachable over HTTP (everything else in the repo stays private)
 const PUBLIC_FILES = new Set(['index.html', 'phone.html']);
@@ -1205,8 +1248,8 @@ const server = http.createServer(async (req, res) => {
             if (along) route.laneIntersections = along;
           }));
 
-          res.writeHead(200, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({
+          // ~170 KB of JSON for a city route, ~15 KB compressed
+          sendCompressed(req, res, 200, { 'Content-Type': 'application/json' }, JSON.stringify({
             success: true,
             source: 'yandex',
             routes: parsedRoutes
@@ -1229,8 +1272,7 @@ const server = http.createServer(async (req, res) => {
         });
       }
 
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({
+      sendCompressed(req, res, 200, { 'Content-Type': 'application/json' }, JSON.stringify({
         success: true,
         source: 'osrm',
         ...osrmData
@@ -1248,8 +1290,7 @@ const server = http.createServer(async (req, res) => {
       const camerasPath = path.join(__dirname, 'data', 'yerevan-cameras-clean.json');
       if (fs.existsSync(camerasPath)) {
         const data = fs.readFileSync(camerasPath, 'utf8');
-        res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'public, max-age=86400' });
-        res.end(data);
+        sendCompressed(req, res, 200, { 'Content-Type': 'application/json', 'Cache-Control': 'public, max-age=86400' }, data);
       } else {
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify([]));
@@ -1290,8 +1331,7 @@ const server = http.createServer(async (req, res) => {
   if (pathname === '/api/chargers') {
     try {
       const data = fs.readFileSync(path.join(__dirname, 'data', 'ev-chargers.json'), 'utf8');
-      res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'public, max-age=86400' });
-      res.end(data);
+      sendCompressed(req, res, 200, { 'Content-Type': 'application/json', 'Cache-Control': 'public, max-age=86400' }, data);
     } catch (e) {
       res.writeHead(500, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ error: e.message, stations: [] }));
@@ -1532,15 +1572,36 @@ const server = http.createServer(async (req, res) => {
 
     const ext = path.extname(filePath).toLowerCase();
     const contentType = MIME_TYPES[ext] || 'application/octet-stream';
-
-    res.writeHead(200, {
+    let entry;
+    try {
+      entry = cachedStatic(filePath, stats);
+    } catch (readErr) {
+      res.writeHead(500, { 'Content-Type': 'text/plain; charset=utf-8' });
+      res.end('500 Read Error');
+      return;
+    }
+    const versioned = parsedUrl.searchParams.has('v');
+    const headers = {
       'Content-Type': contentType,
-      'Cache-Control': 'no-cache',
+      'Cache-Control': versioned ? 'public, max-age=31536000, immutable' : 'no-cache',
+      'ETag': entry.etag,
+      'Vary': 'Accept-Encoding',
       'Access-Control-Allow-Origin': '*'
-    });
-
-    const stream = fs.createReadStream(filePath);
-    stream.pipe(res);
+    };
+    if (req.headers['if-none-match'] === entry.etag) {
+      res.writeHead(304, headers);
+      res.end();
+      return;
+    }
+    const encoding = COMPRESSIBLE.test(contentType) && entry.raw.length >= 1024 ? pickEncoding(req) : null;
+    let body = entry.raw;
+    if (encoding) {
+      body = entry[encoding] || (entry[encoding] = compressBuffer(entry.raw, encoding));
+      headers['Content-Encoding'] = encoding;
+    }
+    headers['Content-Length'] = body.length;
+    res.writeHead(200, headers);
+    res.end(req.method === 'HEAD' ? undefined : body);
   });
 });
 

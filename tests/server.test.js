@@ -323,3 +323,40 @@ test('/api/version names the running revision and is never cached', async () => 
     await new Promise(resolve => server.close(resolve));
   }
 });
+
+test('static files: compressed when accepted, ?v= immutable, others revalidated by ETag', async () => {
+  const { server } = require('../server.js');
+  const zlib = require('node:zlib');
+  const http = require('node:http');
+  await new Promise(resolve => server.listen(0, resolve));
+  const port = server.address().port;
+  // fetch() always decompresses; read the raw bytes to see what went over the wire
+  const raw = (p, headers = {}) => new Promise((resolve, reject) => {
+    http.get({ port, path: p, headers }, res => { const chunks = []; res.on('data', c => chunks.push(c)); res.on('end', () => resolve({ res, body: Buffer.concat(chunks) })); }).on('error', reject);
+  });
+  try {
+    const original = fs.readFileSync(path.join(ROOT, 'js/config.js'));
+    const br = await raw('/js/config.js?v=1', { 'Accept-Encoding': 'gzip, br' });
+    assert.equal(br.res.headers['content-encoding'], 'br');
+    assert.equal(br.res.headers['cache-control'], 'public, max-age=31536000, immutable');
+    assert.ok(br.body.length < original.length / 3, `${br.body.length} vs ${original.length}`);
+    assert.ok(zlib.brotliDecompressSync(br.body).equals(original));
+    const gz = await raw('/js/config.js?v=1', { 'Accept-Encoding': 'gzip' });
+    assert.ok(zlib.gunzipSync(gz.body).equals(original));
+    const plain = await raw('/js/config.js?v=1');
+    assert.equal(plain.res.headers['content-encoding'], undefined);
+    assert.ok(plain.body.equals(original));
+
+    const style = await raw('/styles/mapsev-day.json', { 'Accept-Encoding': 'br' });
+    assert.equal(style.res.headers['cache-control'], 'no-cache');
+    const again = await raw('/styles/mapsev-day.json', { 'If-None-Match': style.res.headers.etag });
+    assert.equal(again.res.statusCode, 304);
+    assert.equal(again.body.length, 0);
+    const png = await raw('/styles/sprites/mapsev-day.png', { 'Accept-Encoding': 'br' });
+    assert.equal(png.res.headers['content-encoding'], undefined, 'images are already compressed');
+    assert.equal((await raw('/server.js')).res.statusCode, 404);
+  } finally {
+    server.closeAllConnections();
+    await new Promise(resolve => server.close(resolve));
+  }
+});

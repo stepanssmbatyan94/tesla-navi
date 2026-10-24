@@ -52,6 +52,10 @@ html, body {
   display: none !important;
 }
 
+/* Panels over the map are (nearly) opaque instead of backdrop-filter: blur, and map tiles get no
+   CSS filter: the map repaints all the time, so both are recomputed on every frame (measured:
+   ~40 % of the idle CPU) and the car's GPU is weak. Keep it that way. */
+
 /* 1. Fullscreen Map Viewport */
 #map-container {
   position: absolute;
@@ -160,8 +164,6 @@ html, body {
   transform: translateY(-20%);
   z-index: 55;
   background: rgba(255, 255, 255, 0.96);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
   border: 1px solid rgba(0, 0, 0, 0.08);
   border-radius: 20px;
   padding: 12px;
@@ -273,8 +275,6 @@ html, body {
   border-radius: 12px;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.22), 0 1px 3px rgba(0, 0, 0, 0.1);
   border: 1px solid rgba(0, 0, 0, 0.08);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
   overflow: hidden;
   width: 44px;
 }
@@ -320,8 +320,6 @@ html, body {
   background: rgba(255, 255, 255, 0.95);
   border: 1px solid rgba(0, 0, 0, 0.08);
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.22), 0 1px 3px rgba(0, 0, 0, 0.1);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -429,8 +427,6 @@ html, body {
   background: rgba(255, 255, 255, 0.95);
   border: 1px solid rgba(0, 0, 0, 0.08);
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.22), 0 1px 3px rgba(0, 0, 0, 0.1);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1342,6 +1338,7 @@ html, body {
   border: 3.5px solid #ef4444;
   background: #fef2f2;
   box-shadow: 0 0 18px rgba(239, 68, 68, 0.55), 0 4px 14px rgba(0, 0, 0, 0.15);
+  /* only while over the limit; scale only (compositor), the shadow stays still */
   animation: overspeed-pulse 0.9s infinite alternate ease-in-out;
 }
 
@@ -1351,14 +1348,8 @@ html, body {
 }
 
 @keyframes overspeed-pulse {
-  from {
-    transform: scale(1);
-    box-shadow: 0 0 10px rgba(239, 68, 68, 0.35);
-  }
-  to {
-    transform: scale(1.06);
-    box-shadow: 0 0 22px rgba(239, 68, 68, 0.7);
-  }
+  from { transform: scale(1); }
+  to { transform: scale(1.06); }
 }
 
 .current-speed-val {
@@ -2411,12 +2402,10 @@ body.night-mode .nav-progress-traveled-fill {
   min-width: 230px;
   max-width: 300px;
   height: 38px;
-  background: rgba(20, 24, 33, 0.92);
+  background: rgba(20, 24, 33, 0.96);
   border: 1px solid rgba(255, 255, 255, 0.14);
   border-radius: 19px;
   padding: 3px 8px 3px 12px;
-  backdrop-filter: blur(24px);
-  -webkit-backdrop-filter: blur(24px);
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(255, 255, 255, 0.06);
   display: flex;
   align-items: center;
@@ -2460,10 +2449,12 @@ body.night-mode .nav-progress-traveled-fill {
 }
 .mini-eq-bars span {
   width: 2.5px;
-  height: 4px;
+  height: 13px;
   background: #ef4444;
   border-radius: 1px;
-  transition: height 0.2s ease;
+  /* scaleY, not height: animating height re-ran layout on every frame */
+  transform: scaleY(0.3);
+  transform-origin: bottom;
 }
 .music-mini-player.playing .mini-eq-bars span:nth-child(1) {
   animation: eqBounce 0.8s infinite ease-in-out;
@@ -2475,8 +2466,8 @@ body.night-mode .nav-progress-traveled-fill {
   animation: eqBounce 0.9s infinite ease-in-out 0.4s;
 }
 @keyframes eqBounce {
-  0%, 100% { height: 3px; }
-  50% { height: 13px; }
+  0%, 100% { transform: scaleY(0.23); }
+  50% { transform: scaleY(1); }
 }
 
 .mini-player-info {
@@ -2560,8 +2551,7 @@ body.night-mode .nav-progress-traveled-fill {
   position: absolute;
   inset: 0;
   z-index: 100;
-  background: rgba(0, 0, 0, 0.45);
-  backdrop-filter: blur(8px);
+  background: rgba(0, 0, 0, 0.6);
   display: grid;
   place-items: center;
   padding: 20px;
@@ -2658,12 +2648,10 @@ body.night-mode .nav-progress-traveled-fill {
   height: 44px;
   border-radius: 50%;
   background: rgba(239, 68, 68, 0.25);
-  animation: carPulse 2s infinite ease-out;
-}
-
-@keyframes carPulse {
-  0% { transform: scale(0.6); opacity: 0.9; }
-  100% { transform: scale(1.8); opacity: 0; }
+  /* a still halo: an endless pulse here kept the compositor redrawing over the map even
+     with the car parked (the main idle cost after the blur) */
+  transform: scale(1.15);
+  opacity: 0.55;
 }
 
 .tesla-car-arrow {
@@ -2688,7 +2676,8 @@ body.night-mode .nav-progress-traveled-fill {
   height: 32px;
   border-radius: 50%;
   background: rgba(239, 68, 68, 0.3);
-  animation: carPulse 1.6s infinite ease-out;
+  transform: scale(1.2);
+  opacity: 0.6;
 }
 
 /* ==========================================================================
@@ -3005,7 +2994,6 @@ body.night-mode .nav-progress-traveled-fill {
   background: rgba(11, 15, 23, 0.95);
   border: 1px solid rgba(56, 189, 248, 0.4);
   border-radius: 20px;
-  backdrop-filter: blur(20px);
   box-shadow: 0 24px 60px rgba(0, 0, 0, 0.85);
   z-index: 1250;
   display: flex;
@@ -3219,34 +3207,6 @@ body.night-mode .nav-progress-traveled-fill {
   fill: #1e293b;
 }
 
-/* Red ring when camera is active ahead along the current route */
-.camera-map-badge.active-route-camera {
-  border: 2.5px solid #ef4444;
-  box-shadow: 0 0 12px rgba(239, 68, 68, 0.6), 0 2px 6px rgba(0, 0, 0, 0.25);
-  animation: camera-pulse 1.2s infinite alternate ease-in-out;
-}
-
-.camera-map-badge.active-route-camera svg {
-  fill: #dc2626;
-}
-
-@keyframes camera-pulse {
-  from {
-    transform: scale(1);
-    box-shadow: 0 0 8px rgba(239, 68, 68, 0.4);
-  }
-  to {
-    transform: scale(1.12);
-    box-shadow: 0 0 16px rgba(239, 68, 68, 0.8);
-  }
-}
-
-/* Yandex Maps 2.1 Aesthetic enhancement matching Mapsev light mode */
-.ymaps-2-1-79-map canvas,
-.ymaps-2-1-79-map ymaps[class*="tile"],
-.ymaps-2-1-79-map img {
-  filter: contrast(1.08) saturate(0.8) brightness(1.02) hue-rotate(-6deg);
-}
 
 /* Suppress Yandex Maps 2.1 promo links ("Создать свою карту", "Как добраться", taxi, promo banners) */
 ymaps[class*="-gotoymaps"],
@@ -3381,9 +3341,7 @@ body.route-options-open .quick-dest-bar {
   align-items: center;
   gap: 10px;
   padding: 8px 18px;
-  background: rgba(15, 23, 42, 0.88);
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
+  background: rgba(15, 23, 42, 0.95);
   border: 1px solid rgba(245, 158, 11, 0.45);
   border-radius: 9999px;
   color: #f8fafc;
@@ -3404,6 +3362,9 @@ body.route-options-open .quick-dest-bar {
   opacity: 0;
   pointer-events: none;
   transform: translateX(-50%) translateY(-10px);
+}
+.gps-status-banner.hidden .gps-pulse-dot {
+  animation: none; /* hidden by opacity, so the pulse would keep running unseen */
 }
 
 .gps-pulse-dot {

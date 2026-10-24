@@ -79,7 +79,7 @@ Git-ignored, local only: `node_modules/`, `refs/` (reference screenshots/photos)
 ## Conventions
 
 - **Classic scripts, globals, no build.** Load order matters (`config` → `realtime` → `map-engine` → `tesla-cockpit`). Top-level `const`/`function` names are global: check for collisions.
-- **Cache busters.** Bump every `?v=` in `index.html` / `phone.html` when files they load change — the Tesla browser caches hard.
+- **Cache busters.** Bump every `?v=` in `index.html` / `phone.html` when files they load change: the server marks `?v=` files `immutable` for a year, so without a bump the car keeps the old file.
 - **i18n.** Add keys to `I18N.ru`, `I18N.hy`, `I18N.en`; render via `data-i18n`, `data-i18n-title`, `data-i18n-placeholder` or `I18N[lang]` lookups. `applyLanguage()` re-renders dynamic UI.
 - **Escaping.** External/untrusted text → `escapeHtml()` or `textContent`.
 - **Voice.** `mapEngine.speakVoice(text)`; ru/en go to Google Cloud TTS (locally run the server with `GOOGLE_TTS_ACCESS_TOKEN=$(gcloud auth print-access-token) GOOGLE_TTS_PROJECT=<project>`, otherwise ru/en voice is unavailable), Armenian needs a clip ([playbooks/add-voice-phrase.md](playbooks/add-voice-phrase.md)).

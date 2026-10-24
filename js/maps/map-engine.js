@@ -46,6 +46,21 @@ function routeMatchShare(currentCoords, fromIndex, freshCoords) {
   return hits.filter(h => h >= 0).length / sample.length;
 }
 
+// Yandex splits a route into hundreds of traffic chunks, most of them the same color as their
+// neighbour (a 20 km route: ~450). Each one became a progress-bar <div>, a GeoJSON feature and,
+// on the Yandex map, its own Polyline. Neighbours of one color are joined (they share the
+// boundary vertex, which is kept once).
+function mergeTrafficSegments(segments) {
+  const out = [];
+  for (const seg of segments || []) {
+    if (!seg || !Array.isArray(seg.coords) || seg.coords.length < 2) continue;
+    const last = out[out.length - 1];
+    if (last && last.color === seg.color) last.coords = last.coords.concat(seg.coords.slice(1));
+    else out.push({ ...seg, coords: seg.coords.slice() });
+  }
+  return out;
+}
+
 // Per-vertex colors of traffic segments (consecutive segments share their boundary vertex)
 function vertexColorsFromSegments(segments, count, fallback) {
   const colors = new Array(count).fill(fallback);
@@ -139,6 +154,10 @@ const STEP_ADVANCE_PAST_JUNCTION_M = 8;
 const FREE_DRIVE_LIMIT_MIN_MOVE_M = 80;
 const FREE_DRIVE_LIMIT_MIN_INTERVAL_MS = 4000;
 const FREE_DRIVE_LIMIT_BUSY_RETRY_MS = 500;
+// The map draws at most 1 device pixel per CSS pixel: on a 2x screen MapLibre otherwise renders a
+// 4x larger canvas and loads the @2x sprite (~3x the bytes). Car screens run at ~1x anyway; raise
+// this for sharper labels on high-DPI screens at the cost of GPU work.
+const MAP_MAX_PIXEL_RATIO = 1;
 // Heading-up car position on screen: MapLibre pads the top by 28 %, so the car sits at 64 %
 const YANDEX_HEADING_UP_CAR_Y = 0.64;
 
@@ -327,12 +346,18 @@ class TeslaMapEngine {
     return { lat, lng, heading };
   }
 
-  // Start continuous 60fps dead-reckoning loop for real-time motion during live driving
+  // 60 fps dead reckoning between position updates, for the developer simulator only. The loop
+  // stops itself when the simulator isn't running (it used to wake the MCU 60 times a second for
+  // nothing) and updateCarPosition starts it again once the simulator runs.
   startMotionExtrapolator() {
     if (this.extrapolatorAnimId) return;
     let lastTime = performance.now();
 
     const loop = (now) => {
+      if (!window.IS_SIMULATOR_RUNNING) {
+        this.extrapolatorAnimId = null;
+        return;
+      }
       const dt = Math.min(0.08, (now - lastTime) / 1000);
       lastTime = now;
 
@@ -373,6 +398,7 @@ class TeslaMapEngine {
         pitch: this.is3D ? (CONFIG.navigationPitch || 45) : 0, // 2D flat or 3D Perspective Driving View (MapsEV)
         bearing: 0,
         attributionControl: false,
+        pixelRatio: Math.min(window.devicePixelRatio || 1, MAP_MAX_PIXEL_RATIO),
         // Authentic MapsEV Tesla MCU performance optimizations (Prevents memory leak & MCU crash)
         fadeDuration: 0,
         maxTileCacheZoomLevels: 1,
@@ -1575,6 +1601,7 @@ class TeslaMapEngine {
 
   // Primary Position Update Handler with Movement Bearing & Road Snapping
   updateCarPosition(lat, lng, rawHeading = 0, speed = 0, isRealFix = true) {
+    if (window.IS_SIMULATOR_RUNNING && !this.extrapolatorAnimId) this.startMotionExtrapolator();
     // 0. Instant Snap on First Real GPS Fix (Bypass smoothing from arbitrary initial center)
     if (!this.hasRealFix && isRealFix) {
       this.hasRealFix = true;
@@ -2487,7 +2514,7 @@ class TeslaMapEngine {
     this.totalRouteMeters = this.routeCumulativeDistances[this.routeCumulativeDistances.length - 1] || distanceMeters;
 
     // Traffic segments (100% genuine Yandex real-time traffic colors)
-    const trafficSegments = isYandex ? primaryRoute.segments : null;
+    const trafficSegments = isYandex ? mergeTrafficSegments(primaryRoute.segments) : null;
 
     // Parse navigation steps
     this.routeSteps = [];

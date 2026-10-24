@@ -382,3 +382,19 @@ test('live traffic: a fresh Yandex route along the same way recolors the rest an
   assert.equal(await engine.refreshRouteTraffic(), false);
   assert.equal(JSON.stringify(engine.trafficSegments), before);
 });
+
+test('traffic segments of one color are joined: fewer bar divs, features and polylines', () => {
+  const { ctx } = newEngine();
+  const merge = get(ctx, 'mergeTrafficSegments');
+  const G = '#82ea0d', Y = '#fbd42e';
+  const segs = [
+    { type: 'FREE', color: G, coords: [[0, 0], [1, 0]] },
+    { type: 'FREE', color: G, coords: [[1, 0], [2, 0]] },
+    { type: 'LIGHT', color: Y, coords: [[2, 0], [3, 0]] },
+    { type: 'FREE', color: G, coords: [[3, 0], [4, 0], [5, 0]] }
+  ];
+  const out = JSON.parse(JSON.stringify(merge(segs)));
+  assert.deepEqual(out.map(s => [s.color, s.coords.length]), [[G, 3], [Y, 2], [G, 3]]);
+  assert.deepEqual(out[0].coords, [[0, 0], [1, 0], [2, 0]], 'the shared vertex is kept once');
+  assert.equal(segs[0].coords.length, 2, 'input untouched');
+});
