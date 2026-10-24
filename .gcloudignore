@@ -11,6 +11,7 @@
 .stitch.json
 docs
 scripts
+tests
 refs
 models
 *.md
