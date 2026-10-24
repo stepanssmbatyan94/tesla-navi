@@ -1,0 +1,46 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: Syntax + unit tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run check
+      - run: npm test
+
+  verify:
+    name: Browser checks (live upstreams)
+    needs: check
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    # The checks hit live Yandex / OSRM / Supabase / Open-Meteo from GitHub's network, which can be
+    # slow or blocked: report the result without blocking merges. See docs/playbooks/verify.md.
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      # ubuntu-latest ships Google Chrome; playwright-core uses it via channel "chrome"
+      - run: npm run verify
