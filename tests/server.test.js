@@ -37,9 +37,9 @@ test('parseYandexGeoUri decodes the float pair from a Yandex protobuf URI', () =
   assert.equal(parseYandexGeoUri('ymapsbm1://org?oid=123'), null);
 });
 
-function yandexRoute({ duration, durationWithoutTraffic, sections }) {
+function yandexRoute({ duration, durationWithoutTraffic, sections, coordinates }) {
   return {
-    coordinates: [[44.50, 40.18], [44.51, 40.18], [44.52, 40.18]],
+    coordinates: coordinates || [[44.50, 40.18], [44.51, 40.18], [44.52, 40.18]],
     colorizeInfo: [{ type: 'FREE', count: 1 }, { type: 'HARD', count: 1 }],
     distance: { value: 1800 },
     duration,
@@ -83,6 +83,32 @@ test('parseYandexRoutes: steps carry the maneuver of the section START, routes s
   assert.ok(routes[0].segments.some(s => s.type === 'HARD'));
 });
 
+test('parseYandexRoutes: roundabout exit number on ENTER and LEAVE, sharp ramps become turns', () => {
+  // east 300 m, then a ramp turning ~110° left (north-west), then on
+  const lngPerM = 1 / (111320 * Math.cos(40.18 * Math.PI / 180));
+  const A = [44.50, 40.18];
+  const B = [44.50 + 300 * lngPerM, 40.18];                                  // ramp start
+  const C = [B[0] - 100 * Math.sin(Math.PI * 20 / 180) * lngPerM, 40.18 + 100 * Math.cos(Math.PI * 20 / 180) / 110540];
+  const route = yandexRoute({
+    duration: 600,
+    durationWithoutTraffic: 500,
+    coordinates: [A, B, C, [C[0], C[1] + 0.002]],
+    sections: [
+      { action: { value: 'straight' }, street: 'Isakov Avenue', distance: { value: 300 }, edgePoints: [A, B] },
+      { action: { value: 'EXIT_LEFT', text: 'exit (left)' }, street: 'Aghasi Khanjyan Street', distance: { value: 100 }, edgePoints: [B, C] },
+      { action: { value: 'ENTER_ROUNDABOUT', text: 'roundabout' }, street: 'Garegin Nzhdeh Square', distance: { value: 30 }, edgePoints: [C, C] },
+      { action: { value: 'LEAVE_ROUNDABOUT', text: 'take the 3rd exit from roundabout ' }, street: 'Tigran Mets Avenue', distance: { value: 400 }, edgePoints: [C, C] },
+      { action: { value: 'FORK_RIGHT', text: 'bear right' }, street: 'Paronyan Street', distance: { value: 200 }, edgePoints: [[C[0], C[1] + 0.001], [C[0], C[1] + 0.002]] }
+    ]
+  });
+  const steps = parseYandexRoutes([route], [])[0].steps;
+  assert.equal(steps[1].modifier, 'left', 'EXIT_LEFT measured at ~-110° is a turn, not "keep left"');
+  assert.equal(steps[4].modifier, 'slight right', 'a ramp that keeps straight stays "keep right"');
+  assert.deepEqual([steps[2].modifier, steps[2].exit, steps[2].exitStreet], ['roundabout', 3, 'Tigran Mets Avenue'], 'known already when approaching');
+  assert.deepEqual([steps[3].modifier, steps[3].exit], ['roundabout', 3]);
+  assert.equal(steps[2].instruction, 'На круговом движении 3-й съезд');
+});
+
 test('getArmenianAudio maps keys and Armenian phrases, never falls back to the greeting', () => {
   const file = (voice, name) => fs.readFileSync(path.join(ROOT, 'sounds/hy', voice, name));
   assert.ok(getArmenianAudio('dist_250_keep_left', 'suzie').equals(file('suzie', 'dist_250_keep_left.mp3')));
@@ -90,6 +116,11 @@ test('getArmenianAudio maps keys and Armenian phrases, never falls back to the g
   assert.ok(getArmenianAudio('Երկու հարյուր հիսուն մետրից պահեք աջ', 'gor').equals(file('gor', 'dist_250_keep_right.mp3')));
   assert.ok(getArmenianAudio('Թեքվեք ձախ', 'suzie').equals(file('suzie', 'turn_left.mp3')));
   assert.equal(getArmenianAudio('completely unknown phrase', 'gor'), null);
+  // roundabouts: the ordinal առաջին ("first") contains աջ and must not become "turn right"
+  assert.ok(getArmenianAudio('Շրջանաձև երթևեկությունում դուրս եկեք առաջին ելքով', 'gor').equals(file('gor', 'roundabout_exit_1.mp3')));
+  assert.ok(getArmenianAudio('Շրջանաձև երթևեկությունում դուրս եկեք երրորդ ելքով', 'suzie').equals(file('suzie', 'roundabout_exit_3.mp3')));
+  assert.ok(getArmenianAudio('dist_250_roundabout', 'gor').equals(file('gor', 'dist_250_roundabout.mp3')));
+  assert.ok(getArmenianAudio('Շրջանաձև երթևեկություն', 'suzie').equals(file('suzie', 'roundabout.mp3')));
 });
 
 test('isAllowedMapLink only accepts map share-link hosts', () => {

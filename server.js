@@ -322,6 +322,9 @@ async function fetchYandexSuggestResults(q, userLng = 44.5125, userLat = 40.1776
 }
 
 // Authentic Armenian Neural Voice Pack (Gor & Suzie - High-Fidelity Eastern Armenian)
+// Armenian ordinals of the roundabout exit clips (roundabout_exit_1..6), as in js/config.js
+const HY_ORDINALS = ['առաջին', 'երկրորդ', 'երրորդ', 'չորրորդ', 'հինգերորդ', 'վեցերորդ'];
+
 function getArmenianAudio(text, voiceChoice = 'gor') {
   const t = (text || '').toLowerCase().trim();
   const v = (voiceChoice || '').toLowerCase();
@@ -333,6 +336,14 @@ function getArmenianAudio(text, voiceChoice = 'gor') {
 
   if (t.includes('կառուցված') || t.includes('գնացինք') || t === 'route_start') {
     file = 'route_start.mp3';
+  } else if (t.includes('շրջանաձև') || /^(dist_250_)?roundabout(_exit_[1-6])?$/.test(t)) {
+    // before the generic ձախ/աջ branches: the ordinal առաջին ("first") contains աջ
+    const exitIdx = HY_ORDINALS.findIndex(o => t.includes(`${o} ելք`));
+    const keyExit = t.match(/^roundabout_exit_([1-6])$/);
+    if ((t.includes('շրջանաձև') && is250) || t === 'dist_250_roundabout') file = 'dist_250_roundabout.mp3';
+    else if (keyExit) file = `roundabout_exit_${keyExit[1]}.mp3`;
+    else if (exitIdx >= 0) file = `roundabout_exit_${exitIdx + 1}.mp3`;
+    else file = 'roundabout.mp3';
   } else if ((t.includes('հետադարձ') && is250) || t === 'dist_250_uturn') {
     file = 'dist_250_uturn.mp3';
   } else if (t.includes('հետադարձ') || t === 'uturn') {
@@ -558,6 +569,39 @@ function speedLimitsForRoute(coords, index = speedLimitIndex || (speedLimitIndex
   return runs;
 }
 
+// Turn of a polyline ([lng, lat]) at the vertex nearest to `loc`: the bearing of the `arm` metres
+// after it minus the bearing of the `arm` metres before, -180..180 (negative = left), or null.
+function polylineTurnAt(coords, loc, arm = 25) {
+  if (!Array.isArray(coords) || coords.length < 3 || !loc) return null;
+  const len = (a, b) => Math.hypot((b[0] - a[0]) * 111320 * Math.cos(a[1] * Math.PI / 180), (b[1] - a[1]) * 110540);
+  const cum = [0];
+  let nearest = 0;
+  let nearestDist = Infinity;
+  for (let i = 0; i < coords.length; i++) {
+    if (i) cum.push(cum[i - 1] + len(coords[i - 1], coords[i]));
+    const d = len(coords[i], loc);
+    if (d < nearestDist) { nearestDist = d; nearest = i; }
+  }
+  if (nearestDist > 30) return null;
+  const at = m => {
+    m = Math.max(0, Math.min(cum[cum.length - 1], m));
+    let i = 1;
+    while (i < cum.length - 1 && cum[i] < m) i++;
+    const f = (m - cum[i - 1]) / ((cum[i] - cum[i - 1]) || 1);
+    return [coords[i - 1][0] + (coords[i][0] - coords[i - 1][0]) * f, coords[i - 1][1] + (coords[i][1] - coords[i - 1][1]) * f];
+  };
+  const m = cum[nearest];
+  const turn = bearingDeg(...at(m), ...at(m + arm)) - bearingDeg(...at(m - arm), ...at(m));
+  return ((turn % 360) + 540) % 360 - 180;
+}
+
+// Exit number of a Yandex roundabout instruction: "take the 2nd exit from roundabout", "2-й съезд"
+function roundaboutExitNumber(text) {
+  const m = String(text || '').match(/(\d+)\s*(?:st|nd|rd|th)?\s*exit|(\d+)\s*-?\s*(?:й|ой|ий)?\s*съезд/i);
+  const n = m ? parseInt(m[1] || m[2], 10) : NaN;
+  return n >= 1 && n <= 12 ? n : null;
+}
+
 // Parse the routes embedded in the Yandex Maps routes page (config.routerResponse.routes)
 // into our route format: traffic-colored segments, steps (maneuver at the step START, see
 // AGENTS.md), heuristic speed limits and distinctive 'via' summaries, fastest first.
@@ -611,6 +655,19 @@ function parseYandexRoutes(yRoutes, laneIntersections = []) {
         modifier = 'straight';
       }
 
+      // The section's action is performed where the section STARTS (edgePoints[0])
+      const loc = (sec.edgePoints && sec.edgePoints[0]) ? sec.edgePoints[0] : ((sec.edgePoints && sec.edgePoints[1]) ? sec.edgePoints[1] : null);
+
+      // Yandex calls every ramp/branch EXIT_* or FORK_*, whatever its angle: a ramp that really
+      // turns 60°+ (e.g. EXIT_LEFT measured at -110°) is a turn, not "keep left"
+      if (modifier === 'slight left' || modifier === 'slight right') {
+        const turn = polylineTurnAt(coords, loc);
+        if (turn != null && Math.abs(turn) >= 60 && (turn < 0) === (modifier === 'slight left')) {
+          modifier = turn < 0 ? 'left' : 'right';
+        }
+      }
+      const exit = actionVal.includes('LEAVE_ROUNDABOUT') ? roundaboutExitNumber(sec.action?.text || sec.text) : null;
+
       const rawStreet = (sec.street || '').trim();
       const isValidStreet = rawStreet.length > 2 && !/^(straight|right|left|roundabout|u-turn|fork)/i.test(rawStreet);
       const streetName = isValidStreet ? rawStreet : '';
@@ -622,7 +679,7 @@ function parseYandexRoutes(yRoutes, laneIntersections = []) {
       else if (modifier === 'left') instruction = streetName ? `Поверните налево на ${streetName}` : 'Поверните налево';
       else if (modifier === 'right') instruction = streetName ? `Поверните направо на ${streetName}` : 'Поверните направо';
       else if (modifier === 'u-turn') instruction = 'Развернитесь';
-      else if (modifier === 'roundabout') instruction = 'Круговое движение';
+      else if (modifier === 'roundabout') instruction = exit ? `На круговом движении ${exit}-й съезд` : 'Круговое движение';
       else if (streetName) instruction = `Двигайтесь по ${streetName}`;
 
       // Determine speed limit for this section (ПДД РА + знаки магистралей)
@@ -631,8 +688,6 @@ function parseYandexRoutes(yRoutes, laneIntersections = []) {
       const isNorthSouthExp = /север-юг|north-south|\bm-1\b|\bm-2\b/i.test(streetLower);
       const isHwy = /highway|трасса|шоссе|\bh-\d+|\bm-\d+/i.test(streetLower);
       const isFastAvenue = /исаков|isakov|сараландж|saralanj|багреванд|bagrevand|давиташен|davitashen/i.test(streetLower);
-      // The section's action is performed where the section STARTS (edgePoints[0])
-      const loc = (sec.edgePoints && sec.edgePoints[0]) ? sec.edgePoints[0] : ((sec.edgePoints && sec.edgePoints[1]) ? sec.edgePoints[1] : null);
 
       if (isNorthSouthExp) {
         speedLimit = 110; // Скоростная автомагистраль Север-Юг (Севан, Арташат)
@@ -655,6 +710,7 @@ function parseYandexRoutes(yRoutes, laneIntersections = []) {
         action: actionVal,
         modifier: modifier,
         type: type,
+        exit, // roundabout exit number (LEAVE_ROUNDABOUT, copied onto ENTER_ROUNDABOUT below) or null
         distance: sec.distance?.value || 0,
         duration: sec.durationInTraffic?.value || sec.duration?.value || 0,
         location: loc, // [lng, lat]
@@ -662,6 +718,16 @@ function parseYandexRoutes(yRoutes, laneIntersections = []) {
         speedLimitSource: 'estimated' // street-name heuristic, not map data
       };
     });
+
+    // A roundabout comes as ENTER_ROUNDABOUT (short, on the ring) + LEAVE_ROUNDABOUT ("take the
+    // 2nd exit"). The driver needs the exit and the street after it already when approaching
+    for (let i = 0; i + 1 < steps.length; i++) {
+      if (steps[i].action.includes('ENTER_ROUNDABOUT') && steps[i + 1].action.includes('LEAVE_ROUNDABOUT')) {
+        steps[i].exit = steps[i + 1].exit;
+        steps[i].exitStreet = steps[i + 1].name || '';
+        if (steps[i].exit) steps[i].instruction = `На круговом движении ${steps[i].exit}-й съезд`;
+      }
+    }
 
     // Collect street names along route
     const cleanStreets = (rawSections.map(s => s.street).filter(Boolean).filter((v, i, a) => a.indexOf(v) === i))
