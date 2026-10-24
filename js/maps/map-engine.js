@@ -17,7 +17,7 @@ const LANE_TURN_INDICATIONS = {
   right: [['right', 'sharp right'], ['slight right']],
   'slight left': [['slight left'], ['left'], ['straight', 'none']],   // straight: only lanes without a
   'slight right': [['slight right'], ['right'], ['straight', 'none']], // turn to the other side, see below
-  straight: [['straight'], ['none', 'slight left', 'slight right']],
+  straight: [['straight'], ['none'], ['slight left', 'slight right']], // 'none' = unmarked, goes straight
   'u-turn': [['uturn'], ['left', 'sharp left']]
 };
 

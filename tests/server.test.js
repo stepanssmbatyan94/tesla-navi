@@ -309,3 +309,17 @@ test('ru/en voices come from Google Cloud TTS with the right voice, cached per v
     delete process.env.GOOGLE_TTS_ACCESS_TOKEN;
   }
 });
+
+test('/api/version names the running revision and is never cached', async () => {
+  const { server } = require('../server.js');
+  await new Promise(resolve => server.listen(0, resolve));
+  try {
+    const res = await fetch(`http://127.0.0.1:${server.address().port}/api/version`);
+    assert.equal(res.headers.get('cache-control'), 'no-store');
+    const { version } = await res.json();
+    assert.ok(typeof version === 'string' && version.length > 3);
+  } finally {
+    server.closeAllConnections();
+    await new Promise(resolve => server.close(resolve));
+  }
+});

@@ -339,3 +339,12 @@ test('lanes: a fork without its own arrows and a junction node past the maneuver
   for (let x = 0; x <= 300; x += 10) driveTo(engine, x);
   assert.equal(active(maneuvers.at(-1).lanes), '011', 'the turn\'s own lanes, not straight');
 });
+
+test('lanes: unmarked lanes are the straight ones when no lane says straight', () => {
+  const { ctx } = newEngine();
+  const highlight = get(ctx, 'highlightLanesForTurn');
+  const lanes = inds => inds.map(i => ({ indications: i.split(';'), valid: true }));
+  const active = ls => JSON.parse(JSON.stringify(ls)).map(l => (l.valid ? 1 : 0)).join('');
+  assert.equal(active(highlight(lanes(['none', 'none', 'none', 'slight right']), 'straight')), '1110');
+  assert.equal(active(highlight(lanes(['slight left', 'slight right']), 'straight')), '11');
+});

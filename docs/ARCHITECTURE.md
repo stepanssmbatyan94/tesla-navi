@@ -167,6 +167,8 @@ Per position update (`updateCarPosition(lat, lng, heading, speedKmh, isRealFix)`
 
 Route rendering (MapLibre) uses a fixed set of sources/layers — alternatives, casing, one data-driven traffic layer, traveled line — and is replayed after day/night style swaps.
 
+Self-update: the car keeps the page open for days, so `checkForAppUpdate` polls `/api/version` every 2 minutes and reloads after a deploy once idle (no route, no music, not typing).
+
 ## 6. Deployment topology
 
 ```mermaid
@@ -217,6 +219,6 @@ Heuristic data that remains, and how it is presented: speed limits where OSM has
 ## 10. Testing strategy
 
 - `npm run check` — syntax.
-- `npm test` — 39 `node:test` unit tests, no network: server parsing (links, protobuf URIs, `parseYandexRoutes`), Armenian clip mapping, allowlist, rate limit, upstream timeout, OSM speed-limit matching and legal defaults; the map engine loaded in a `vm` with DOM stubs (maneuver = `steps[k+1]`, sign kept until the junction, silent preview, voice text, lane matching, speed-limit priority camera > OSM > legal default > estimate); realtime dedup and pairing codes; cockpit traffic-hint language.
+- `npm test` — 42 `node:test` unit tests, no network: server parsing (links, protobuf URIs, `parseYandexRoutes`), Armenian clip mapping, allowlist, rate limit, upstream timeout, OSM speed-limit matching and legal defaults; the map engine loaded in a `vm` with DOM stubs (maneuver = `steps[k+1]`, sign kept until the junction, silent preview, voice text, lane matching, speed-limit priority camera > OSM > legal default > estimate); realtime dedup and pairing codes; cockpit traffic-hint language.
 - `npm run verify` — 11 headless Chrome checks against a local server with live upstreams: smoke, maneuver vs. geometry (sign sampled down to 5 m before each turn), speed-limit sign vs. OSM, route layers + theme swap, XSS through the pairing channel, dual GPS, translations, Yandex provider, MapLibre-CDN-blocked and no-WebGL fallbacks, phone remote. See [playbooks/verify.md](playbooks/verify.md).
 - CI (`.github/workflows/ci.yml`): check + unit tests block merges; browser checks run but don't block (live upstreams from GitHub's network).

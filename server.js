@@ -134,6 +134,8 @@ async function synthesizeNeuralSpeech(text, voiceChoice = 'auto', lang = 'ru') {
 }
 
 const PORT = process.env.PORT || 8085;
+// Cloud Run names every deploy (K_REVISION); locally each server start is a new version
+const APP_VERSION = process.env.K_REVISION || `local-${Date.now()}`;
 
 const MIME_TYPES = {
   '.html': 'text/html; charset=utf-8',
@@ -1256,6 +1258,13 @@ const server = http.createServer(async (req, res) => {
       res.writeHead(500, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ error: e.message }));
     }
+    return;
+  }
+
+  // API: /api/version (the deployed revision: the car page reloads itself when it changes)
+  if (pathname === '/api/version') {
+    res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
+    res.end(JSON.stringify({ version: APP_VERSION }));
     return;
   }
 
