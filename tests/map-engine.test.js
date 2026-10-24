@@ -142,7 +142,7 @@ test('OSRM lane junctions are kept only on the route and in the same direction',
 test('speed limit: a route camera ahead is verified, otherwise the step limit is an estimate', () => {
   const { engine, maneuvers } = newEngine();
   engine.applyRouteData(routeData(), DEST, 0);
-  engine.routeCameras = [{ type: 'camera', limit: 40, routeDist: 650 }];
+  engine.routeCameras = [{ type: 'camera', limit: 40, routeDist: 550 }];
   engine.isNavigating = true;
   driveTo(engine, 100);
   driveTo(engine, 150);

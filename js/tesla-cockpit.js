@@ -2470,6 +2470,8 @@ function cancelActiveNavigation() {
 }
 
 function showArrivalModal(dest) {
+  // Navigation is over: a camera limit from the route must not keep driving the overspeed chime
+  setSpeedLimitDisplay(null, 'estimated');
   document.body.classList.remove('navigating');
   document.body.classList.remove('route-options-open');
   document.getElementById('quick-dest-bar')?.classList.remove('hidden');

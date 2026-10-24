@@ -16,8 +16,9 @@ const MAP_LIBRARY_TIMEOUT_MS = 10000;
 // Route/progress color when there is no traffic information
 const NO_TRAFFIC_COLOR = '#3b82f6';
 
-// Window around a route speed camera in which its limit counts as the verified limit
-const CAMERA_LIMIT_AHEAD_M = 400;
+// Window around a route speed camera in which its limit counts as the verified limit.
+// Kept short: before the zone the road may allow more, and the voice alert already fires at 350 m.
+const CAMERA_LIMIT_AHEAD_M = 200;
 const CAMERA_LIMIT_BEHIND_M = 50;
 
 function loadExternalScript(src, timeoutMs = MAP_LIBRARY_TIMEOUT_MS) {
