@@ -40,7 +40,9 @@
       const ahead = me.getPositionAtDistance(d + 80);
       probe.geometry.setCoordinates([ahead.lat, ahead.lng]);
       // Yandex redraws placemarks asynchronously and the rotor turns with a 0.3 s transition:
-      // measure until the screen positions stop moving (slow CI machines need longer)
+      // measure until the screen positions stop moving (slow CI machines need longer). The dev
+      // simulator's extrapolator would keep moving the car meanwhile: pause it while measuring
+      window.IS_SIMULATOR_RUNNING = false;
       let car, pr, angle, prev = null;
       for (let i = 0; i < 25; i++) {
         await sleep(i ? 150 : 400);
@@ -50,6 +52,7 @@
         if (prev && Math.abs(angle - prev.angle) < 0.5 && Math.abs(car.y - prev.y) < 1) break;
         prev = { angle, y: car.y };
       }
+      window.IS_SIMULATOR_RUNNING = true;
       const cp = me.currentPosition;
       const expected = me.calculateBearing(cp.lat, cp.lng, ahead.lat, ahead.lng) - me.currentHeading;
       const off = Math.abs(((angle - expected) % 360 + 540) % 360 - 180);

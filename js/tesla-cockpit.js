@@ -180,7 +180,7 @@ function applyLanguage(lang) {
   });
   // the traffic badge title carries the live score and hint, not just its label
   const trafficBadgeEl = document.getElementById('traffic-score-badge');
-  if (trafficBadgeEl && liveTrafficData) trafficBadgeEl.title = trafficBadgeTitle(liveTrafficData, lang);
+  if (trafficBadgeEl) trafficBadgeEl.title = liveTrafficData ? trafficBadgeTitle(liveTrafficData, lang) : (trafficBadgeEl.textContent === '—' ? dict.trafficUnavailable : trafficBadgeEl.title);
   // camera markers already on the map (MapLibre) carry their limit for the same reason
   document.querySelectorAll('.camera-map-badge[data-limit]').forEach(el => { el.title = speedCameraTitle(el.dataset.limit); });
 
@@ -611,7 +611,6 @@ function trafficBadgeTitle(data, lang) {
 async function updateLiveTrafficBadge() {
   const badge = document.getElementById('traffic-score-badge');
   if (!badge) return;
-  const dict = I18N[window.CURRENT_LANG || 'ru'] || I18N.ru;
 
   const curLat = mapEngine?.currentPosition?.lat;
   const curLng = mapEngine?.currentPosition?.lng;
@@ -633,7 +632,9 @@ async function updateLiveTrafficBadge() {
     console.warn('Traffic score fetch error:', e);
   }
 
-  // No live score here (outside Yerevan or Yandex unavailable): show that, never a guess
+  // No live score here (outside Yerevan or Yandex unavailable): show that, never a guess.
+  // The language is read now, not before the fetch: it may have been switched meanwhile
+  const dict = I18N[window.CURRENT_LANG || 'ru'] || I18N.ru;
   badge.textContent = '—';
   badge.style.background = '#94a3b8';
   badge.style.boxShadow = 'none';
@@ -2142,12 +2143,14 @@ function showRouteAlternativesDrawer(route) {
   if (route.steps && route.steps.length > 0) {
     route.steps.forEach(step => {
       let icon = '↑';
-      if (step.modifier && step.modifier.includes('left')) icon = '↰';
-      else if (step.modifier && step.modifier.includes('right')) icon = '↱';
-      else if (step.modifier && step.modifier.includes('uturn')) icon = '↺';
+      const mod = step.modifier || '';
+      if (mod.includes('roundabout')) icon = step.exit ? `⟳${step.exit}` : '⟳';
+      else if (mod.includes('u-turn') || mod.includes('uturn')) icon = '↺';
+      else if (mod.includes('left')) icon = '↰';
+      else if (mod.includes('right')) icon = '↱';
 
       const distStr = mapEngine ? mapEngine.formatNavDistance(step.distance) : `${Math.round(step.distance)} м`;
-      const localizedInstruction = mapEngine ? mapEngine.formatStepInstruction(step.modifier, step.name) : (step.instruction || step.name);
+      const localizedInstruction = mapEngine ? mapEngine.formatStepInstruction(step.modifier, step.exitStreet || step.name, step.exit) : (step.instruction || step.name);
       const item = document.createElement('div');
       item.className = 'turn-step-item';
       item.innerHTML = `
@@ -2241,7 +2244,9 @@ function updateManeuverHud(m) {
 
   let svgIcon = '';
   if (type === 'roundabout' || mod.includes('roundabout')) {
-    svgIcon = `<svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="7"/><polyline points="15 5 12 2 9 5"/></svg>`;
+    // the exit number sits inside the ring (Number(): it comes from the route data)
+    const exitNo = Number(m.exit) > 0 ? `<text x="12" y="15.5" text-anchor="middle" font-size="10" font-weight="800" fill="currentColor" stroke="none" font-family="Arial, sans-serif">${Number(m.exit)}</text>` : '';
+    svgIcon = `<svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="7"/><polyline points="15 5 12 2 9 5"/>${exitNo}</svg>`;
   } else if (mod.includes('uturn') || mod.includes('u-turn')) {
     svgIcon = `<svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 19v-9a6 6 0 0 0-12 0v9"/><polyline points="9 16 6 19 3 16"/></svg>`;
   } else if (mod.includes('slight left') || mod.includes('fork left') || mod.includes('keep left') || mod.includes('bear left') || mod.includes('левее')) {

@@ -245,3 +245,30 @@ test('a fix that arrives during a lookup is looked up right after it, not droppe
   assert.match(requests[1], new RegExp(`lat=${far.lat.toFixed(6)}`));
   release();
 });
+
+test('roundabouts: exit number in text and voice (never "continue straight"), one prompt per roundabout', () => {
+  const { ctx, engine, maneuvers, spoken } = newEngine();
+  ctx.CURRENT_LANG = 'ru';
+  assert.equal(engine.getTurnSpeech('roundabout', 2), 'На круговом движении 2-й съезд');
+  assert.equal(engine.getTurnSpeech('roundabout', null), 'Круговое движение');
+  ctx.CURRENT_LANG = 'hy';
+  assert.equal(engine.getTurnSpeech('roundabout', 1), 'Շրջանաձև երթևեկությունում դուրս եկեք առաջին ելքով');
+  ctx.CURRENT_LANG = 'en';
+  assert.equal(engine.formatStepInstruction('roundabout', 'Tigran Mets Avenue', 3), 'At the roundabout, take exit 3 onto Tigran Mets Avenue');
+
+  // straight 400 m, roundabout (ENTER 30 m on the ring + LEAVE 3rd exit), then on
+  engine.applyRouteData(routeData({ steps: [
+    { name: 'Start Street', modifier: 'straight', action: 'STRAIGHT', distance: 400, location: [COORDS[0][0], LAT] },
+    { name: 'Ring', modifier: 'roundabout', type: 'roundabout', action: 'ENTER_ROUNDABOUT', exit: 3, exitStreet: 'Exit Avenue', distance: 30, location: [at(400).lng, LAT] },
+    { name: 'Exit Avenue', modifier: 'roundabout', type: 'roundabout', action: 'LEAVE_ROUNDABOUT', exit: 3, distance: 570, location: [at(430).lng, LAT] }
+  ] }), DEST, 0);
+  engine.isNavigating = true;
+  engine.voiceEnabled = true;
+  for (let m = 0; m <= 440; m += 10) driveTo(engine, m);
+  const approaching = maneuvers.find(x => x.distanceMeters > 100 && x.distanceMeters < 300);
+  assert.deepEqual([approaching.modifier, approaching.exit, approaching.street], ['roundabout', 3, 'Exit Avenue']);
+  const roundaboutPrompts = spoken.filter(t => /roundabout|exit 3/i.test(t));
+  assert.ok(roundaboutPrompts.length >= 1 && roundaboutPrompts.every(t => /exit 3/.test(t)), JSON.stringify(spoken));
+  assert.ok(!spoken.some(t => /straight/i.test(t)), JSON.stringify(spoken));
+  assert.equal(spoken.filter(t => /^At the roundabout, take exit 3$/.test(t)).length, 1, 'no second prompt on the ring');
+});
