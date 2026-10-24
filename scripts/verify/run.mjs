@@ -21,13 +21,19 @@ const PORT = Number(process.env.VERIFY_PORT || 8199);
 const BASE = `http://localhost:${PORT}`;
 const CHECK_TIMEOUT_MS = 120000;
 
-// Which page each check runs on
+// Each check: the page it runs on, its script, and optional browser setup
+// (requests to block, extra Chrome flags -> its own browser instance)
 const CHECKS = {
-  smoke: '/',
-  maneuvers: '/',
-  'route-layers': '/',
-  security: '/',
-  phone: '/phone'
+  smoke: { page: '/' },
+  maneuvers: { page: '/' },
+  'route-layers': { page: '/' },
+  security: { page: '/' },
+  'dual-gps': { page: '/' },
+  i18n: { page: '/' },
+  yandex: { page: '/?provider=yandex' },
+  'fallback-cdn': { page: '/', file: 'fallback', block: ['**/maplibre-gl*.js'] },
+  'fallback-webgl': { page: '/', file: 'fallback', args: ['--disable-webgl', '--disable-3d-apis'] },
+  phone: { page: '/phone' }
 };
 
 const requested = process.argv.slice(2).filter(a => !a.startsWith('-'));
@@ -60,23 +66,31 @@ const server = spawn(process.execPath, ['server.js'], {
 let serverStderr = '';
 server.stderr.on('data', d => { serverStderr += d; });
 
+function launchBrowser(args = []) {
+  return chromium.launch(process.env.CHROME_PATH
+    ? { executablePath: process.env.CHROME_PATH, headless: true, args }
+    : { channel: 'chrome', headless: true, args });
+}
+
 let browser;
 let failed = 0;
 try {
   await waitForServer(`${BASE}/`);
-  browser = await chromium.launch(process.env.CHROME_PATH
-    ? { executablePath: process.env.CHROME_PATH, headless: true }
-    : { channel: 'chrome', headless: true });
+  browser = await launchBrowser();
 
   for (const name of selected) {
-    const context = await browser.newContext({ viewport: { width: 1600, height: 1000 } });
+    const spec = CHECKS[name];
+    const ownBrowser = spec.args ? await launchBrowser(spec.args) : null;
+    const context = await (ownBrowser || browser).newContext({ viewport: { width: 1600, height: 1000 } });
     const page = await context.newPage();
+    for (const pattern of spec.block || []) await page.route(pattern, route => route.abort());
     const code = `VERIFY${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
     const started = Date.now();
     let result;
     try {
-      await page.goto(`${BASE}${CHECKS[name]}?code=${code}`, { waitUntil: 'load' });
-      const script = readFileSync(path.join(ROOT, 'scripts/verify/checks', `${name}.js`), 'utf8');
+      const sep = spec.page.includes('?') ? '&' : '?';
+      await page.goto(`${BASE}${spec.page}${sep}code=${code}`, { waitUntil: 'load' });
+      const script = readFileSync(path.join(ROOT, 'scripts/verify/checks', `${spec.file || name}.js`), 'utf8');
       result = await Promise.race([
         page.evaluate(script),
         new Promise((_, reject) => setTimeout(() => reject(new Error(`timed out after ${CHECK_TIMEOUT_MS / 1000}s`)), CHECK_TIMEOUT_MS))
@@ -85,6 +99,7 @@ try {
       result = { pass: false, error: String(err && err.message || err) };
     }
     await context.close();
+    if (ownBrowser) await ownBrowser.close();
     const seconds = ((Date.now() - started) / 1000).toFixed(1);
     if (!result || result.pass !== true) failed++;
     console.log(`${result && result.pass === true ? 'PASS' : 'FAIL'}  ${name}  (${seconds}s)`);

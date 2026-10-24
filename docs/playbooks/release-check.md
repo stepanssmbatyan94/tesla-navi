@@ -6,6 +6,7 @@ Run against the diff you are about to ship and report a short PASS/FAIL list. Fi
 
 ```bash
 npm run check
+npm test
 npm run verify            # or the subset from verify.md, always including smoke
 ```
 
@@ -29,7 +30,7 @@ git diff -U0 $R -- 'js/*' | grep -nE '^\+.*\$\{[^}]*\}' | grep -vE 'escapeHtml|d
 # swallowed errors
 git diff -U0 $R | grep -nE '^\+.*catch \((e|err)\) \{\s*\}'
 # likely fake data: hardcoded counts/times/availability in UI strings
-git diff -U0 $R -- 'js/*' | grep -nE '^\+.*(свободно|светофор|спутник|мс`|ms`|\b[0-9]{1,2}:[0-9]{2}\b)'
+git diff -U0 $R -- 'js/*' index.html phone.html | grep -nE '^\+.*(свободно|светофор|спутник|мс`|ms`|[0-9]{2}%|\b[0-9]{1,2}:[0-9]{2}\b)'
 # user-visible Russian strings outside I18N
 git diff -U0 $R -- js/tesla-cockpit.js js/maps/map-engine.js | grep -nE "^\+.*['\`][А-Яа-я][^'\`]{3,}['\`]" | grep -v console
 ```
