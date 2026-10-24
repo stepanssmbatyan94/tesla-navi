@@ -180,7 +180,7 @@ function applyLanguage(lang) {
   });
   // the traffic badge title carries the live score and hint, not just its label
   const trafficBadgeEl = document.getElementById('traffic-score-badge');
-  if (trafficBadgeEl && liveTrafficData) trafficBadgeEl.title = trafficBadgeTitle(liveTrafficData, lang);
+  if (trafficBadgeEl) trafficBadgeEl.title = liveTrafficData ? trafficBadgeTitle(liveTrafficData, lang) : (trafficBadgeEl.textContent === '—' ? dict.trafficUnavailable : trafficBadgeEl.title);
   // camera markers already on the map (MapLibre) carry their limit for the same reason
   document.querySelectorAll('.camera-map-badge[data-limit]').forEach(el => { el.title = speedCameraTitle(el.dataset.limit); });
 
@@ -611,7 +611,6 @@ function trafficBadgeTitle(data, lang) {
 async function updateLiveTrafficBadge() {
   const badge = document.getElementById('traffic-score-badge');
   if (!badge) return;
-  const dict = I18N[window.CURRENT_LANG || 'ru'] || I18N.ru;
 
   const curLat = mapEngine?.currentPosition?.lat;
   const curLng = mapEngine?.currentPosition?.lng;
@@ -633,7 +632,9 @@ async function updateLiveTrafficBadge() {
     console.warn('Traffic score fetch error:', e);
   }
 
-  // No live score here (outside Yerevan or Yandex unavailable): show that, never a guess
+  // No live score here (outside Yerevan or Yandex unavailable): show that, never a guess.
+  // The language is read now, not before the fetch: it may have been switched meanwhile
+  const dict = I18N[window.CURRENT_LANG || 'ru'] || I18N.ru;
   badge.textContent = '—';
   badge.style.background = '#94a3b8';
   badge.style.boxShadow = 'none';
