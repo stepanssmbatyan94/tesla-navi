@@ -125,3 +125,19 @@ test('clientIp uses the address Cloud Run appends, not client-supplied X-Forward
   assert.equal(clientIp({ headers: { 'x-forwarded-for': 'forged-1, forged-2, 203.0.113.7' }, socket: {} }), '203.0.113.7');
   assert.equal(clientIp({ headers: {}, socket: { remoteAddress: '::1' } }), '::1');
 });
+
+test('/api/route rejects missing or non-numeric coordinates before calling upstreams', async () => {
+  const { server } = require('../server.js');
+  await new Promise(resolve => server.listen(0, resolve));
+  const base = `http://127.0.0.1:${server.address().port}/api/route`;
+  try {
+    for (const query of ['', '?startLat=40.19&startLng=44.51&destLat=40.17', '?startLat=1/../x&startLng=44.51&destLat=40.17&destLng=44.51', '?startLat=95&startLng=44.51&destLat=40.17&destLng=44.51']) {
+      const res = await fetch(base + query);
+      assert.equal(res.status, 400, query);
+      assert.match((await res.json()).error, /coordinates/);
+    }
+  } finally {
+    server.closeAllConnections();
+    await new Promise(resolve => server.close(resolve));
+  }
+});

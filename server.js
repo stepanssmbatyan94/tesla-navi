@@ -789,15 +789,20 @@ const server = http.createServer(async (req, res) => {
 
   // API 3: /api/route (Lane-accurate OpenStreetMap OSRM routing for MapLibre + Yandex Live Router for Yandex provider)
   if (pathname === '/api/route') {
-    const startLat = parsedUrl.searchParams.get('startLat');
-    const startLng = parsedUrl.searchParams.get('startLng');
-    const destLat = parsedUrl.searchParams.get('destLat');
-    const destLng = parsedUrl.searchParams.get('destLng');
-    const provider = parsedUrl.searchParams.get('provider') || 'maplibre';
+    // Parsed as numbers: the values are interpolated into upstream OSRM/Yandex URLs
+    const coord = name => {
+      const raw = parsedUrl.searchParams.get(name);
+      return raw === null || raw.trim() === '' ? NaN : Number(raw);
+    };
+    const startLat = coord('startLat');
+    const startLng = coord('startLng');
+    const destLat = coord('destLat');
+    const destLng = coord('destLng');
 
-    if (!startLat || !startLng || !destLat || !destLng) {
+    if (![startLat, startLng, destLat, destLng].every(Number.isFinite) ||
+        Math.abs(startLat) > 90 || Math.abs(destLat) > 90 || Math.abs(startLng) > 180 || Math.abs(destLng) > 180) {
       res.writeHead(400, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ error: 'Missing coordinates' }));
+      res.end(JSON.stringify({ error: 'Missing or invalid coordinates' }));
       return;
     }
 
