@@ -154,8 +154,8 @@ async function resolveMapLinkRedirects(startUrl, maxHops = 5) {
 // hold the client request (and a Cloud Run slot) until the platform's 300 s timeout
 const UPSTREAM_TIMEOUT_MS = 12000;
 
-function fetchUpstream(url, options = {}) {
-  return fetch(url, { ...options, signal: options.signal || AbortSignal.timeout(UPSTREAM_TIMEOUT_MS) });
+function fetchUpstream(url, options = {}, timeoutMs = UPSTREAM_TIMEOUT_MS) {
+  return fetch(url, { ...options, signal: options.signal || AbortSignal.timeout(timeoutMs) });
 }
 
 // Per-client token bucket for /api/*: the scraping endpoints are expensive and can get the
@@ -211,32 +211,6 @@ function extractCoords(str) {
 
   return null;
 }
-
-const server = http.createServer(async (req, res) => {
-  const parsedUrl = new URL(req.url, `http://${req.headers.host}`);
-  let pathname = parsedUrl.pathname;
-
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-
-  if (req.method === 'OPTIONS') {
-    res.writeHead(204);
-    res.end();
-    return;
-  }
-
-  if (pathname.startsWith('/api/') && !takeRateToken(clientIp(req))) {
-    res.writeHead(429, { 'Content-Type': 'application/json', 'Retry-After': '5' });
-    res.end(JSON.stringify({ error: 'Too many requests' }));
-    return;
-  }
-
-  if (pathname === '/favicon.ico') {
-    res.writeHead(204);
-    res.end();
-    return;
-  }
 
 // Helper: Parse coordinates directly from Yandex Maps protobuf URI
 function parseYandexGeoUri(uri) {
@@ -337,6 +311,249 @@ async function fetchYandexSuggestResults(q, userLng = 44.5125, userLat = 40.1776
   return results;
 }
 
+// Authentic Armenian Neural Voice Pack (Gor & Suzie - High-Fidelity Eastern Armenian)
+function getArmenianAudio(text, voiceChoice = 'gor') {
+  const t = (text || '').toLowerCase().trim();
+  const v = (voiceChoice || '').toLowerCase();
+  const folder = (v === 'suzie' || v === 'female' || v === 'svetlana' || v === 'ava') ? 'suzie' : 'gor';
+
+  // Unknown phrases get no clip (the caller answers 404) instead of replaying the greeting
+  let file = null;
+  const is250 = t.includes('250') || t.includes('հիսուն');
+
+  if (t.includes('կառուցված') || t.includes('գնացինք') || t === 'route_start') {
+    file = 'route_start.mp3';
+  } else if ((t.includes('հետադարձ') && is250) || t === 'dist_250_uturn') {
+    file = 'dist_250_uturn.mp3';
+  } else if (t.includes('հետադարձ') || t === 'uturn') {
+    file = 'uturn.mp3';
+  } else if ((t.includes('պահեք ձախ') && is250) || t === 'dist_250_keep_left') {
+    file = 'dist_250_keep_left.mp3';
+  } else if ((t.includes('պահեք աջ') && is250) || t === 'dist_250_keep_right') {
+    file = 'dist_250_keep_right.mp3';
+  } else if ((t.includes('ձախ') && (t.includes('250') || t.includes('հիսուն'))) || t === 'dist_250_left') {
+    file = 'dist_250_left.mp3';
+  } else if ((t.includes('աջ') && (t.includes('250') || t.includes('հիսուն'))) || t === 'dist_250_right') {
+    file = 'dist_250_right.mp3';
+  } else if ((t.includes('ուղիղ') && (t.includes('250') || t.includes('հիսուն'))) || t === 'dist_250_straight') {
+    file = 'dist_250_straight.mp3';
+  } else if ((t.includes('ձախ') && (t.includes('500') || t.includes('հարյուր'))) || t === 'dist_500_left') {
+    file = 'dist_500_left.mp3';
+  } else if ((t.includes('աջ') && (t.includes('500') || t.includes('հարյուր'))) || t === 'dist_500_right') {
+    file = 'dist_500_right.mp3';
+  } else if (t.includes('պահեք ձախ') || t === 'keep_left') {
+    file = 'keep_left.mp3';
+  } else if (t.includes('պահեք աջ') || t === 'keep_right') {
+    file = 'keep_right.mp3';
+  } else if (t.includes('ձախ') || t === 'turn_left') {
+    file = 'turn_left.mp3';
+  } else if (t.includes('աջ') || t === 'turn_right') {
+    file = 'turn_right.mp3';
+  } else if (t.includes('ուղիղ') || t === 'straight') {
+    file = 'straight.mp3';
+  } else if (t.includes('վերահաշվարկ') || t === 'rerouting') {
+    file = 'rerouting.mp3';
+  } else if (t.includes('հասել եք') || t.includes('նպատակակետ') || t === 'arrived') {
+    file = 'arrived.mp3';
+  } else if (t.includes('տեսախցիկ') || t.includes('արագաչափ') || t.includes('կամերա') || t === 'camera_ahead') {
+    file = 'camera_ahead.mp3';
+  } else if (t.includes('արագություն') || t === 'speed_limit') {
+    file = 'speed_limit.mp3';
+  } else if (t.includes('ընտրված') || t === 'voice_switched') {
+    file = 'voice_switched.mp3';
+  } else if (t.includes('գոռն') || t.includes('սյուզի') || t.includes('բարև') || t === 'welcome') {
+    file = 'welcome.mp3';
+  }
+
+  if (!file) return null;
+
+  let filePath = path.join(__dirname, 'sounds', 'hy', folder, file);
+  if (!fs.existsSync(filePath)) {
+    filePath = path.join(__dirname, 'sounds', 'hy', 'gor', file);
+  }
+  if (!fs.existsSync(filePath)) {
+    filePath = path.join(__dirname, 'sounds', 'hy', file);
+  }
+  if (fs.existsSync(filePath)) {
+    return fs.readFileSync(filePath);
+  }
+  return null;
+}
+
+// Parse the routes embedded in the Yandex Maps routes page (config.routerResponse.routes)
+// into our route format: traffic-colored segments, steps (maneuver at the step START, see
+// AGENTS.md), heuristic speed limits and distinctive 'via' summaries, fastest first.
+function parseYandexRoutes(yRoutes, laneIntersections = []) {
+  const colors = {
+    'FREE': '#82ea0d',       // 100% Sampled Yandex Navigator Lime Green
+    'LIGHT': '#fbd42e',      // 100% Sampled Yandex Navigator Sunny Yellow
+    'HARD': '#ff4533',       // 100% Sampled Yandex Navigator Bright Red
+    'VERY_HARD': '#a80000',  // 100% Sampled Yandex Navigator Burgundy
+    'UNKNOWN': '#82ea0d'
+  };
+
+  const parsedRoutes = yRoutes.map((r, idx) => {
+    const coords = r.coordinates || [];
+    const colorize = r.colorizeInfo || [];
+    const segments = [];
+    let curIdx = 0;
+
+    for (const info of colorize) {
+      const nextIdx = Math.min(curIdx + info.count, coords.length);
+      const segCoords = coords.slice(curIdx, nextIdx + 1);
+      if (segCoords.length >= 2) {
+        segments.push({
+          type: info.type,
+          color: colors[info.type] || '#22c55e',
+          coords: segCoords // [[lng, lat], ...]
+        });
+      }
+      curIdx = nextIdx;
+    }
+
+    // Parse turn-by-turn navigation steps from Yandex paths segments
+    const rawSections = (r.paths && r.paths[0] && r.paths[0].segments) ? r.paths[0].segments : (r.sections || []);
+    const steps = rawSections.map((sec, sIdx) => {
+      const actionVal = (sec.action?.value || sec.action?.text || '').toUpperCase();
+      let modifier = 'straight';
+      let type = 'turn';
+
+      const isSlightOrKeep = actionVal.includes('SLIGHT') || actionVal.includes('KEEP') || actionVal.includes('BEAR') || actionVal.includes('FORK') || actionVal.includes('EXIT') || actionVal.includes('MERGE') || actionVal.includes('ЛЕВЕЕ') || actionVal.includes('ПРАВЕЕ') || actionVal.includes('ПЛАВН');
+
+      if (actionVal.includes('UTURN') || actionVal.includes('РАЗВОРОТ')) {
+        modifier = 'u-turn';
+      } else if (actionVal.includes('ROUNDABOUT') || actionVal.includes('КРУГ')) {
+        modifier = 'roundabout';
+        type = 'roundabout';
+      } else if (actionVal.includes('LEFT') || actionVal.includes('ЛЕВЕЕ')) {
+        modifier = isSlightOrKeep ? 'slight left' : 'left';
+      } else if (actionVal.includes('RIGHT') || actionVal.includes('ПРАВЕЕ')) {
+        modifier = isSlightOrKeep ? 'slight right' : 'right';
+      } else {
+        modifier = 'straight';
+      }
+
+      const rawStreet = (sec.street || '').trim();
+      const isValidStreet = rawStreet.length > 2 && !/^(straight|right|left|roundabout|u-turn|fork)/i.test(rawStreet);
+      const streetName = isValidStreet ? rawStreet : '';
+
+      // Authentic turn instruction (clean Russian voice grammar)
+      let instruction = 'Двигайтесь прямо';
+      if (modifier === 'slight left') instruction = streetName ? `Держитесь левее на ${streetName}` : 'Держитесь левее';
+      else if (modifier === 'slight right') instruction = streetName ? `Держитесь правее на ${streetName}` : 'Держитесь правее';
+      else if (modifier === 'left') instruction = streetName ? `Поверните налево на ${streetName}` : 'Поверните налево';
+      else if (modifier === 'right') instruction = streetName ? `Поверните направо на ${streetName}` : 'Поверните направо';
+      else if (modifier === 'u-turn') instruction = 'Развернитесь';
+      else if (modifier === 'roundabout') instruction = 'Круговое движение';
+      else if (streetName) instruction = `Двигайтесь по ${streetName}`;
+
+      // Determine speed limit for this section (ПДД РА + знаки магистралей)
+      let speedLimit = 60; // Стандарт по ПДД Армении в черте населенных пунктов
+      const streetLower = (streetName || '').toLowerCase();
+      const isNorthSouthExp = /север-юг|north-south|\bm-1\b|\bm-2\b/i.test(streetLower);
+      const isHwy = /highway|трасса|шоссе|\bh-\d+|\bm-\d+/i.test(streetLower);
+      const isFastAvenue = /исаков|isakov|сараландж|saralanj|багреванд|bagrevand|давиташен|davitashen/i.test(streetLower);
+      // The section's action is performed where the section STARTS (edgePoints[0])
+      const loc = (sec.edgePoints && sec.edgePoints[0]) ? sec.edgePoints[0] : ((sec.edgePoints && sec.edgePoints[1]) ? sec.edgePoints[1] : null);
+
+      if (isNorthSouthExp) {
+        speedLimit = 110; // Скоростная автомагистраль Север-Юг (Севан, Арташат)
+      } else if (isHwy) {
+        speedLimit = 90; // Загородная трасса / шоссе по ПДД РА
+      } else if (isFastAvenue) {
+        speedLimit = 70; // Специальные городские магистрали Еревана со знаками 70
+      } else if (loc) {
+        // Check distance from Yerevan center (40.1772, 44.5105)
+        const dLat = (loc[1] - 40.1772) * 111;
+        const dLng = (loc[0] - 44.5105) * 85;
+        const distCenter = Math.sqrt(dLat * dLat + dLng * dLng);
+        if (distCenter > 14) speedLimit = 90; // За пределами Еревана — трасса 90
+      }
+
+      return {
+        index: sIdx,
+        name: streetName,
+        instruction: instruction,
+        action: actionVal,
+        modifier: modifier,
+        type: type,
+        distance: sec.distance?.value || 0,
+        duration: sec.durationInTraffic?.value || sec.duration?.value || 0,
+        location: loc, // [lng, lat]
+        speedLimit: speedLimit,
+        speedLimitSource: 'estimated' // street-name heuristic, not map data
+      };
+    });
+
+    // Collect street names along route
+    const cleanStreets = (rawSections.map(s => s.street).filter(Boolean).filter((v, i, a) => a.indexOf(v) === i))
+      .filter(st => st.length > 3 && !/^(straight|right|left|roundabout|u-turn|подъезд|двор)/i.test(st));
+
+    return {
+      index: idx,
+      cleanStreets: cleanStreets,
+      distance: r.distance?.value || 0,
+      duration: r.durationInTraffic || r.duration || 0,
+      durationWithoutTraffic: r.duration || 0,
+      coordinates: coords, // [lng, lat]
+      segments: segments.length ? segments : [{ type: 'FREE', color: '#22c55e', coords }],
+      steps: steps,
+      laneIntersections: laneIntersections,
+      specialRoadPoints: r.specialRoadPoints || []
+    };
+  });
+
+  // Sort routes so the fastest route (lowest duration) is guaranteed to be at index 0
+  parsedRoutes.sort((a, b) => a.duration - b.duration);
+
+  // Assign human-friendly distinctive summaries (e.g. "через ул. Теряна", "через просп. Мясникяна")
+  const usedViaStreets = new Set();
+  parsedRoutes.forEach((r, i) => {
+    r.index = i;
+    let via = '';
+    if (i === 0) {
+      // Primary fastest route: use major/longest street
+      via = r.cleanStreets.find(s => s.length > 7) || r.cleanStreets[1] || r.cleanStreets[0] || '';
+    } else {
+      // Alternative route: find the street that has not been used yet
+      via = r.cleanStreets.find(s => !usedViaStreets.has(s) && s.length > 4) ||
+            r.cleanStreets.find(s => s.length > 6) ||
+            r.cleanStreets[0] || '';
+    }
+    if (via) usedViaStreets.add(via);
+    r.summary = via ? `через ${via}` : `Маршрут ${i + 1}`;
+    delete r.cleanStreets; // Clean up temporary array
+  });
+
+  return parsedRoutes;
+}
+
+const server = http.createServer(async (req, res) => {
+  const parsedUrl = new URL(req.url, `http://${req.headers.host}`);
+  let pathname = parsedUrl.pathname;
+
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+
+  if (req.method === 'OPTIONS') {
+    res.writeHead(204);
+    res.end();
+    return;
+  }
+
+  if (pathname.startsWith('/api/') && !takeRateToken(clientIp(req))) {
+    res.writeHead(429, { 'Content-Type': 'application/json', 'Retry-After': '5' });
+    res.end(JSON.stringify({ error: 'Too many requests' }));
+    return;
+  }
+
+  if (pathname === '/favicon.ico') {
+    res.writeHead(204);
+    res.end();
+    return;
+  }
+
   // API 1: /api/resolve-location (Resolves Google Maps links, coordinates, or search queries)
   if (pathname === '/api/resolve-location') {
     const input = (parsedUrl.searchParams.get('url') || parsedUrl.searchParams.get('q') || '').trim();
@@ -431,75 +648,6 @@ async function fetchYandexSuggestResults(q, userLng = 44.5125, userLat = 40.1776
     }
     return;
   }
-
-// Authentic Armenian Neural Voice Pack (Gor & Suzie - High-Fidelity Eastern Armenian)
-function getArmenianAudio(text, voiceChoice = 'gor') {
-  const t = (text || '').toLowerCase().trim();
-  const v = (voiceChoice || '').toLowerCase();
-  const folder = (v === 'suzie' || v === 'female' || v === 'svetlana' || v === 'ava') ? 'suzie' : 'gor';
-
-  // Unknown phrases get no clip (the caller answers 404) instead of replaying the greeting
-  let file = null;
-  const is250 = t.includes('250') || t.includes('հիսուն');
-
-  if (t.includes('կառուցված') || t.includes('գնացինք') || t === 'route_start') {
-    file = 'route_start.mp3';
-  } else if ((t.includes('հետադարձ') && is250) || t === 'dist_250_uturn') {
-    file = 'dist_250_uturn.mp3';
-  } else if (t.includes('հետադարձ') || t === 'uturn') {
-    file = 'uturn.mp3';
-  } else if ((t.includes('պահեք ձախ') && is250) || t === 'dist_250_keep_left') {
-    file = 'dist_250_keep_left.mp3';
-  } else if ((t.includes('պահեք աջ') && is250) || t === 'dist_250_keep_right') {
-    file = 'dist_250_keep_right.mp3';
-  } else if ((t.includes('ձախ') && (t.includes('250') || t.includes('հիսուն'))) || t === 'dist_250_left') {
-    file = 'dist_250_left.mp3';
-  } else if ((t.includes('աջ') && (t.includes('250') || t.includes('հիսուն'))) || t === 'dist_250_right') {
-    file = 'dist_250_right.mp3';
-  } else if ((t.includes('ուղիղ') && (t.includes('250') || t.includes('հիսուն'))) || t === 'dist_250_straight') {
-    file = 'dist_250_straight.mp3';
-  } else if ((t.includes('ձախ') && (t.includes('500') || t.includes('հարյուր'))) || t === 'dist_500_left') {
-    file = 'dist_500_left.mp3';
-  } else if ((t.includes('աջ') && (t.includes('500') || t.includes('հարյուր'))) || t === 'dist_500_right') {
-    file = 'dist_500_right.mp3';
-  } else if (t.includes('պահեք ձախ') || t === 'keep_left') {
-    file = 'keep_left.mp3';
-  } else if (t.includes('պահեք աջ') || t === 'keep_right') {
-    file = 'keep_right.mp3';
-  } else if (t.includes('ձախ') || t === 'turn_left') {
-    file = 'turn_left.mp3';
-  } else if (t.includes('աջ') || t === 'turn_right') {
-    file = 'turn_right.mp3';
-  } else if (t.includes('ուղիղ') || t === 'straight') {
-    file = 'straight.mp3';
-  } else if (t.includes('վերահաշվարկ') || t === 'rerouting') {
-    file = 'rerouting.mp3';
-  } else if (t.includes('հասել եք') || t.includes('նպատակակետ') || t === 'arrived') {
-    file = 'arrived.mp3';
-  } else if (t.includes('տեսախցիկ') || t.includes('արագաչափ') || t.includes('կամերա') || t === 'camera_ahead') {
-    file = 'camera_ahead.mp3';
-  } else if (t.includes('արագություն') || t === 'speed_limit') {
-    file = 'speed_limit.mp3';
-  } else if (t.includes('ընտրված') || t === 'voice_switched') {
-    file = 'voice_switched.mp3';
-  } else if (t.includes('գոռն') || t.includes('սյուզի') || t.includes('բարև') || t === 'welcome') {
-    file = 'welcome.mp3';
-  }
-
-  if (!file) return null;
-
-  let filePath = path.join(__dirname, 'sounds', 'hy', folder, file);
-  if (!fs.existsSync(filePath)) {
-    filePath = path.join(__dirname, 'sounds', 'hy', 'gor', file);
-  }
-  if (!fs.existsSync(filePath)) {
-    filePath = path.join(__dirname, 'sounds', 'hy', file);
-  }
-  if (fs.existsSync(filePath)) {
-    return fs.readFileSync(filePath);
-  }
-  return null;
-}
 
   // API 1.5: /api/tts (STRICTLY Neural Studio Voice Synthesizer - 100% Non-Robotic)
   if (pathname === '/api/tts') {
@@ -691,149 +839,10 @@ function getArmenianAudio(text, voiceChoice = 'gor') {
         const yRoutes = stateData.config?.routerResponse?.routes;
 
         if (yRoutes && yRoutes.length > 0) {
-          const colors = {
-            'FREE': '#82ea0d',       // 100% Sampled Yandex Navigator Lime Green
-            'LIGHT': '#fbd42e',      // 100% Sampled Yandex Navigator Sunny Yellow
-            'HARD': '#ff4533',       // 100% Sampled Yandex Navigator Bright Red
-            'VERY_HARD': '#a80000',  // 100% Sampled Yandex Navigator Burgundy
-            'UNKNOWN': '#82ea0d'
-          };
-
           const osrmData = await osrmPromise;
           const laneIntersections = extractLaneIntersections(osrmData);
 
-          const parsedRoutes = yRoutes.map((r, idx) => {
-            const coords = r.coordinates || [];
-            const colorize = r.colorizeInfo || [];
-            const segments = [];
-            let curIdx = 0;
-
-            for (const info of colorize) {
-              const nextIdx = Math.min(curIdx + info.count, coords.length);
-              const segCoords = coords.slice(curIdx, nextIdx + 1);
-              if (segCoords.length >= 2) {
-                segments.push({
-                  type: info.type,
-                  color: colors[info.type] || '#22c55e',
-                  coords: segCoords // [[lng, lat], ...]
-                });
-              }
-              curIdx = nextIdx;
-            }
-
-            // Parse turn-by-turn navigation steps from Yandex paths segments
-            const rawSections = (r.paths && r.paths[0] && r.paths[0].segments) ? r.paths[0].segments : (r.sections || []);
-            const steps = rawSections.map((sec, sIdx) => {
-              const actionVal = (sec.action?.value || sec.action?.text || '').toUpperCase();
-              let modifier = 'straight';
-              let type = 'turn';
-
-              const isSlightOrKeep = actionVal.includes('SLIGHT') || actionVal.includes('KEEP') || actionVal.includes('BEAR') || actionVal.includes('FORK') || actionVal.includes('EXIT') || actionVal.includes('MERGE') || actionVal.includes('ЛЕВЕЕ') || actionVal.includes('ПРАВЕЕ') || actionVal.includes('ПЛАВН');
-
-              if (actionVal.includes('UTURN') || actionVal.includes('РАЗВОРОТ')) {
-                modifier = 'u-turn';
-              } else if (actionVal.includes('ROUNDABOUT') || actionVal.includes('КРУГ')) {
-                modifier = 'roundabout';
-                type = 'roundabout';
-              } else if (actionVal.includes('LEFT') || actionVal.includes('ЛЕВЕЕ')) {
-                modifier = isSlightOrKeep ? 'slight left' : 'left';
-              } else if (actionVal.includes('RIGHT') || actionVal.includes('ПРАВЕЕ')) {
-                modifier = isSlightOrKeep ? 'slight right' : 'right';
-              } else {
-                modifier = 'straight';
-              }
-
-              const rawStreet = (sec.street || '').trim();
-              const isValidStreet = rawStreet.length > 2 && !/^(straight|right|left|roundabout|u-turn|fork)/i.test(rawStreet);
-              const streetName = isValidStreet ? rawStreet : '';
-
-              // Authentic turn instruction (clean Russian voice grammar)
-              let instruction = 'Двигайтесь прямо';
-              if (modifier === 'slight left') instruction = streetName ? `Держитесь левее на ${streetName}` : 'Держитесь левее';
-              else if (modifier === 'slight right') instruction = streetName ? `Держитесь правее на ${streetName}` : 'Держитесь правее';
-              else if (modifier === 'left') instruction = streetName ? `Поверните налево на ${streetName}` : 'Поверните налево';
-              else if (modifier === 'right') instruction = streetName ? `Поверните направо на ${streetName}` : 'Поверните направо';
-              else if (modifier === 'u-turn') instruction = 'Развернитесь';
-              else if (modifier === 'roundabout') instruction = 'Круговое движение';
-              else if (streetName) instruction = `Двигайтесь по ${streetName}`;
-
-              // Determine speed limit for this section (ПДД РА + знаки магистралей)
-              let speedLimit = 60; // Стандарт по ПДД Армении в черте населенных пунктов
-              const streetLower = (streetName || '').toLowerCase();
-              const isNorthSouthExp = /север-юг|north-south|\bm-1\b|\bm-2\b/i.test(streetLower);
-              const isHwy = /highway|трасса|шоссе|\bh-\d+|\bm-\d+/i.test(streetLower);
-              const isFastAvenue = /исаков|isakov|сараландж|saralanj|багреванд|bagrevand|давиташен|davitashen/i.test(streetLower);
-              // The section's action is performed where the section STARTS (edgePoints[0])
-              const loc = (sec.edgePoints && sec.edgePoints[0]) ? sec.edgePoints[0] : ((sec.edgePoints && sec.edgePoints[1]) ? sec.edgePoints[1] : null);
-
-              if (isNorthSouthExp) {
-                speedLimit = 110; // Скоростная автомагистраль Север-Юг (Севан, Арташат)
-              } else if (isHwy) {
-                speedLimit = 90; // Загородная трасса / шоссе по ПДД РА
-              } else if (isFastAvenue) {
-                speedLimit = 70; // Специальные городские магистрали Еревана со знаками 70
-              } else if (loc) {
-                // Check distance from Yerevan center (40.1772, 44.5105)
-                const dLat = (loc[1] - 40.1772) * 111;
-                const dLng = (loc[0] - 44.5105) * 85;
-                const distCenter = Math.sqrt(dLat * dLat + dLng * dLng);
-                if (distCenter > 14) speedLimit = 90; // За пределами Еревана — трасса 90
-              }
-
-              return {
-                index: sIdx,
-                name: streetName,
-                instruction: instruction,
-                action: actionVal,
-                modifier: modifier,
-                type: type,
-                distance: sec.distance?.value || 0,
-                duration: sec.durationInTraffic?.value || sec.duration?.value || 0,
-                location: loc, // [lng, lat]
-                speedLimit: speedLimit,
-                speedLimitSource: 'estimated' // street-name heuristic, not map data
-              };
-            });
-
-            // Collect street names along route
-            const cleanStreets = (rawSections.map(s => s.street).filter(Boolean).filter((v, i, a) => a.indexOf(v) === i))
-              .filter(st => st.length > 3 && !/^(straight|right|left|roundabout|u-turn|подъезд|двор)/i.test(st));
-
-            return {
-              index: idx,
-              cleanStreets: cleanStreets,
-              distance: r.distance?.value || 0,
-              duration: r.durationInTraffic || r.duration || 0,
-              durationWithoutTraffic: r.duration || 0,
-              coordinates: coords, // [lng, lat]
-              segments: segments.length ? segments : [{ type: 'FREE', color: '#22c55e', coords }],
-              steps: steps,
-              laneIntersections: laneIntersections,
-              specialRoadPoints: r.specialRoadPoints || []
-            };
-          });
-
-          // Sort routes so the fastest route (lowest duration) is guaranteed to be at index 0
-          parsedRoutes.sort((a, b) => a.duration - b.duration);
-
-          // Assign human-friendly distinctive summaries (e.g. "через ул. Теряна", "через просп. Мясникяна")
-          const usedViaStreets = new Set();
-          parsedRoutes.forEach((r, i) => {
-            r.index = i;
-            let via = '';
-            if (i === 0) {
-              // Primary fastest route: use major/longest street
-              via = r.cleanStreets.find(s => s.length > 7) || r.cleanStreets[1] || r.cleanStreets[0] || '';
-            } else {
-              // Alternative route: find the street that has not been used yet
-              via = r.cleanStreets.find(s => !usedViaStreets.has(s) && s.length > 4) ||
-                    r.cleanStreets.find(s => s.length > 6) ||
-                    r.cleanStreets[0] || '';
-            }
-            if (via) usedViaStreets.add(via);
-            r.summary = via ? `через ${via}` : `Маршрут ${i + 1}`;
-            delete r.cleanStreets; // Clean up temporary array
-          });
+          const parsedRoutes = parseYandexRoutes(yRoutes, laneIntersections);
 
           res.writeHead(200, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify({
@@ -1205,57 +1214,72 @@ wss.on('connection', (ws, req) => {
   });
 });
 
-server.listen(PORT, () => {
-  console.log(`⚡ Tesla Navi Server running at: http://localhost:${PORT}`);
-  console.log(`📱 Tesla Display: http://localhost:${PORT}/`);
-  console.log(`📱 Phone Remote: http://localhost:${PORT}/phone?code=DEMO12`);
+// Start only when run directly (`node server.js`, Cloud Run); tests require() the helpers
+if (require.main === module) {
+  server.listen(PORT, () => {
+    console.log(`⚡ Tesla Navi Server running at: http://localhost:${PORT}`);
+    console.log(`📱 Tesla Display: http://localhost:${PORT}/`);
+    console.log(`📱 Phone Remote: http://localhost:${PORT}/phone?code=DEMO12`);
 
-  // Pre-warm neural audio cache in background for instant 0ms response
-  const PREWARM_RU_SVETLANA = [
-    'Здравствуйте! Я Светлана, ваш голосовой навигатор в Tesla Navi. Маршрут свободен, приятной дороги!',
-    'Голос изменён на Светлана. Приятной дороги!',
-    'Маршрут построен. Поехали!',
-    'Вы прибыли в пункт назначения',
-    'Перестраиваю маршрут',
-    'Поверните направо',
-    'Поверните налево',
-    'Держитесь правее',
-    'Держитесь левее',
-    'Двигайтесь прямо'
-  ];
-  const PREWARM_RU_DMITRY = [
-    'Здравствуйте! Я Дмитрий, ваш голосовой навигатор в Tesla Navi. Маршрут свободен, приятной дороги!',
-    'Голос изменён на Дмитрий. Приятной дороги!',
-    'Маршрут построен. Поехали!',
-    'Вы прибыли в пункт назначения',
-    'Перестраиваю маршрут'
-  ];
-  const PREWARM_EN = [
-    'Hello! I am Ava, your Tesla Navi voice assistant. The route is clear, have a safe trip!',
-    'Voice switched to Ava',
-    'Route calculated. Let us go!',
-    'You have arrived at your destination',
-    'Rerouting'
-  ];
-  setTimeout(async () => {
-    for (const p of PREWARM_RU_SVETLANA) {
-      try {
-        await synthesizeNeuralSpeech(p, 'svetlana', 'ru');
-        await new Promise(r => setTimeout(r, 60));
-      } catch (e) {}
-    }
-    for (const p of PREWARM_RU_DMITRY) {
-      try {
-        await synthesizeNeuralSpeech(p, 'dmitry', 'ru');
-        await new Promise(r => setTimeout(r, 60));
-      } catch (e) {}
-    }
-    for (const p of PREWARM_EN) {
-      try {
-        await synthesizeNeuralSpeech(p, 'ava', 'en');
-        await new Promise(r => setTimeout(r, 60));
-      } catch (e) {}
-    }
-    console.log('🎙️ Neural Voice Cache pre-warmed for Svetlana, Dmitry & Ava');
-  }, 1500);
-});
+    // Pre-warm neural audio cache in background for instant 0ms response
+    const PREWARM_RU_SVETLANA = [
+      'Здравствуйте! Я Светлана, ваш голосовой навигатор в Tesla Navi. Маршрут свободен, приятной дороги!',
+      'Голос изменён на Светлана. Приятной дороги!',
+      'Маршрут построен. Поехали!',
+      'Вы прибыли в пункт назначения',
+      'Перестраиваю маршрут',
+      'Поверните направо',
+      'Поверните налево',
+      'Держитесь правее',
+      'Держитесь левее',
+      'Двигайтесь прямо'
+    ];
+    const PREWARM_RU_DMITRY = [
+      'Здравствуйте! Я Дмитрий, ваш голосовой навигатор в Tesla Navi. Маршрут свободен, приятной дороги!',
+      'Голос изменён на Дмитрий. Приятной дороги!',
+      'Маршрут построен. Поехали!',
+      'Вы прибыли в пункт назначения',
+      'Перестраиваю маршрут'
+    ];
+    const PREWARM_EN = [
+      'Hello! I am Ava, your Tesla Navi voice assistant. The route is clear, have a safe trip!',
+      'Voice switched to Ava',
+      'Route calculated. Let us go!',
+      'You have arrived at your destination',
+      'Rerouting'
+    ];
+    setTimeout(async () => {
+      for (const p of PREWARM_RU_SVETLANA) {
+        try {
+          await synthesizeNeuralSpeech(p, 'svetlana', 'ru');
+          await new Promise(r => setTimeout(r, 60));
+        } catch (e) {}
+      }
+      for (const p of PREWARM_RU_DMITRY) {
+        try {
+          await synthesizeNeuralSpeech(p, 'dmitry', 'ru');
+          await new Promise(r => setTimeout(r, 60));
+        } catch (e) {}
+      }
+      for (const p of PREWARM_EN) {
+        try {
+          await synthesizeNeuralSpeech(p, 'ava', 'en');
+          await new Promise(r => setTimeout(r, 60));
+        } catch (e) {}
+      }
+      console.log('🎙️ Neural Voice Cache pre-warmed for Svetlana, Dmitry & Ava');
+    }, 1500);
+  });
+}
+
+module.exports = {
+  server,
+  extractCoords,
+  parseYandexGeoUri,
+  parseYandexRoutes,
+  getArmenianAudio,
+  isAllowedMapLink,
+  fetchUpstream,
+  takeRateToken,
+  RATE_LIMIT_CAPACITY
+};
