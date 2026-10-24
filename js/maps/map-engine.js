@@ -46,6 +46,21 @@ function routeMatchShare(currentCoords, fromIndex, freshCoords) {
   return hits.filter(h => h >= 0).length / sample.length;
 }
 
+// Yandex splits a route into hundreds of traffic chunks, most of them the same color as their
+// neighbour (a 20 km route: ~450). Each one became a progress-bar <div>, a GeoJSON feature and,
+// on the Yandex map, its own Polyline. Neighbours of one color are joined (they share the
+// boundary vertex, which is kept once).
+function mergeTrafficSegments(segments) {
+  const out = [];
+  for (const seg of segments || []) {
+    if (!seg || !Array.isArray(seg.coords) || seg.coords.length < 2) continue;
+    const last = out[out.length - 1];
+    if (last && last.color === seg.color) last.coords = last.coords.concat(seg.coords.slice(1));
+    else out.push({ ...seg, coords: seg.coords.slice() });
+  }
+  return out;
+}
+
 // Per-vertex colors of traffic segments (consecutive segments share their boundary vertex)
 function vertexColorsFromSegments(segments, count, fallback) {
   const colors = new Array(count).fill(fallback);
@@ -2494,7 +2509,7 @@ class TeslaMapEngine {
     this.totalRouteMeters = this.routeCumulativeDistances[this.routeCumulativeDistances.length - 1] || distanceMeters;
 
     // Traffic segments (100% genuine Yandex real-time traffic colors)
-    const trafficSegments = isYandex ? primaryRoute.segments : null;
+    const trafficSegments = isYandex ? mergeTrafficSegments(primaryRoute.segments) : null;
 
     // Parse navigation steps
     this.routeSteps = [];
