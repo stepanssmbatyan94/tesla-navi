@@ -468,3 +468,50 @@ test('POST /api/client-log: 204 for a report, 400 for garbage, oversized bodies 
     await new Promise(resolve => server.close(resolve));
   }
 });
+
+test('camera database: known types, plausible limits and courses, red-light cameras without a limit', () => {
+  const db = JSON.parse(fs.readFileSync(path.join(ROOT, 'data/speed-cameras.json'), 'utf8'));
+  assert.ok(db.cameras.length > 100);
+  assert.ok(db.source.some(s => /OpenStreetMap/.test(s)));
+  const ids = new Set();
+  for (const c of db.cameras) {
+    assert.ok(!ids.has(c.id), `duplicate id ${c.id}`);
+    ids.add(c.id);
+    assert.ok(['speed', 'red_light'].includes(c.type), c.id);
+    assert.ok(['osm', 'speedcamonline'].includes(c.source), c.id);
+    assert.ok(c.lat > 38.8 && c.lat < 41.4 && c.lng > 43.4 && c.lng < 46.7, `${c.id} outside Armenia`);
+    assert.ok(c.limit === null || (Number.isInteger(c.limit) && c.limit >= 5 && c.limit <= 130), c.id);
+    assert.ok(c.direction === null || (c.direction >= 0 && c.direction < 360), c.id);
+    if (c.type === 'red_light') assert.equal(c.limit, null, c.id);
+    // OSM direction tags are ambiguous: only SpeedCamOnLine courses are trusted for filtering
+    if (c.source === 'osm') assert.equal(c.direction, null, c.id);
+  }
+});
+
+test('/api/speed-cameras serves the cameras array of the database', async () => {
+  const { server } = require('../server.js');
+  await new Promise(resolve => server.listen(0, resolve));
+  try {
+    const res = await fetch(`http://127.0.0.1:${server.address().port}/api/speed-cameras`);
+    assert.equal(res.status, 200);
+    const cams = await res.json();
+    const db = JSON.parse(fs.readFileSync(path.join(ROOT, 'data/speed-cameras.json'), 'utf8'));
+    assert.ok(Array.isArray(cams));
+    assert.equal(cams.length, db.cameras.length);
+    assert.deepEqual(Object.keys(cams[0]).sort(), ['direction', 'id', 'lat', 'limit', 'lng', 'source', 'type']);
+  } finally {
+    server.closeAllConnections();
+    await new Promise(resolve => server.close(resolve));
+  }
+});
+
+test('Armenian camera warnings of every kind play the "camera ahead" clip', () => {
+  const ctx = require('./helpers/browser-context');
+  const browser = ctx.loadScripts(ctx.createBrowserContext(), ['js/config.js']);
+  const hy = ctx.get(browser, 'I18N').hy;
+  const clip = fs.readFileSync(path.join(ROOT, 'sounds/hy/gor/camera_ahead.mp3'));
+  for (const phrase of [hy.voiceSpeedCamera.replace('{limit}', 60), hy.voiceSpeedCameraNoLimit, hy.voiceRedLightCamera]) {
+    const audio = getArmenianAudio(phrase, 'gor');
+    assert.ok(audio && audio.equals(clip), phrase);
+  }
+});

@@ -21,6 +21,7 @@ npm run verify         # 12 headless browser checks (system Chrome, live network
 npm run verify -- smoke maneuvers --verbose
 node scripts/update_chargers.mjs   # refresh the OSM charging-station snapshot (~1 min)
 node scripts/update_speed_limits.mjs  # refresh the OSM speed-limit + built-up snapshot (~1-4 min)
+node scripts/update_speed_cameras.mjs # refresh the camera DB: OSM + SpeedCamOnLine.ru (--osm-only without it)
 ```
 
 Manual URLs: car screen `/?code=TEST01`, simulator/diagnostics `/?mode=dev`, phone `/phone?code=TEST01`; params `provider=maplibre|yandex`, `theme=day|night|auto`.
@@ -39,11 +40,12 @@ js/phone-remote.js        Phone page: GPS watcher, wake lock, destination search
 css/                      Car + phone styles
 styles/                   MapLibre day/night styles + sprites (tiles: OpenFreeMap)
 sounds/                   nav chime + Armenian clips sounds/hy/{gor,suzie}/<key>.mp3
-data/                     Speed-camera DB, OSM charging stations and speed limits (served only via /api/*)
+data/                     Camera DB (speed + red-light), OSM charging stations and speed limits (served only via /api/*)
 tests/                    Unit tests (node:test); browser scripts load in a vm with DOM stubs
 scripts/verify/           npm run verify runner + page checks
 scripts/update_chargers.mjs  Refreshes data/ev-chargers.json from OpenStreetMap
 scripts/update_speed_limits.mjs  Refreshes data/speed-limits.json (OSM maxspeed) from OpenStreetMap
+scripts/update_speed_cameras.mjs  Refreshes data/speed-cameras.json from OpenStreetMap + SpeedCamOnLine.ru
 .github/workflows/ci.yml  CI: check + unit tests (blocking), browser checks (non-blocking)
 scripts/generate_*.py     Armenian voice pack generators (piper; model in models/, git-ignored)
 docs/                     Architecture, API, deployment, development, ADRs, playbooks
@@ -77,7 +79,8 @@ Not served and not for agents to modify casually: `refs/` (personal reference ph
 6. **Realtime packets arrive twice** (Supabase + local WS) and `realtime.js` drops exact repeats (kind + timestamp + lat/lng). Anything new on the channel needs a `timestamp`.
 7. **One GPS source at a time.** Phone fixes win; the car browser's own geolocation is used only when no phone fix arrived within 5 s (`PHONE_GPS_PRIORITY_MS`).
 8. **Speed limits.** Priority: a route speed camera within 200 m ahead (`'camera'`) > the run the car is on in `route.speedLimits` — the OSM `maxspeed` (`'osm'`, solid sign) or, where OSM has no tag (most residential streets and yards), the legal default of the Armenian traffic rules: 60 in a built-up area, 90 outside (`'default'`, dashed sign; built-up areas come from OSM outlines in the snapshot) > the step's street-name heuristic (`'estimated'`, dashed, only without snapshot data). Without a route the same comes from `/api/speed-limit`; a dash `—` only when nothing is known. The overspeed chime fires only on `'camera'`/`'osm'` limits.
-9. **Map providers.** `provider` must name the library actually running: `maplibre`, `yandex` (loaded on demand) or `osm` (Leaflet fallback when MapLibre can't load or start). Provider-specific code branches on it.
+9. **Cameras.** `data/speed-cameras.json` holds `type` `speed` or `red_light`. Only a SpeedCamOnLine `direction` (the course of the enforced traffic) filters: a camera counts when the route/car heading is within 60° of it. OSM `direction` tags point either way depending on the mapper, so OSM-only and red-light cameras have `direction: null` and warn both ways. A camera without a limit stays without one (no default 60), and a red-light camera never sets the speed limit. Dummies (МЛЖ) are not in the DB.
+10. **Map providers.** `provider` must name the library actually running: `maplibre`, `yandex` (loaded on demand) or `osm` (Leaflet fallback when MapLibre can't load or start). Provider-specific code branches on it.
 
 ## Rules
 

@@ -49,7 +49,7 @@ ngrok http 8085              # open https://<id>.ngrok.app/?code=… in the car,
 ├── css/                       tesla-display.css (car), phone-remote.css (phone)
 ├── styles/                    mapsev-day.json, mapsev-night.json, sprites/
 ├── sounds/                    nav-chime.wav, hy/{gor,suzie}/*.mp3 (+ legacy hy/*.mp3)
-├── data/                      yerevan-cameras-clean.json, ev-chargers.json, speed-limits.json (served via /api), yerevan-cameras.json (raw)
+├── data/                      speed-cameras.json, ev-chargers.json, speed-limits.json (served via /api)
 ├── tests/                     npm test: node:test unit tests; helpers/browser-context.js loads js/*.js in a vm
 ├── scripts/
 │   ├── verify/run.mjs         npm run verify runner (headless Chrome, per-check blocking/flags)

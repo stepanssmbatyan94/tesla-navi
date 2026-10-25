@@ -197,6 +197,17 @@ html, body {
   gap: 8px;
 }
 
+/* Data credit of the camera database (OSM + SpeedCamOnLine.ru ask for attribution) */
+.more-tools-credit {
+  max-width: 192px;
+  margin-top: 8px;
+  padding: 0 4px;
+  font-size: 10px;
+  line-height: 1.3;
+  color: #94a3b8;
+  text-align: center;
+}
+
 .more-tool-card {
   display: flex;
   flex-direction: column;
@@ -3206,6 +3217,11 @@ body.night-mode .nav-progress-traveled-fill {
   width: 14px;
   height: 14px;
   fill: #1e293b;
+}
+
+/* Red-light camera: same badge, red rim so it reads apart from a speed camera */
+.camera-map-badge.red-light {
+  border-color: #dc2626;
 }
 
 

@@ -453,3 +453,86 @@ test('a reroute while driving takes the fastest route at once, never offers a ch
   assert.equal(engine.isNavigating, true);
   assert.equal(engine.activeRoute.durationSec, 500);
 });
+
+// Cameras for the straight east-bound test route (bearing 90°)
+const cam = (meters, extra = {}) => ({ type: 'camera', kind: 'speed', limit: 60, direction: null, ...at(meters), ...extra });
+
+test('route cameras: only those on the route in the travel direction, red-light ones without a limit', () => {
+  const { engine } = newEngine();
+  const offRoute = { ...cam(450), lat: LAT + 0.002 }; // ~220 m north of the route
+  engine.trafficPoints = [
+    cam(300, { direction: 92 }),           // same course: on the route
+    cam(500, { direction: 270 }),          // opposite carriageway: silent
+    cam(600, { direction: 0 }),            // crossing street with its own course: silent
+    cam(700),                              // unknown course (OSM): counts
+    cam(800, { kind: 'red_light', limit: null }),
+    offRoute
+  ];
+  engine.applyRouteData(routeData(), DEST, 0);
+  const found = engine.routeCameras.map(c => [Math.round(c.routeDist / 10) * 10, c.kind, c.limit]);
+  assert.deepEqual(JSON.parse(JSON.stringify(found)), [[300, 'speed', 60], [700, 'speed', 60], [800, 'red_light', null]]);
+});
+
+test('camera voice: limit only when known, a red-light camera never sets a speed limit', () => {
+  const { engine, maneuvers, spoken } = newEngine();
+  engine.trafficPoints = [cam(400, { limit: null }), cam(800, { kind: 'red_light', limit: null })];
+  engine.applyRouteData(routeData(), DEST, 0);
+  engine.isNavigating = true;
+  const alerts = [];
+  engine.onCameraAlert = a => alerts.push(a);
+  driveTo(engine, 50);
+  driveTo(engine, 150);
+  assert.ok(spoken.includes('Speed camera ahead'), spoken.join(' | '));
+  assert.notEqual(maneuvers.at(-1).speedLimitSource, 'camera');
+  driveTo(engine, 500);
+  driveTo(engine, 600);
+  assert.ok(spoken.includes('Red-light camera ahead'), spoken.join(' | '));
+  assert.equal(alerts.at(-1).kind, 'red_light');
+  assert.equal(alerts.at(-1).limit, null);
+  assert.notEqual(maneuvers.at(-1).speedLimitSource, 'camera');
+  assert.equal(spoken.filter(s => /camera/i.test(s)).length, 2);
+});
+
+test('free driving: a camera of the opposite direction stays silent, a passed camera warns again next time', () => {
+  const { engine, spoken } = newEngine();
+  engine.currentHeading = 90;
+  engine.trafficPoints = [cam(300, { direction: 270, limit: 40 })];
+  engine.checkFreeDrivingCameraAlert(LAT, LNG0, 40);
+  assert.equal(spoken.length, 0);
+  engine.trafficPoints = [cam(300, { direction: 85, limit: 40 })];
+  engine.checkFreeDrivingCameraAlert(LAT, LNG0, 40);
+  assert.deepEqual(spoken, ['Speed camera ahead, limit 40']);
+  engine.checkFreeDrivingCameraAlert(LAT, LNG0, 40); // still approaching: once
+  assert.equal(spoken.length, 1);
+  const far = at(1000);
+  engine.checkFreeDrivingCameraAlert(far.lat, far.lng, 40); // 700 m past it: re-armed
+  engine.checkFreeDrivingCameraAlert(LAT, LNG0, 40);
+  assert.equal(spoken.length, 2);
+});
+
+test('camera database: loaded as is (no invented limit) and projected onto a route built before it arrived', async () => {
+  const { ctx, engine } = newEngine();
+  engine.applyRouteData(routeData(), DEST, 0);
+  assert.equal(engine.routeCameras.length, 0);
+  const p = at(400);
+  ctx.fetch = async () => ({
+    ok: true,
+    json: async () => [
+      { id: 'sco/1', type: 'speed', lat: p.lat, lng: p.lng, limit: null, direction: 90 },
+      { id: 'osm/node/2', type: 'red_light', lat: p.lat, lng: p.lng, limit: 60, direction: null },
+      { id: 'bad', type: 'speed', lat: 'x', lng: null }
+    ]
+  });
+  await engine.loadRealSpeedCameras();
+  assert.deepEqual(JSON.parse(JSON.stringify(engine.trafficPoints.map(c => [c.kind, c.limit, c.direction]))), [['speed', null, 90], ['red_light', null, null]]);
+  assert.equal(engine.routeCameras.length, 2);
+});
+
+test('camera marker tooltip: red-light cameras are named as such, in every language', () => {
+  const ctx = loadScripts(createBrowserContext(), ['js/config.js', 'js/maps/map-engine.js']);
+  const title = get(ctx, 'speedCameraTitle');
+  for (const [lang, text] of [['ru', 'Камера контроля светофора'], ['hy', 'Լուսացույցի տեսախցիկ'], ['en', 'Red-light camera']]) {
+    ctx.CURRENT_LANG = lang;
+    assert.equal(title('', 'red_light'), text);
+  }
+});
