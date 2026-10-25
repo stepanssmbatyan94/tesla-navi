@@ -58,6 +58,8 @@ Then open `$U/?code=TEST01` and `$U/phone?code=TEST01` on a phone and confirm pa
 gcloud run services describe tesla-navi --project botifyshop-453014 --region europe-central2
 gcloud run revisions list --service tesla-navi --project botifyshop-453014 --region europe-central2 --limit 5
 gcloud run services logs read tesla-navi --project botifyshop-453014 --region europe-central2 --limit 100
+# errors from the car/phone browsers (js/client-log.js → /api/client-log)
+gcloud logging read 'resource.labels.service_name="tesla-navi" AND jsonPayload.message=~"^\[client:"' --project botifyshop-453014 --limit 50
 ```
 
 ## Rollback

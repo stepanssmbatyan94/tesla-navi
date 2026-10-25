@@ -378,3 +378,93 @@ test('map sprites: each PNG is the size its JSON index was made for (1x half of 
     }
   }
 });
+
+test('/api/route?mode=traffic asks only Yandex: no OSRM lanes, no OSRM fallback', async () => {
+  const { server } = require('../server.js');
+  const realFetch = globalThis.fetch;
+  const upstream = [];
+  let yandexState = {
+    config: { routerResponse: { routes: [yandexRoute({
+      duration: 600,
+      durationWithoutTraffic: 500,
+      sections: [{ action: { value: 'straight' }, street: 'Sarmen Street', distance: { value: 500 }, edgePoints: [[44.50, 40.18], [44.505, 40.18]] }]
+    })] } }
+  };
+  globalThis.fetch = async url => {
+    upstream.push(String(url));
+    if (/yandex\.com\/maps/.test(url)) {
+      const html = yandexState ? `<script type="application/json" class="state-view">${JSON.stringify(yandexState)}</script>` : '<html>captcha</html>';
+      return { ok: true, status: 200, text: async () => html };
+    }
+    return { ok: true, status: 200, json: async () => ({ code: 'Ok', routes: [] }) };
+  };
+  await new Promise(resolve => server.listen(0, resolve));
+  const url = `http://127.0.0.1:${server.address().port}/api/route?startLat=40.18&startLng=44.50&destLat=40.185&destLng=44.505&mode=traffic`;
+  try {
+    const res = await realFetch(url);
+    const data = await res.json();
+    assert.equal(data.source, 'yandex');
+    assert.equal(data.routes.length, 1);
+    assert.equal(data.routes[0].duration, 600);
+    assert.deepEqual(upstream.filter(u => /osrm/.test(u)), [], 'no OSRM request for a traffic refresh');
+
+    yandexState = null; // Yandex answers without route data (e.g. a captcha page)
+    upstream.length = 0;
+    const failed = await realFetch(url);
+    assert.equal(failed.status, 502);
+    assert.equal((await failed.json()).success, false);
+    assert.deepEqual(upstream.filter(u => /osrm/.test(u)), [], 'no OSRM fallback: it has no traffic');
+  } finally {
+    globalThis.fetch = realFetch;
+    server.closeAllConnections();
+    await new Promise(resolve => server.close(resolve));
+  }
+});
+
+test('client-log: entries are cut to a known shape, pairing codes masked, a server-wide budget per minute', () => {
+  const { clientLogEntry, takeClientLogSlot, CLIENT_LOG_MAX_PER_MIN } = require('../server.js');
+  assert.equal(clientLogEntry(null), null);
+  assert.equal(clientLogEntry({ message: '' }), null, 'nothing to log without a message');
+  const e = clientLogEntry({
+    kind: 'whatever', page: 'phone', message: 'x'.repeat(900), line: 12.4, col: -3,
+    source: 'https://host/?code=AB12CD&mode=dev', stack: 'at f (https://host/js/a.js?v=1:1:2)\u0000', provider: '<b>', extra: 'dropped'
+  });
+  assert.equal(e.kind, 'error');
+  assert.equal(e.page, 'phone');
+  assert.equal(e.message.length, 500);
+  assert.equal(e.line, 12);
+  assert.equal(e.col, undefined, 'negative numbers are dropped');
+  assert.equal(e.source, 'https://host/?code=…&mode=dev', 'the pairing code never reaches the log');
+  assert.ok(!e.stack.includes('\u0000'));
+  assert.equal(e.provider, undefined);
+  assert.equal(e.extra, undefined);
+
+  const t = 1_700_000_040_000;
+  let accepted = 0;
+  for (let i = 0; i < CLIENT_LOG_MAX_PER_MIN + 10; i++) if (takeClientLogSlot(t)) accepted++;
+  assert.equal(accepted, CLIENT_LOG_MAX_PER_MIN);
+  assert.equal(takeClientLogSlot(t + 60000), true, 'a new minute, a new budget');
+});
+
+test('POST /api/client-log: 204 for a report, 400 for garbage, oversized bodies cut off', async () => {
+  const { server } = require('../server.js');
+  const realError = console.error;
+  const logged = [];
+  console.error = line => logged.push(line);
+  await new Promise(resolve => server.listen(0, resolve));
+  const url = `http://127.0.0.1:${server.address().port}/api/client-log`;
+  const post = body => fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body });
+  try {
+    assert.equal((await post(JSON.stringify({ kind: 'error', message: 'boom', line: 3 }))).status, 204);
+    const entry = JSON.parse(logged[logged.length - 1]);
+    assert.equal(entry.severity, 'ERROR');
+    assert.equal(entry.message, '[client:car] boom');
+    assert.equal(entry.client.line, 3);
+    assert.equal((await post('not json')).status, 400);
+    await assert.rejects(post(JSON.stringify({ message: 'y'.repeat(20000) })).then(r => r.text()));
+  } finally {
+    console.error = realError;
+    server.closeAllConnections();
+    await new Promise(resolve => server.close(resolve));
+  }
+});

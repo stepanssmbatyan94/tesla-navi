@@ -21,6 +21,7 @@ Builds driving routes.
 |---|---|---|
 | `startLat`, `startLng`, `destLat`, `destLng` | yes | decimal degrees |
 | `provider` | no | accepted for compatibility; routing is always Yandex with OSRM fallback |
+| `mode` | no | `traffic`: the car's 2-minute traffic refresh while navigating — Yandex routes only, without `laneIntersections`, `speedLimits` or the OSRM fallback (`502 {success:false}` when Yandex gives no routes) |
 
 **Yandex response** (`source: "yandex"`):
 
@@ -120,6 +121,10 @@ Returns `audio/mpeg`.
 ## `GET /api/version`
 
 `{ "version": "tesla-navi-00093-abc" }` — the Cloud Run revision (`K_REVISION`; locally `local-<start time>`), `Cache-Control: no-store`. The car page polls it every 2 minutes and reloads itself after a deploy, but only while idle: no route built or driven, no music playing, nothing being typed.
+
+## `POST /api/client-log`
+
+Uncaught errors and promise rejections from the car and phone pages (`js/client-log.js`, at most 20 distinct reports per page load). Body (JSON, ≤ 8 KB): `{ kind: "error"|"rejection", page: "car"|"phone", message, source, line, col, stack, provider, userAgent }`. Every field is cut to a fixed length, `code=` values are masked, unknown fields dropped. Logged as one structured line (`severity: "ERROR"`, message `[client:car] …`, plus `appVersion`), at most 60 reports a minute server-wide. `204`; `400` for a body without a message; oversized bodies are cut off.
 
 ## `GET /api/speed-limit`
 

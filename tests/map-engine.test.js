@@ -361,10 +361,12 @@ test('live traffic: a fresh Yandex route along the same way recolors the rest an
 
   // Yandex from the car (300 m): same street, now a jam on it, 15 min left
   const RED = '#ff4533';
-  ctx.fetch = async () => ({ json: async () => ({ success: true, source: 'yandex', routes: [
+  const requested = [];
+  ctx.fetch = async url => { requested.push(url); return { json: async () => ({ success: true, source: 'yandex', routes: [
     { coordinates: [[at(300).lng, LAT], ...COORDS.slice(4)], duration: 900, segments: [{ color: RED, coords: [[at(300).lng, LAT], ...COORDS.slice(4)] }] }
-  ] }) });
+  ] }) }; };
   assert.equal(await engine.refreshRouteTraffic(), true);
+  assert.match(requested[0], /[?&]mode=traffic(&|$)/, 'the light traffic-only request, without lanes');
   const colors = JSON.parse(JSON.stringify(engine.trafficSegments)).map(s => [s.color, s.coords.length]);
   assert.equal(colors[0][0], '#82ea0d', 'the driven part keeps its colour');
   assert.equal(colors[colors.length - 1][0], RED, 'the rest shows the fresh jam');

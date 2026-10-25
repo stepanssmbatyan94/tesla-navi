@@ -2814,7 +2814,8 @@ class TeslaMapEngine {
     try {
       const { lat, lng } = this.currentPosition;
       const dest = this.activeRoute.destination;
-      const res = await fetch(`/api/route?startLat=${lat}&startLng=${lng}&destLat=${dest.lat}&destLng=${dest.lng}&provider=${this.provider}`);
+      // mode=traffic: Yandex routes only, without the lanes/speed limits the current route already has
+      const res = await fetch(`/api/route?startLat=${lat}&startLng=${lng}&destLat=${dest.lat}&destLng=${dest.lng}&provider=${this.provider}&mode=traffic`);
       const data = await res.json();
       // the route may have been cancelled or rerouted while the request ran
       if (!this.isNavigating || this.routeCoordinates !== routeAtStart || !data || data.source !== 'yandex' || !Array.isArray(data.routes)) return false;
