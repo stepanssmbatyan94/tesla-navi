@@ -563,6 +563,8 @@ const SPEED_LIMIT_MATCH_M = 15;
 const SPEED_LIMIT_BEARING_TOLERANCE = 35;   // degrees between route and way direction
 const SPEED_LIMIT_SAMPLE_M = 20;
 let speedLimitIndex = null;
+// /api/speed-cameras body: the cameras array of data/speed-cameras.json, built on first request
+let speedCamerasJson = null;
 
 function loadSpeedLimitIndex(file = path.join(__dirname, 'data', 'speed-limits.json')) {
   const index = new Map();
@@ -1344,13 +1346,14 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  // API: /api/speed-cameras (185 Verified Real Speed Cameras for Yerevan / Armenia)
+  // API: /api/speed-cameras (speed and red-light cameras in Armenia from OpenStreetMap and
+  // SpeedCamOnLine.ru, refreshed with scripts/update_speed_cameras.mjs)
   if (pathname === '/api/speed-cameras') {
     try {
-      const camerasPath = path.join(__dirname, 'data', 'yerevan-cameras-clean.json');
+      const camerasPath = path.join(__dirname, 'data', 'speed-cameras.json');
       if (fs.existsSync(camerasPath)) {
-        const data = fs.readFileSync(camerasPath, 'utf8');
-        sendCompressed(req, res, 200, { 'Content-Type': 'application/json', 'Cache-Control': 'public, max-age=86400' }, data);
+        if (!speedCamerasJson) speedCamerasJson = JSON.stringify(JSON.parse(fs.readFileSync(camerasPath, 'utf8')).cameras || []);
+        sendCompressed(req, res, 200, { 'Content-Type': 'application/json', 'Cache-Control': 'public, max-age=86400' }, speedCamerasJson);
       } else {
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify([]));

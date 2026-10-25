@@ -1,0 +1,4659 @@
+{
+  "source": [
+    "OpenStreetMap contributors (ODbL) via Overpass API",
+    "SpeedCamOnLine.ru (community database \"Armenia\")"
+  ],
+  "generatedAt": "2026-10-25T19:29:52.278Z",
+  "osmBase": "2026-10-25T19:28:36Z",
+  "counts": {
+    "speed": 498,
+    "redLight": 18,
+    "withDirection": 389
+  },
+  "cameras": [
+    {
+      "id": "osm/node/130041119",
+      "type": "speed",
+      "source": "osm",
+      "lat": 40.1637179,
+      "lng": 44.4186902,
+      "limit": null,
+      "direction": null
+    },
+    {
+      "id": "osm/node/287885928",
+      "type": "speed",
+      "source": "osm",
+      "lat": 40.1552523,
+      "lng": 44.5408417,
+      "limit": 60,
+      "direction": null
+    },
+    {
+      "id": "osm/node/287887115",
+      "type": "red_light",
+      "source": "osm",
+      "lat": 40.1420019,
+      "lng": 44.5219421,
+      "limit": null,
+      "direction": null
+    },
+    {
+      "id": "osm/node/288952205",
+      "type": "speed",
+      "source": "osm",
+      "lat": 40.2335271,
+      "lng": 44.5495666,
+      "limit": 80,
+      "direction": null
+    },
+    {
+      "id": "osm/node/293020739",
+      "type": "red_light",
+      "source": "osm",
+      "lat": 40.2210771,
+      "lng": 44.4932319,
+      "limit": null,
+      "direction": null
+    },
+    {
+      "id": "osm/node/311034501",
+      "type": "red_light",
+      "source": "osm",
+      "lat": 40.2075303,
+      "lng": 44.5277605,
+      "limit": null,
+      "direction": null
+    },
+    {
+      "id": "osm/node/331480191",
+      "type": "red_light",
+      "source": "osm",
+      "lat": 40.1983782,
+      "lng": 44.5674205,
+      "limit": null,
+      "direction": null
+    },
+    {
+      "id": "osm/node/354434145",
+      "type": "speed",
+      "source": "osm",
+      "lat": 40.1832276,
+      "lng": 44.4807414,
+      "limit": 60,
+      "direction": null
+    },
+    {
+      "id": "osm/node/356745420",
+      "type": "red_light",
+      "source": "osm",
+      "lat": 40.2050938,
+      "lng": 44.4802895,
+      "limit": null,
+      "direction": null
+    },
+    {
+      "id": "osm/node/387278326",
+      "type": "red_light",
+      "source": "osm",
+      "lat": 40.2052727,
+      "lng": 44.4769063,
+      "limit": null,
+      "direction": null
+    },
+    {
+      "id": "osm/node/412353063",
+      "type": "speed",
+      "source": "osm",
+      "lat": 41.1850298,
+      "lng": 44.8885321,
+      "limit": 60,
+      "direction": null
+    },
+    {
+      "id": "osm/node/457493772",
+      "type": "speed",
+      "source": "osm",
+      "lat": 40.7302997,
+      "lng": 44.8665666,
+      "limit": 50,
+      "direction": null
+    },
+    {
+      "id": "osm/node/597103112",
+      "type": "speed",
+      "source": "osm",
+      "lat": 40.5939551,
+      "lng": 44.3553108,
+      "limit": 60,
+      "direction": null
+    },
+    {
+      "id": "osm/node/597103239",
+      "type": "speed",
+      "source": "osm",
+      "lat": 40.6581158,
+      "lng": 44.300456,
+      "limit": 60,
+      "direction": null
+    },
+    {
+      "id": "osm/node/597695236",
+      "type": "red_light",
+      "source": "osm",
+      "lat": 40.1598368,
+      "lng": 44.4401313,
+      "limit": null,
+      "direction": null
+    },
+    {
+      "id": "osm/node/602698990",
+      "type": "speed",
+      "source": "osm",
+      "lat": 41.0053256,
+      "lng": 44.4042694,
+      "limit": 60,
+      "direction": null
+    },
+    {
+      "id": "osm/node/611406096",
+      "type": "speed",
+      "source": "osm",
+      "lat": 40.1684228,
+      "lng": 44.525793,
+      "limit": 40,
+      "direction": null
+    },
+    {
+      "id": "osm/node/703653339",
+      "type": "speed",
+      "source": "osm",
+      "lat": 40.1996604,
+      "lng": 44.5072995,
+      "limit": 60,
+      "direction": null
+    },
+    {
+      "id": "osm/node/760306310",
+      "type": "speed",
+      "source": "osm",
+      "lat": 39.6957629,
+      "lng": 45.4596909,
+      "limit": 60,
+      "direction": null
+    },
+    {
+      "id": "osm/node/983124830",
+      "type": "speed",
+      "source": "osm",
+      "lat": 40.2434312,
+      "lng": 44.5760657,
+      "limit": null,
+      "direction": null
+    },
+    {
+      "id": "osm/node/986406475",
+      "type": "speed",
+      "source": "osm",
+      "lat": 40.1441124,
+      "lng": 44.3270498,
+      "limit": 50,
+      "direction": null
+    },
+    {
+      "id": "osm/node/1410205970",
+      "type": "speed",
+      "source": "osm",
+      "lat": 40.6558429,
+      "lng": 44.0757377,
+      "limit": 60,
+      "direction": null
+    },
+    {
+      "id": "osm/node/1827774633",
+      "type": "speed",
+      "source": "osm",
+      "lat": 40.1652721,
+      "lng": 44.3383983,
+      "limit": 50,
+      "direction": null
+    },
+    {
+      "id": "osm/node/1871495481",
+      "type": "red_light",
+      "source": "osm",
+      "lat": 40.1600428,
+      "lng": 44.4408136,
+      "limit": null,
+      "direction": null
+    },
+    {
+      "id": "osm/node/1884452947",
+      "type": "speed",
+      "source": "osm",
+      "lat": 39.1508555,
+      "lng": 46.1929914,
+      "limit": 60,
+      "direction": null
+    },
+    {
+      "id": "osm/node/1902258450",
+      "type": "speed",
+      "source": "osm",
+      "lat": 40.1654763,
+      "lng": 44.3352002,
+      "limit": 60,
+      "direction": null
+    },
+    {
+      "id": "osm/node/1965740475",
+      "type": "speed",
+      "source": "osm",
+      "lat": 40.2097049,
+      "lng": 44.5345022,
+      "limit": 60,
+      "direction": null
+    },
+    {
+      "id": "osm/node/1972401132",
+      "type": "speed",
+      "source": "osm",
+      "lat": 40.1574539,
+      "lng": 44.4613723,
+      "limit": null,
+      "direction": null
+    },
+    {
+      "id": "osm/node/1972936528",
+      "type": "speed",
+      "source": "osm",
+      "lat": 40.3126562,
+      "lng": 44.5772122,
+      "limit": 60,
+      "direction": null
+    },
+    {
+      "id": "osm/node/1973140981",
+      "type": "speed",
+      "source": "osm",
+      "lat": 40.3092596,
+      "lng": 44.5755323,
+      "limit": 60,
+      "direction": null
+    },
+    {
+      "id": "osm/node/1980753488",
+      "type": "speed",
+      "source": "osm",
+      "lat": 40.1979035,
+      "lng": 44.5112293,
+      "limit": 60,
+      "direction": null
+    },
+    {
+      "id": "osm/node/2004508885",
+      "type": "speed",
+      "source": "osm",
+      "lat": 40.1987166,
+      "lng": 44.4622047,
+      "limit": 60,
+      "direction": null
+    },
+    {
+      "id": "osm/node/2035518010",
+      "type": "speed",
+      "source": "osm",
+      "lat": 40.4674657,
+      "lng": 44.737605,
+      "limit": null,
+      "direction": null
+    },
+    {
+      "id": "osm/node/2178857499",
+      "type": "speed",
+      "source": "osm",
+      "lat": 40.2811196,
+      "lng": 44.6250366,
+      "limit": 60,
+      "direction": null
+    },
+    {
+      "id": "osm/node/2240175285",
+      "type": "speed",
+      "source": "osm",
+      "lat": 40.1405569,
+      "lng": 44.5106987,
+      "limit": 60,
+      "direction": null
+    },
+    {
+      "id": "osm/node/2242761559",
+      "type": "speed",
+      "source": "osm",
+      "lat": 40.6524542,
+      "lng": 44.8938113,
+      "limit": 50,
+      "direction": null
+    },
+    {
+      "id": "osm/node/2254360419",
+      "type": "speed",
+      "source": "osm",
+      "lat": 40.1770669,
+      "lng": 44.5286141,
+      "limit": 40,
+      "direction": null
+    },
+    {
+      "id": "osm/node/2317707972",
+      "type": "speed",
+      "source": "osm",
+      "lat": 40.150292,
+      "lng": 44.4731472,
+      "limit": 40,
+      "direction": null
+    },
+    {
+      "id": "osm/node/2327176016",
+      "type": "speed",
+      "source": "osm",
+      "lat": 40.1623687,
+      "lng": 44.4414796,
+      "limit": 60,
+      "direction": null
+    },
+    {
+      "id": "osm/node/2337651445",
+      "type": "speed",
+      "source": "osm",
+      "lat": 40.2203118,
+      "lng": 44.531324,
+      "limit": null,
+      "direction": null
+    },
+    {
+      "id": "osm/node/2407257041",
+      "type": "speed",
+      "source": "osm",
+      "lat": 40.8747695,
+      "lng": 43.8501997,
+      "limit": 60,
+      "direction": null
+    },
+    {
+      "id": "osm/node/2431058372",
+      "type": "speed",
+      "source": "osm",
+      "lat": 39.7982954,
+      "lng": 44.7694656,
+      "limit": null,
+      "direction": null
+    },
+    {
+      "id": "osm/node/2458144200",
+      "type": "speed",
+      "source": "osm",
+      "lat": 40.662174,
+      "lng": 43.8847424,
+      "limit": 60,
+      "direction": null
+    },
+    {
+      "id": "osm/node/2479786880",
+      "type": "speed",
+      "source": "osm",
+      "lat": 40.1612104,
+      "lng": 44.2942911,
+      "limit": 50,
+      "direction": null
+    },
+    {
+      "id": "osm/node/2559589911",
+      "type": "speed",
+      "source": "osm",
+      "lat": 39.7309141,
+      "lng": 45.3839992,
+      "limit": 60,
+      "direction": null
+    },
+    {
+      "id": "osm/node/2704382102",
+      "type": "speed",
+      "source": "osm",
+      "lat": 40.0197682,
+      "lng": 44.4890338,
+      "limit": 60,
+      "direction": null
+    },
+    {
+      "id": "osm/node/2738044091",
+      "type": "speed",
+      "source": "osm",
+      "lat": 40.4924835,
+      "lng": 44.7779675,
+      "limit": 90,
+      "direction": null
+    },
+    {
+      "id": "osm/node/2925156500",
+      "type": "speed",
+      "source": "osm",
+      "lat": 39.7545248,
+      "lng": 45.3333047,
+      "limit": 60,
+      "direction": null
+    },
+    {
+      "id": "osm/node/2925541673",
+      "type": "speed",
+      "source": "osm",
+      "lat": 40.0907598,
+      "lng": 44.0449432,
+      "limit": 60,
+      "direction": null
+    },
+    {
+      "id": "osm/node/2925554205",
+      "type": "speed",
+      "source": "osm",
+      "lat": 40.8476168,
+      "lng": 43.838142,
+      "limit": 60,
+      "direction": null
+    },
+    {
+      "id": "osm/node/2925559966",
+      "type": "speed",
+      "source": "osm",
+      "lat": 40.840017,
+      "lng": 43.7852021,
+      "limit": 60,
+      "direction": null
+    },
+    {
+      "id": "osm/node/2951369093",
+      "type": "speed",
+      "source": "osm",
+      "lat": 40.3830774,
+      "lng": 44.6553302,
+      "limit": 70,
+      "direction": null
+    },
+    {
+      "id": "osm/node/3006218947",
+      "type": "speed",
+      "source": "osm",
+      "lat": 40.5852407,
+      "lng": 44.3587923,
+      "limit": 60,
+      "direction": null
+    },
+    {
+      "id": "osm/node/3006218955",
+      "type": "speed",
+      "source": "osm",
+      "lat": 40.7201171,
+      "lng": 44.2062357,
+      "limit": 60,
+      "direction": null
+    },
+    {
+      "id": "osm/node/3006219126",
+      "type": "speed",
+      "source": "osm",
+      "lat": 41.2265098,
+      "lng": 44.8576768,
+      "limit": 60,
+      "direction": null
+    },
+    {
+      "id": "osm/node/3192581992",
+      "type": "speed",
+      "source": "osm",
+      "lat": 40.7686902,
+      "lng": 43.8455384,
+      "limit": 60,
+      "direction": null
+    },
+    {
+      "id": "osm/node/3413163179",
+      "type": "speed",
+      "source": "osm",
+      "lat": 40.1342858,
+      "lng": 44.5007873,
+      "limit": 60,
+      "direction": null
+    },
+    {
+      "id": "osm/node/3415474039",
+      "type": "speed",
+      "source": "osm",
+      "lat": 40.203349,
+      "lng": 44.5301557,
+      "limit": 60,
+      "direction": null
+    },
+    {
+      "id": "osm/node/3424399686",
+      "type": "speed",
+      "source": "osm",
+      "lat": 40.1935143,
+      "lng": 44.4894537,
+      "limit": 40,
+      "direction": null
+    },
+    {
+      "id": "osm/node/3520247822",
+      "type": "speed",
+      "source": "osm",
+      "lat": 40.1834086,
+      "lng": 44.5274895,
+      "limit": 60,
+      "direction": null
+    },
+    {
+      "id": "osm/node/3613297917",
+      "type": "speed",
+      "source": "osm",
+      "lat": 40.2229832,
+      "lng": 44.5756522,
+      "limit": 60,
+      "direction": null
+    },
+    {
+      "id": "osm/node/3613370241",
+      "type": "speed",
+      "source": "osm",
+      "lat": 39.81443,
+      "lng": 45.0436096,
+      "limit": 70,
+      "direction": null
+    },
+    {
+      "id": "osm/node/3715913149",
+      "type": "speed",
+      "source": "osm",
+      "lat": 40.2187744,
+      "lng": 44.4960445,
+      "limit": 60,
+      "direction": null
+    },
+    {
+      "id": "osm/node/3735729787",
+      "type": "speed",
+      "source": "osm",
+      "lat": 40.1503577,
+      "lng": 44.5063737,
+      "limit": 60,
+      "direction": null
+    },
+    {
+      "id": "osm/node/3824493939",
+      "type": "speed",
+      "source": "osm",
+      "lat": 40.1968818,
+      "lng": 44.4912643,
+      "limit": 60,
+      "direction": null
+    },
+    {
+      "id": "osm/node/3836963489",
+      "type": "speed",
+      "source": "osm",
+      "lat": 40.1775495,
+      "lng": 44.5226339,
+      "limit": 60,
+      "direction": null
+    },
+    {
+      "id": "osm/node/3913360568",
+      "type": "speed",
+      "source": "osm",
+      "lat": 40.774899,
+      "lng": 44.9763483,
+      "limit": 60,
+      "direction": null
+    },
+    {
+      "id": "osm/node/3963323866",
+      "type": "speed",
+      "source": "osm",
+      "lat": 40.3106629,
+      "lng": 44.4726318,
+      "limit": 60,
+      "direction": null
+    },
+    {
+      "id": "osm/node/3963323874",
+      "type": "speed",
+      "source": "osm",
+      "lat": 40.3185961,
+      "lng": 44.4850136,
+      "limit": null,
+      "direction": null
+    },
+    {
+      "id": "osm/node/4084595412",
+      "type": "speed",
+      "source": "osm",
+      "lat": 39.6480503,
+      "lng": 45.8872749,
+      "limit": 60,
+      "direction": null
+    },
+    {
+      "id": "osm/node/4113489888",
+      "type": "speed",
+      "source": "osm",
+      "lat": 39.9105563,
+      "lng": 44.7115376,
+      "limit": 60,
+      "direction": null
+    },
+    {
+      "id": "osm/node/4113489889",
+      "type": "speed",
+      "source": "osm",
+      "lat": 39.9210098,
+      "lng": 44.7513741,
+      "limit": 60,
+      "direction": null
+    },
+    {
+      "id": "osm/node/4200866274",
+      "type": "speed",
+      "source": "osm",
+      "lat": 40.817682,
+      "lng": 43.8373602,
+      "limit": 60,
+      "direction": null
+    },
+    {
+      "id": "osm/node/4200866400",
+      "type": "speed",
+      "source": "osm",
+      "lat": 40.81987,
+      "lng": 43.8208489,
+      "limit": null,
+      "direction": null
+    },
+    {
+      "id": "osm/node/4209742309",
+      "type": "red_light",
+      "source": "osm",
+      "lat": 40.1775315,
+      "lng": 44.5030907,
+      "limit": null,
+      "direction": null
+    },
+    {
+      "id": "osm/node/4227214348",
+      "type": "speed",
+      "source": "osm",
+      "lat": 40.6900503,
+      "lng": 44.272566,
+      "limit": 60,
+      "direction": null
+    },
+    {
+      "id": "osm/node/4227214350",
+      "type": "speed",
+      "source": "osm",
+      "lat": 40.8233678,
+      "lng": 44.2438438,
+      "limit": 60,
+      "direction": null
+    },
+    {
+      "id": "osm/node/4228167598",
+      "type": "red_light",
+      "source": "osm",
+      "lat": 40.1957891,
+      "lng": 44.4790623,
+      "limit": null,
+      "direction": null
+    },
+    {
+      "id": "osm/node/4228167600",
+      "type": "red_light",
+      "source": "osm",
+      "lat": 40.1988973,
+      "lng": 44.4795526,
+      "limit": null,
+      "direction": null
+    },
+    {
+      "id": "osm/node/4406579553",
+      "type": "speed",
+      "source": "osm",
+      "lat": 40.1940575,
+      "lng": 44.5248778,
+      "limit": 70,
+      "direction": null
+    },
+    {
+      "id": "osm/node/4423444517",
+      "type": "speed",
+      "source": "osm",
+      "lat": 40.1832828,
+      "lng": 44.5151019,
+      "limit": 30,
+      "direction": null
+    },
+    {
+      "id": "osm/node/4473806836",
+      "type": "speed",
+      "source": "osm",
+      "lat": 39.6793081,
+      "lng": 45.7613408,
+      "limit": 60,
+      "direction": null
+    },
+    {
+      "id": "osm/node/4474517922",
+      "type": "speed",
+      "source": "osm",
+      "lat": 39.6904457,
+      "lng": 45.4702342,
+      "limit": 60,
+      "direction": null
+    },
+    {
+      "id": "osm/node/4695993515",
+      "type": "speed",
+      "source": "osm",
+      "lat": 41.1125409,
+      "lng": 44.2928258,
+      "limit": 60,
+      "direction": null
+    },
+    {
+      "id": "osm/node/4769038233",
+      "type": "red_light",
+      "source": "osm",
+      "lat": 40.2008597,
+      "lng": 44.5661319,
+      "limit": null,
+      "direction": null
+    },
+    {
+      "id": "osm/node/4886144202",
+      "type": "speed",
+      "source": "osm",
+      "lat": 40.1776822,
+      "lng": 45.5756216,
+      "limit": 60,
+      "direction": null
+    },
+    {
+      "id": "osm/node/4908971292",
+      "type": "speed",
+      "source": "osm",
+      "lat": 40.2436877,
+      "lng": 44.5762338,
+      "limit": null,
+      "direction": null
+    },
+    {
+      "id": "osm/node/4947171593",
+      "type": "speed",
+      "source": "osm",
+      "lat": 40.1645379,
+      "lng": 44.4631982,
+      "limit": 60,
+      "direction": null
+    },
+    {
+      "id": "osm/node/5017653080",
+      "type": "speed",
+      "source": "osm",
+      "lat": 40.1909686,
+      "lng": 44.4659259,
+      "limit": 60,
+      "direction": null
+    },
+    {
+      "id": "osm/node/5037605625",
+      "type": "speed",
+      "source": "osm",
+      "lat": 40.2095748,
+      "lng": 44.4934879,
+      "limit": 60,
+      "direction": null
+    },
+    {
+      "id": "osm/node/5141771164",
+      "type": "speed",
+      "source": "osm",
+      "lat": 40.8463975,
+      "lng": 43.8379052,
+      "limit": 60,
+      "direction": null
+    },
+    {
+      "id": "osm/node/5183222226",
+      "type": "speed",
+      "source": "osm",
+      "lat": 40.1851809,
+      "lng": 45.7205467,
+      "limit": 60,
+      "direction": null
+    },
+    {
+      "id": "osm/node/5200073367",
+      "type": "speed",
+      "source": "osm",
+      "lat": 40.1402747,
+      "lng": 44.0481366,
+      "limit": 60,
+      "direction": null
+    },
+    {
+      "id": "osm/node/5220006396",
+      "type": "speed",
+      "source": "osm",
+      "lat": 40.0708281,
+      "lng": 44.4407007,
+      "limit": 60,
+      "direction": null
+    },
+    {
+      "id": "osm/node/5391066416",
+      "type": "speed",
+      "source": "osm",
+      "lat": 40.2043253,
+      "lng": 44.5154509,
+      "limit": 40,
+      "direction": null
+    },
+    {
+      "id": "osm/node/5454764452",
+      "type": "speed",
+      "source": "osm",
+      "lat": 40.6249935,
+      "lng": 43.9786485,
+      "limit": null,
+      "direction": null
+    },
+    {
+      "id": "osm/node/5482777969",
+      "type": "speed",
+      "source": "osm",
+      "lat": 40.2194527,
+      "lng": 44.4764283,
+      "limit": 60,
+      "direction": null
+    },
+    {
+      "id": "osm/node/5489632014",
+      "type": "speed",
+      "source": "osm",
+      "lat": 40.18151,
+      "lng": 45.5929607,
+      "limit": 60,
+      "direction": null
+    },
+    {
+      "id": "osm/node/5502010276",
+      "type": "speed",
+      "source": "osm",
+      "lat": 40.2062737,
+      "lng": 44.5293037,
+      "limit": null,
+      "direction": null
+    },
+    {
+      "id": "osm/node/5503504936",
+      "type": "red_light",
+      "source": "osm",
+      "lat": 40.1631278,
+      "lng": 44.5129122,
+      "limit": null,
+      "direction": null
+    },
+    {
+      "id": "osm/node/8780343388",
+      "type": "speed",
+      "source": "osm",
+      "lat": 41.0334168,
+      "lng": 45.1447515,
+      "limit": null,
+      "direction": null
+    },
+    {
+      "id": "osm/node/8780350659",
+      "type": "speed",
+      "source": "osm",
+      "lat": 41.1759081,
+      "lng": 44.9980591,
+      "limit": 60,
+      "direction": null
+    },
+    {
+      "id": "osm/node/8818078251",
+      "type": "speed",
+      "source": "osm",
+      "lat": 40.139197,
+      "lng": 44.5364154,
+      "limit": 60,
+      "direction": null
+    },
+    {
+      "id": "osm/node/8818078314",
+      "type": "speed",
+      "source": "osm",
+      "lat": 40.146243,
+      "lng": 44.5159164,
+      "limit": 60,
+      "direction": null
+    },
+    {
+      "id": "osm/node/8914197452",
+      "type": "speed",
+      "source": "osm",
+      "lat": 40.1622091,
+      "lng": 44.3956878,
+      "limit": 60,
+      "direction": null
+    },
+    {
+      "id": "osm/node/8914197453",
+      "type": "speed",
+      "source": "osm",
+      "lat": 40.1620942,
+      "lng": 44.3934273,
+      "limit": 60,
+      "direction": null
+    },
+    {
+      "id": "osm/node/8914242440",
+      "type": "speed",
+      "source": "osm",
+      "lat": 40.1742076,
+      "lng": 43.9525981,
+      "limit": null,
+      "direction": null
+    },
+    {
+      "id": "osm/node/8914270714",
+      "type": "speed",
+      "source": "osm",
+      "lat": 40.1651537,
+      "lng": 44.2509035,
+      "limit": 90,
+      "direction": null
+    },
+    {
+      "id": "osm/node/8914339608",
+      "type": "speed",
+      "source": "osm",
+      "lat": 40.1596222,
+      "lng": 44.2194227,
+      "limit": 90,
+      "direction": null
+    },
+    {
+      "id": "osm/node/8914436528",
+      "type": "speed",
+      "source": "osm",
+      "lat": 40.1431144,
+      "lng": 44.1099402,
+      "limit": 60,
+      "direction": null
+    },
+    {
+      "id": "osm/node/8914436529",
+      "type": "speed",
+      "source": "osm",
+      "lat": 40.143019,
+      "lng": 44.1093885,
+      "limit": 60,
+      "direction": null
+    },
+    {
+      "id": "osm/node/8914600252",
+      "type": "speed",
+      "source": "osm",
+      "lat": 40.5808108,
+      "lng": 44.6769413,
+      "limit": null,
+      "direction": null
+    },
+    {
+      "id": "osm/node/9084238470",
+      "type": "speed",
+      "source": "osm",
+      "lat": 40.1427262,
+      "lng": 44.1159573,
+      "limit": 60,
+      "direction": null
+    },
+    {
+      "id": "osm/node/9084334122",
+      "type": "speed",
+      "source": "osm",
+      "lat": 40.1648802,
+      "lng": 44.3610769,
+      "limit": 60,
+      "direction": null
+    },
+    {
+      "id": "osm/node/10008910036",
+      "type": "speed",
+      "source": "osm",
+      "lat": 40.1000161,
+      "lng": 43.9519408,
+      "limit": null,
+      "direction": null
+    },
+    {
+      "id": "osm/node/10008948394",
+      "type": "speed",
+      "source": "osm",
+      "lat": 40.1317786,
+      "lng": 44.0095201,
+      "limit": null,
+      "direction": null
+    },
+    {
+      "id": "osm/node/10830811240",
+      "type": "red_light",
+      "source": "osm",
+      "lat": 40.1770628,
+      "lng": 44.5036636,
+      "limit": null,
+      "direction": null
+    },
+    {
+      "id": "osm/node/10830811241",
+      "type": "red_light",
+      "source": "osm",
+      "lat": 40.1770619,
+      "lng": 44.5031578,
+      "limit": null,
+      "direction": null
+    },
+    {
+      "id": "osm/node/10830811242",
+      "type": "red_light",
+      "source": "osm",
+      "lat": 40.177601,
+      "lng": 44.5036001,
+      "limit": null,
+      "direction": null
+    },
+    {
+      "id": "osm/node/11127595751",
+      "type": "speed",
+      "source": "osm",
+      "lat": 40.1887988,
+      "lng": 44.5155304,
+      "limit": null,
+      "direction": null
+    },
+    {
+      "id": "osm/node/11142874455",
+      "type": "red_light",
+      "source": "osm",
+      "lat": 40.1543628,
+      "lng": 44.47891,
+      "limit": null,
+      "direction": null
+    },
+    {
+      "id": "osm/node/11259408331",
+      "type": "red_light",
+      "source": "osm",
+      "lat": 40.2049098,
+      "lng": 44.4972933,
+      "limit": null,
+      "direction": null
+    },
+    {
+      "id": "osm/node/12093265523",
+      "type": "speed",
+      "source": "osm",
+      "lat": 40.2730459,
+      "lng": 44.5991926,
+      "limit": 70,
+      "direction": null
+    },
+    {
+      "id": "osm/node/12093274640",
+      "type": "speed",
+      "source": "osm",
+      "lat": 40.4734308,
+      "lng": 44.7477722,
+      "limit": 90,
+      "direction": null
+    },
+    {
+      "id": "osm/node/12549694712",
+      "type": "speed",
+      "source": "osm",
+      "lat": 40.5284483,
+      "lng": 44.7668839,
+      "limit": 60,
+      "direction": null
+    },
+    {
+      "id": "osm/node/13049636576",
+      "type": "speed",
+      "source": "osm",
+      "lat": 40.8507317,
+      "lng": 44.1567821,
+      "limit": null,
+      "direction": null
+    },
+    {
+      "id": "osm/node/13049671356",
+      "type": "speed",
+      "source": "osm",
+      "lat": 40.8377254,
+      "lng": 44.3226564,
+      "limit": null,
+      "direction": null
+    },
+    {
+      "id": "sco/1",
+      "lat": 40.1362115,
+      "lng": 44.5382527,
+      "limit": 60,
+      "direction": 35,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/2",
+      "lat": 40.1951787,
+      "lng": 44.538588,
+      "limit": 60,
+      "direction": 280,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/3",
+      "lat": 40.1648,
+      "lng": 44.4619,
+      "limit": 60,
+      "direction": 124,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/5",
+      "lat": 40.1956035,
+      "lng": 44.5135517,
+      "limit": 60,
+      "direction": 141,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/6",
+      "lat": 40.1935872,
+      "lng": 44.5227192,
+      "limit": 60,
+      "direction": 98,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/7",
+      "lat": 40.2016535,
+      "lng": 44.5824615,
+      "limit": 60,
+      "direction": 334,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/9",
+      "lat": 40.1627,
+      "lng": 44.4742262,
+      "limit": 60,
+      "direction": 240,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/10",
+      "lat": 40.142736,
+      "lng": 44.11429,
+      "limit": 60,
+      "direction": 95,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/11",
+      "lat": 40.382157,
+      "lng": 44.6545531,
+      "limit": 70,
+      "direction": 216,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/13",
+      "lat": 40.1963774,
+      "lng": 44.5169127,
+      "limit": 60,
+      "direction": 218,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/14",
+      "lat": 40.153058,
+      "lng": 44.491375,
+      "limit": 60,
+      "direction": 134,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/15",
+      "lat": 40.157772,
+      "lng": 44.462789,
+      "limit": 60,
+      "direction": 75,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/17",
+      "lat": 40.1562763,
+      "lng": 44.473592,
+      "limit": 60,
+      "direction": 115,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/19",
+      "lat": 40.185484,
+      "lng": 44.5027852,
+      "limit": 60,
+      "direction": 225,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/20",
+      "lat": 40.1496141,
+      "lng": 44.4736946,
+      "limit": 40,
+      "direction": 65,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/20-reverse",
+      "lat": 40.1496141,
+      "lng": 44.4736946,
+      "limit": 40,
+      "direction": 245,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/21",
+      "lat": 40.8768652,
+      "lng": 45.1453216,
+      "limit": 60,
+      "direction": 16,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/22",
+      "lat": 40.1579486,
+      "lng": 44.5405322,
+      "limit": 60,
+      "direction": 175,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/23",
+      "lat": 40.151283,
+      "lng": 44.532461,
+      "limit": 60,
+      "direction": 76,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/24",
+      "lat": 40.1366904,
+      "lng": 44.4725899,
+      "limit": 60,
+      "direction": 315,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/25",
+      "lat": 40.1323644,
+      "lng": 44.4781097,
+      "limit": 60,
+      "direction": 135,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/26",
+      "lat": 40.1148207,
+      "lng": 44.4774847,
+      "limit": 60,
+      "direction": 214,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/27",
+      "lat": 40.1301788,
+      "lng": 44.5098452,
+      "limit": 60,
+      "direction": 4,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/28",
+      "lat": 40.2106079,
+      "lng": 44.4926388,
+      "limit": 60,
+      "direction": 325,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/29",
+      "lat": 40.2083911,
+      "lng": 44.4942852,
+      "limit": 60,
+      "direction": 145,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/30",
+      "lat": 41.0194262,
+      "lng": 44.3763048,
+      "limit": 60,
+      "direction": 320,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/31",
+      "lat": 40.9560329,
+      "lng": 44.4423466,
+      "limit": 60,
+      "direction": 358,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/32",
+      "lat": 40.246343,
+      "lng": 44.581726,
+      "limit": 60,
+      "direction": 57,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/33",
+      "lat": 40.1897982,
+      "lng": 44.4756469,
+      "limit": 60,
+      "direction": 320,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/34",
+      "lat": 40.132537,
+      "lng": 44.48514,
+      "limit": 60,
+      "direction": 231,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/35",
+      "lat": 40.1581965,
+      "lng": 44.5024973,
+      "limit": 60,
+      "direction": 25,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/36",
+      "lat": 40.1484159,
+      "lng": 44.4701077,
+      "limit": 60,
+      "direction": 63,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/38",
+      "lat": 40.220493,
+      "lng": 44.5784416,
+      "limit": 60,
+      "direction": 85,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/39",
+      "lat": 40.2205573,
+      "lng": 44.5784265,
+      "limit": 60,
+      "direction": 270,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/40",
+      "lat": 40.2159418,
+      "lng": 44.5551939,
+      "limit": 40,
+      "direction": 98,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/41",
+      "lat": 40.1994732,
+      "lng": 44.5083306,
+      "limit": 60,
+      "direction": 300,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/42",
+      "lat": 40.1942713,
+      "lng": 44.5179437,
+      "limit": 60,
+      "direction": 286,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/44",
+      "lat": 40.1649119,
+      "lng": 44.3622062,
+      "limit": 60,
+      "direction": 90,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/45",
+      "lat": 40.1650487,
+      "lng": 44.3634518,
+      "limit": 60,
+      "direction": 273,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/46",
+      "lat": 40.1497562,
+      "lng": 44.1633469,
+      "limit": 70,
+      "direction": 257,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/48",
+      "lat": 40.1566973,
+      "lng": 44.4725158,
+      "limit": 60,
+      "direction": 293,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/49",
+      "lat": 40.1614925,
+      "lng": 44.4419331,
+      "limit": 60,
+      "direction": 157,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/50",
+      "lat": 40.1311845,
+      "lng": 44.5335121,
+      "limit": 60,
+      "direction": 44,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/55",
+      "lat": 40.2182038,
+      "lng": 44.4987334,
+      "limit": 60,
+      "direction": 226,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/56",
+      "lat": 40.1567349,
+      "lng": 44.501467,
+      "limit": 60,
+      "direction": 198,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/58",
+      "lat": 40.2086261,
+      "lng": 44.5354146,
+      "limit": 60,
+      "direction": 140,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/59",
+      "lat": 40.2227408,
+      "lng": 44.4546016,
+      "limit": 60,
+      "direction": 303,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/60",
+      "lat": 40.2226422,
+      "lng": 44.4544621,
+      "limit": 60,
+      "direction": 135,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/61",
+      "lat": 40.2465938,
+      "lng": 44.4251317,
+      "limit": 60,
+      "direction": 148,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/62",
+      "lat": 40.2466595,
+      "lng": 44.4252712,
+      "limit": 60,
+      "direction": 326,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/64",
+      "lat": 40.1614725,
+      "lng": 44.4238058,
+      "limit": 60,
+      "direction": 300,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/66",
+      "lat": 40.1256493,
+      "lng": 44.4924934,
+      "limit": 60,
+      "direction": 87,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/67",
+      "lat": 40.4175698,
+      "lng": 45.109381,
+      "limit": 60,
+      "direction": 153,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/69",
+      "lat": 40.6524269,
+      "lng": 44.8945381,
+      "limit": 50,
+      "direction": 105,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/70",
+      "lat": 40.7063588,
+      "lng": 44.8508387,
+      "limit": 50,
+      "direction": 175,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/71",
+      "lat": 40.5367217,
+      "lng": 44.9310377,
+      "limit": 70,
+      "direction": 100,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/72",
+      "lat": 40.4932258,
+      "lng": 44.7789783,
+      "limit": 90,
+      "direction": 228,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/73",
+      "lat": 40.30281,
+      "lng": 44.6185,
+      "limit": 90,
+      "direction": 208,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/200",
+      "lat": 40.2234354,
+      "lng": 44.5599117,
+      "limit": 60,
+      "direction": 158,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/201",
+      "lat": 40.2193607,
+      "lng": 44.5313671,
+      "limit": 60,
+      "direction": 1,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/202",
+      "lat": 40.2193483,
+      "lng": 44.5312652,
+      "limit": 60,
+      "direction": 185,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/207",
+      "lat": 40.1850975,
+      "lng": 43.9124608,
+      "limit": 60,
+      "direction": 148,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/208",
+      "lat": 40.1306823,
+      "lng": 44.006778,
+      "limit": 60,
+      "direction": 60,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/209",
+      "lat": 40.0912607,
+      "lng": 44.0446845,
+      "limit": 60,
+      "direction": 175,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/210",
+      "lat": 40.3469723,
+      "lng": 44.3803722,
+      "limit": 60,
+      "direction": 26,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/211",
+      "lat": 40.385039,
+      "lng": 44.3796051,
+      "limit": 60,
+      "direction": 358,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/213",
+      "lat": 39.797895,
+      "lng": 44.769776,
+      "limit": 60,
+      "direction": 150,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/220",
+      "lat": 40.2346208,
+      "lng": 44.5546407,
+      "limit": null,
+      "direction": 253,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/234",
+      "lat": 40.2463958,
+      "lng": 44.5816827,
+      "limit": 60,
+      "direction": 236,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/235",
+      "lat": 39.8142634,
+      "lng": 45.0444911,
+      "limit": 70,
+      "direction": 104,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/238",
+      "lat": 40.1415145,
+      "lng": 44.5296009,
+      "limit": 60,
+      "direction": 275,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/239",
+      "lat": 40.1806478,
+      "lng": 44.5276839,
+      "limit": 60,
+      "direction": 3,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/240",
+      "lat": 40.5184304,
+      "lng": 44.3900764,
+      "limit": 60,
+      "direction": 184,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/241",
+      "lat": 40.6785627,
+      "lng": 44.289669,
+      "limit": 60,
+      "direction": 340,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/242",
+      "lat": 40.7209206,
+      "lng": 44.2062018,
+      "limit": 60,
+      "direction": 345,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/243",
+      "lat": 40.8356341,
+      "lng": 44.2812917,
+      "limit": 60,
+      "direction": 90,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/245",
+      "lat": 40.73919,
+      "lng": 44.6906958,
+      "limit": 60,
+      "direction": 115,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/246",
+      "lat": 40.218769,
+      "lng": 44.499923,
+      "limit": 60,
+      "direction": 46,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/247",
+      "lat": 40.2962403,
+      "lng": 44.2931343,
+      "limit": 60,
+      "direction": 90,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/248",
+      "lat": 40.3201652,
+      "lng": 44.4869041,
+      "limit": 60,
+      "direction": 45,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/249",
+      "lat": 40.2368425,
+      "lng": 44.5101664,
+      "limit": 60,
+      "direction": 350,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/250",
+      "lat": 40.2576979,
+      "lng": 44.4945373,
+      "limit": 60,
+      "direction": 340,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/251",
+      "lat": 40.3219196,
+      "lng": 44.5797086,
+      "limit": 60,
+      "direction": 12,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/252",
+      "lat": 40.6569659,
+      "lng": 44.3009608,
+      "limit": 60,
+      "direction": 350,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/253",
+      "lat": 40.6565178,
+      "lng": 44.0804744,
+      "limit": 60,
+      "direction": 110,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/254",
+      "lat": 40.8469954,
+      "lng": 43.8379383,
+      "limit": 60,
+      "direction": 9,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/257",
+      "lat": 40.811067,
+      "lng": 43.876099,
+      "limit": 60,
+      "direction": 50,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/258",
+      "lat": 40.3126014,
+      "lng": 44.4733,
+      "limit": 60,
+      "direction": 9,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/259",
+      "lat": 40.3126999,
+      "lng": 44.4734287,
+      "limit": 60,
+      "direction": 190,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/260",
+      "lat": 40.1414274,
+      "lng": 44.5295509,
+      "limit": 60,
+      "direction": 94,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/300",
+      "lat": 40.1876222,
+      "lng": 44.4619127,
+      "limit": 60,
+      "direction": 13,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/301",
+      "lat": 40.1809461,
+      "lng": 44.4597387,
+      "limit": 60,
+      "direction": 195,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/302",
+      "lat": 40.174653,
+      "lng": 44.449596,
+      "limit": 60,
+      "direction": 275,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/303",
+      "lat": 40.1743971,
+      "lng": 44.4496644,
+      "limit": 60,
+      "direction": 82,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/304",
+      "lat": 40.1765342,
+      "lng": 44.5218262,
+      "limit": 60,
+      "direction": 38,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/307",
+      "lat": 40.2041301,
+      "lng": 44.5082306,
+      "limit": 60,
+      "direction": 260,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/312",
+      "lat": 40.2199272,
+      "lng": 44.4768859,
+      "limit": 60,
+      "direction": 35,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/313",
+      "lat": 40.2117319,
+      "lng": 44.538389,
+      "limit": 60,
+      "direction": 150,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/314",
+      "lat": 40.2610897,
+      "lng": 44.6095249,
+      "limit": 60,
+      "direction": 231,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/315",
+      "lat": 40.2276453,
+      "lng": 44.5495866,
+      "limit": 60,
+      "direction": 35,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/317",
+      "lat": 40.1890264,
+      "lng": 44.5281094,
+      "limit": 60,
+      "direction": 35,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/318",
+      "lat": 40.1598818,
+      "lng": 44.4026965,
+      "limit": 50,
+      "direction": 213,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/332",
+      "lat": 40.1577072,
+      "lng": 44.4502256,
+      "limit": 60,
+      "direction": 285,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/333",
+      "lat": 40.8716347,
+      "lng": 45.1426151,
+      "limit": 60,
+      "direction": 34,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/334",
+      "lat": 40.887434,
+      "lng": 45.1486914,
+      "limit": 60,
+      "direction": 20,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/335",
+      "lat": 41.033748,
+      "lng": 45.144218,
+      "limit": 60,
+      "direction": 137,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/336",
+      "lat": 41.1282304,
+      "lng": 45.003685,
+      "limit": 60,
+      "direction": 85,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/337",
+      "lat": 41.2010338,
+      "lng": 44.9933592,
+      "limit": 60,
+      "direction": 15,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/338",
+      "lat": 41.2271471,
+      "lng": 44.8570389,
+      "limit": 60,
+      "direction": 132,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/339",
+      "lat": 39.7619577,
+      "lng": 44.805141,
+      "limit": 60,
+      "direction": 304,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/340",
+      "lat": 39.7444984,
+      "lng": 44.8264648,
+      "limit": 60,
+      "direction": 330,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/341",
+      "lat": 39.727871,
+      "lng": 45.188088,
+      "limit": 60,
+      "direction": 115,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/344",
+      "lat": 39.73852,
+      "lng": 45.265221,
+      "limit": 60,
+      "direction": 95,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/345",
+      "lat": 39.690817,
+      "lng": 45.469744,
+      "limit": 60,
+      "direction": 135,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/346",
+      "lat": 40.0193753,
+      "lng": 44.4897196,
+      "limit": 60,
+      "direction": 130,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/348",
+      "lat": 39.2033269,
+      "lng": 46.4520836,
+      "limit": 60,
+      "direction": 90,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/350",
+      "lat": 40.2060807,
+      "lng": 44.5061558,
+      "limit": 60,
+      "direction": 240,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/351",
+      "lat": 40.1829149,
+      "lng": 44.5097499,
+      "limit": 60,
+      "direction": 222,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/352",
+      "lat": 40.181741,
+      "lng": 44.524039,
+      "limit": 60,
+      "direction": 5,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/356",
+      "lat": 39.2219308,
+      "lng": 46.3528633,
+      "limit": 60,
+      "direction": 111,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/357",
+      "lat": 40.2901393,
+      "lng": 44.6098348,
+      "limit": 90,
+      "direction": 28,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/358",
+      "lat": 40.467848,
+      "lng": 44.7383,
+      "limit": 90,
+      "direction": 50,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/359",
+      "lat": 40.16024,
+      "lng": 45.25049,
+      "limit": 60,
+      "direction": 132,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/361",
+      "lat": 40.7589402,
+      "lng": 43.8346841,
+      "limit": 60,
+      "direction": 40,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/363",
+      "lat": 39.5097368,
+      "lng": 46.3389593,
+      "limit": 60,
+      "direction": 330,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/364",
+      "lat": 40.3330565,
+      "lng": 44.3682808,
+      "limit": 60,
+      "direction": 16,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/366",
+      "lat": 40.1932757,
+      "lng": 44.4849827,
+      "limit": 60,
+      "direction": 231,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/367",
+      "lat": 40.182675,
+      "lng": 44.5619043,
+      "limit": 60,
+      "direction": 200,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/369",
+      "lat": 40.1784617,
+      "lng": 44.4803621,
+      "limit": 60,
+      "direction": 155,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/370",
+      "lat": 40.1785316,
+      "lng": 44.4805337,
+      "limit": 60,
+      "direction": 337,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/371",
+      "lat": 40.160598,
+      "lng": 44.425635,
+      "limit": 60,
+      "direction": 120,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/372",
+      "lat": 40.1453122,
+      "lng": 44.5100569,
+      "limit": 60,
+      "direction": 180,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/373",
+      "lat": 39.9511795,
+      "lng": 44.5415381,
+      "limit": 60,
+      "direction": 134,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/374",
+      "lat": 39.9520734,
+      "lng": 44.5404047,
+      "limit": 60,
+      "direction": 313,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/376",
+      "lat": 40.1363452,
+      "lng": 44.4619123,
+      "limit": 60,
+      "direction": 224,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/377",
+      "lat": 40.1361485,
+      "lng": 44.4617933,
+      "limit": 60,
+      "direction": 44,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/378",
+      "lat": 40.1435952,
+      "lng": 44.4935509,
+      "limit": 60,
+      "direction": 315,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/381",
+      "lat": 40.529379,
+      "lng": 44.780522,
+      "limit": 60,
+      "direction": 139,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/383",
+      "lat": 40.822937,
+      "lng": 44.2411065,
+      "limit": 60,
+      "direction": 77,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/384",
+      "lat": 40.14239,
+      "lng": 44.51463,
+      "limit": 60,
+      "direction": 274,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/385",
+      "lat": 40.14228,
+      "lng": 44.5146,
+      "limit": 60,
+      "direction": 92,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/388",
+      "lat": 40.2048751,
+      "lng": 44.5556829,
+      "limit": 60,
+      "direction": 53,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/391",
+      "lat": 40.7037873,
+      "lng": 44.2202077,
+      "limit": 60,
+      "direction": 128,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/392",
+      "lat": 40.475125,
+      "lng": 44.741393,
+      "limit": 50,
+      "direction": 40,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/415",
+      "lat": 40.157948,
+      "lng": 44.511099,
+      "limit": 60,
+      "direction": 196,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/417",
+      "lat": 40.172709,
+      "lng": 44.4931026,
+      "limit": 60,
+      "direction": 232,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/419",
+      "lat": 40.2043269,
+      "lng": 44.5285087,
+      "limit": 60,
+      "direction": 306,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/420",
+      "lat": 40.172973,
+      "lng": 44.493885,
+      "limit": 60,
+      "direction": 52,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/421",
+      "lat": 40.0190701,
+      "lng": 44.490299,
+      "limit": 60,
+      "direction": 330,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/423",
+      "lat": 40.2045711,
+      "lng": 44.5643878,
+      "limit": 60,
+      "direction": 340,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/424",
+      "lat": 40.1996309,
+      "lng": 44.4935287,
+      "limit": 60,
+      "direction": 205,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/425",
+      "lat": 40.2001892,
+      "lng": 44.4650581,
+      "limit": 60,
+      "direction": 96,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/426",
+      "lat": 40.2090029,
+      "lng": 44.4652775,
+      "limit": 60,
+      "direction": 92,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/427",
+      "lat": 40.1701519,
+      "lng": 44.4461982,
+      "limit": 60,
+      "direction": 8,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/430",
+      "lat": 40.29224,
+      "lng": 44.368061,
+      "limit": 60,
+      "direction": 56,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/431",
+      "lat": 40.5352831,
+      "lng": 44.7126366,
+      "limit": 60,
+      "direction": 72,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/435",
+      "lat": 40.168439,
+      "lng": 44.438548,
+      "limit": 60,
+      "direction": 340,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/471",
+      "lat": 40.1348212,
+      "lng": 44.5280549,
+      "limit": 60,
+      "direction": 56,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/472",
+      "lat": 40.1487287,
+      "lng": 44.4540552,
+      "limit": 60,
+      "direction": 110,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/473",
+      "lat": 40.18577,
+      "lng": 44.54052,
+      "limit": 60,
+      "direction": 100,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/474",
+      "lat": 40.1857864,
+      "lng": 44.5405843,
+      "limit": 60,
+      "direction": 290,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/475",
+      "lat": 40.22355,
+      "lng": 44.57554,
+      "limit": 60,
+      "direction": 350,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/476",
+      "lat": 40.2235911,
+      "lng": 44.5755291,
+      "limit": 60,
+      "direction": 164,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/477",
+      "lat": 39.7424535,
+      "lng": 44.8329207,
+      "limit": 60,
+      "direction": 254,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/479",
+      "lat": 40.13976,
+      "lng": 44.51757,
+      "limit": 60,
+      "direction": 4,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/480",
+      "lat": 40.1398671,
+      "lng": 44.5175383,
+      "limit": 60,
+      "direction": 184,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/494",
+      "lat": 40.1679206,
+      "lng": 44.5468648,
+      "limit": 60,
+      "direction": 40,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/495",
+      "lat": 40.166259,
+      "lng": 44.505381,
+      "limit": 60,
+      "direction": 206,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/496",
+      "lat": 40.16675,
+      "lng": 44.50566,
+      "limit": 60,
+      "direction": 18,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/497",
+      "lat": 39.9770272,
+      "lng": 44.5208091,
+      "limit": 60,
+      "direction": 50,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/498",
+      "lat": 40.14162,
+      "lng": 44.42301,
+      "limit": 60,
+      "direction": 40,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/499",
+      "lat": 40.14005,
+      "lng": 44.49311,
+      "limit": 60,
+      "direction": 36,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/502",
+      "lat": 40.126426,
+      "lng": 44.406621,
+      "limit": 60,
+      "direction": 72,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/503",
+      "lat": 41.1129389,
+      "lng": 44.2925057,
+      "limit": 60,
+      "direction": 329,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/505",
+      "lat": 40.2117404,
+      "lng": 44.5618739,
+      "limit": 60,
+      "direction": 19,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/506",
+      "lat": 40.2025283,
+      "lng": 44.5552086,
+      "limit": 60,
+      "direction": 217,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/511",
+      "lat": 40.796248,
+      "lng": 43.835501,
+      "limit": 60,
+      "direction": 170,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/512",
+      "lat": 40.818099,
+      "lng": 43.836924,
+      "limit": 60,
+      "direction": 146,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/513",
+      "lat": 40.7391457,
+      "lng": 43.7976606,
+      "limit": 40,
+      "direction": 226,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/514",
+      "lat": 40.15191,
+      "lng": 44.51641,
+      "limit": 60,
+      "direction": 4,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/515",
+      "lat": 40.825566,
+      "lng": 44.467485,
+      "limit": 50,
+      "direction": 109,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/516",
+      "lat": 40.15034,
+      "lng": 44.50734,
+      "limit": 60,
+      "direction": 102,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/518",
+      "lat": 40.15026,
+      "lng": 44.50733,
+      "limit": 60,
+      "direction": 266,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/520",
+      "lat": 39.9914743,
+      "lng": 44.4982606,
+      "limit": 40,
+      "direction": 328,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/559",
+      "lat": 40.2075082,
+      "lng": 44.4805198,
+      "limit": 60,
+      "direction": 185,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/567",
+      "lat": 40.1148189,
+      "lng": 44.4774844,
+      "limit": 60,
+      "direction": 35,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/569",
+      "lat": 40.1762513,
+      "lng": 45.5634677,
+      "limit": 60,
+      "direction": 82,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/571",
+      "lat": 40.2122155,
+      "lng": 44.5621431,
+      "limit": 60,
+      "direction": 190,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/572",
+      "lat": 40.756225,
+      "lng": 44.883775,
+      "limit": 60,
+      "direction": 65,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/579",
+      "lat": 40.102734,
+      "lng": 43.9542174,
+      "limit": 60,
+      "direction": 34,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/580",
+      "lat": 39.9159344,
+      "lng": 44.7254659,
+      "limit": 60,
+      "direction": 240,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/581",
+      "lat": 39.9207564,
+      "lng": 44.7552944,
+      "limit": 60,
+      "direction": 256,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/582",
+      "lat": 40.1246932,
+      "lng": 44.4452065,
+      "limit": 60,
+      "direction": 51,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/583",
+      "lat": 40.1752503,
+      "lng": 44.5271567,
+      "limit": 60,
+      "direction": 11,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/586",
+      "lat": 40.182555,
+      "lng": 44.562081,
+      "limit": 60,
+      "direction": 15,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/589",
+      "lat": 40.1819636,
+      "lng": 44.4819206,
+      "limit": 60,
+      "direction": 142,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/590",
+      "lat": 40.181674,
+      "lng": 44.4823816,
+      "limit": 60,
+      "direction": 275,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/591",
+      "lat": 40.1653595,
+      "lng": 44.3378528,
+      "limit": 50,
+      "direction": 273,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/592",
+      "lat": 40.1653802,
+      "lng": 44.3378511,
+      "limit": 50,
+      "direction": 93,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/593",
+      "lat": 40.1599724,
+      "lng": 44.4025571,
+      "limit": 60,
+      "direction": 30,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/595",
+      "lat": 40.1626406,
+      "lng": 44.3900514,
+      "limit": 60,
+      "direction": 100,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/596",
+      "lat": 40.162667,
+      "lng": 44.474768,
+      "limit": 60,
+      "direction": 61,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/597",
+      "lat": 40.1497597,
+      "lng": 44.1633944,
+      "limit": 70,
+      "direction": 76,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/599",
+      "lat": 40.1963355,
+      "lng": 44.5480637,
+      "limit": 60,
+      "direction": 60,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/600",
+      "lat": 40.2035657,
+      "lng": 44.4613912,
+      "limit": 60,
+      "direction": 185,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/603",
+      "lat": 40.1752585,
+      "lng": 44.5272318,
+      "limit": 60,
+      "direction": 185,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/604",
+      "lat": 40.6245706,
+      "lng": 43.9795482,
+      "limit": 60,
+      "direction": 304,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/605",
+      "lat": 40.1537154,
+      "lng": 44.6564809,
+      "limit": 60,
+      "direction": 105,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/606",
+      "lat": 40.8388243,
+      "lng": 44.4339939,
+      "limit": 50,
+      "direction": 315,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/607",
+      "lat": 39.5127201,
+      "lng": 46.338466,
+      "limit": 40,
+      "direction": 330,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/609",
+      "lat": 40.8709259,
+      "lng": 44.4388733,
+      "limit": 60,
+      "direction": 345,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/610",
+      "lat": 40.201027,
+      "lng": 44.479734,
+      "limit": 60,
+      "direction": 6,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/612",
+      "lat": 40.1937518,
+      "lng": 44.5227192,
+      "limit": 60,
+      "direction": 264,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/614",
+      "lat": 40.139884,
+      "lng": 44.0493926,
+      "limit": 60,
+      "direction": 116,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/615",
+      "lat": 39.5223677,
+      "lng": 46.3342189,
+      "limit": 60,
+      "direction": 120,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/616",
+      "lat": 41.1765144,
+      "lng": 44.9979155,
+      "limit": 60,
+      "direction": 340,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/617",
+      "lat": 40.474098,
+      "lng": 44.748828,
+      "limit": 90,
+      "direction": 231,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/618",
+      "lat": 40.5290188,
+      "lng": 44.7672183,
+      "limit": 60,
+      "direction": 20,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/619",
+      "lat": 40.214255,
+      "lng": 44.4894306,
+      "limit": 60,
+      "direction": 325,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/621",
+      "lat": 40.190672,
+      "lng": 44.559206,
+      "limit": 60,
+      "direction": 36,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/622",
+      "lat": 40.2351108,
+      "lng": 44.556797,
+      "limit": 60,
+      "direction": 247,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/623",
+      "lat": 40.2350779,
+      "lng": 44.5568184,
+      "limit": 60,
+      "direction": 75,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/624",
+      "lat": 40.138476,
+      "lng": 44.5368901,
+      "limit": 60,
+      "direction": 152,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/625",
+      "lat": 40.1888865,
+      "lng": 44.5278948,
+      "limit": 60,
+      "direction": 215,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/627",
+      "lat": 40.170306,
+      "lng": 44.446032,
+      "limit": 60,
+      "direction": 176,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/628",
+      "lat": 40.150295,
+      "lng": 44.5206056,
+      "limit": 60,
+      "direction": 94,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/629",
+      "lat": 40.142686,
+      "lng": 44.539571,
+      "limit": 60,
+      "direction": 264,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/630",
+      "lat": 40.1441343,
+      "lng": 44.5336778,
+      "limit": 60,
+      "direction": 14,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/631",
+      "lat": 40.662283,
+      "lng": 43.8863329,
+      "limit": 60,
+      "direction": 85,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/632",
+      "lat": 40.1815181,
+      "lng": 45.5965126,
+      "limit": 60,
+      "direction": 86,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/633",
+      "lat": 39.1561297,
+      "lng": 46.2005516,
+      "limit": 60,
+      "direction": 222,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/634",
+      "lat": 39.156088,
+      "lng": 46.2006052,
+      "limit": 60,
+      "direction": 44,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/635",
+      "lat": 40.740365,
+      "lng": 44.848769,
+      "limit": 60,
+      "direction": 98,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/636",
+      "lat": 39.2074145,
+      "lng": 46.3898947,
+      "limit": 60,
+      "direction": 108,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/637",
+      "lat": 39.2075063,
+      "lng": 46.3898089,
+      "limit": 60,
+      "direction": 276,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/638",
+      "lat": 39.2182905,
+      "lng": 46.3648573,
+      "limit": 60,
+      "direction": 116,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/639",
+      "lat": 39.2184073,
+      "lng": 46.3647822,
+      "limit": 60,
+      "direction": 306,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/640",
+      "lat": 40.1604824,
+      "lng": 45.2500786,
+      "limit": 60,
+      "direction": 306,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/641",
+      "lat": 40.2235505,
+      "lng": 44.5600297,
+      "limit": 60,
+      "direction": 344,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/643",
+      "lat": 40.3330401,
+      "lng": 44.3681413,
+      "limit": 60,
+      "direction": 208,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/644",
+      "lat": 40.3469641,
+      "lng": 44.3802756,
+      "limit": 60,
+      "direction": 194,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/645",
+      "lat": 40.4725,
+      "lng": 44.394167,
+      "limit": 70,
+      "direction": 192,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/646",
+      "lat": 40.4725491,
+      "lng": 44.3942528,
+      "limit": 70,
+      "direction": 12,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/647",
+      "lat": 40.3849815,
+      "lng": 44.3794763,
+      "limit": 60,
+      "direction": 180,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/648",
+      "lat": 40.518455,
+      "lng": 44.390173,
+      "limit": 60,
+      "direction": 352,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/661",
+      "lat": 40.823798,
+      "lng": 44.474811,
+      "limit": 50,
+      "direction": 105,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/663",
+      "lat": 40.164088,
+      "lng": 44.407847,
+      "limit": 60,
+      "direction": 266,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/677",
+      "lat": 40.690007,
+      "lng": 44.2721452,
+      "limit": 60,
+      "direction": 106,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/678",
+      "lat": 40.6899825,
+      "lng": 44.273497,
+      "limit": 60,
+      "direction": 280,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/680",
+      "lat": 40.2382353,
+      "lng": 44.5648758,
+      "limit": 60,
+      "direction": 45,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/681",
+      "lat": 40.159876,
+      "lng": 44.221101,
+      "limit": 90,
+      "direction": 78,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/682",
+      "lat": 40.1600448,
+      "lng": 44.2210205,
+      "limit": 90,
+      "direction": 258,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/683",
+      "lat": 40.1655083,
+      "lng": 44.2520892,
+      "limit": 90,
+      "direction": 258,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/684",
+      "lat": 40.21507,
+      "lng": 44.296379,
+      "limit": 60,
+      "direction": 192,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/685",
+      "lat": 40.780668,
+      "lng": 43.84771,
+      "limit": 60,
+      "direction": 275,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/686",
+      "lat": 40.1896747,
+      "lng": 44.4755825,
+      "limit": 60,
+      "direction": 140,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/687",
+      "lat": 40.2383504,
+      "lng": 44.5645754,
+      "limit": 60,
+      "direction": 240,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/689",
+      "lat": 40.49775,
+      "lng": 45.272239,
+      "limit": 60,
+      "direction": 108,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/690",
+      "lat": 40.4978892,
+      "lng": 45.2721425,
+      "limit": 60,
+      "direction": 288,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/691",
+      "lat": 40.53546,
+      "lng": 44.87625,
+      "limit": 90,
+      "direction": 241,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/692",
+      "lat": 40.4176518,
+      "lng": 45.109381,
+      "limit": 60,
+      "direction": 333,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/693",
+      "lat": 40.2718996,
+      "lng": 44.5989236,
+      "limit": 70,
+      "direction": 2,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/694",
+      "lat": 40.2719079,
+      "lng": 44.5987627,
+      "limit": 70,
+      "direction": 196,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/695",
+      "lat": 40.20919,
+      "lng": 44.45274,
+      "limit": 60,
+      "direction": 270,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/696",
+      "lat": 39.5224425,
+      "lng": 46.3340044,
+      "limit": 60,
+      "direction": 296,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/696-reverse",
+      "lat": 39.5224425,
+      "lng": 46.3340044,
+      "limit": 60,
+      "direction": 116,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/697",
+      "lat": 40.1428265,
+      "lng": 44.1142793,
+      "limit": 60,
+      "direction": 274,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/698",
+      "lat": 41.2271957,
+      "lng": 44.8570121,
+      "limit": 60,
+      "direction": 323,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/699",
+      "lat": 40.7391701,
+      "lng": 43.7977893,
+      "limit": 40,
+      "direction": 43,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/700",
+      "lat": 40.21258,
+      "lng": 44.47791,
+      "limit": 60,
+      "direction": 119,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/702",
+      "lat": 40.2938737,
+      "lng": 44.3922042,
+      "limit": 60,
+      "direction": 63,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/703",
+      "lat": 40.2938819,
+      "lng": 44.3920862,
+      "limit": 60,
+      "direction": 243,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/705",
+      "lat": 40.8707304,
+      "lng": 44.4388733,
+      "limit": 60,
+      "direction": 170,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/706",
+      "lat": 39.8143213,
+      "lng": 45.0443195,
+      "limit": 70,
+      "direction": 282,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/707",
+      "lat": 41.1128821,
+      "lng": 44.2925057,
+      "limit": 60,
+      "direction": 145,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/708",
+      "lat": 39.9912185,
+      "lng": 44.4983894,
+      "limit": 40,
+      "direction": 148,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/709",
+      "lat": 40.2297331,
+      "lng": 44.5975989,
+      "limit": 70,
+      "direction": 323,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/710",
+      "lat": 40.229618,
+      "lng": 44.5976526,
+      "limit": 70,
+      "direction": 144,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/711",
+      "lat": 40.7038689,
+      "lng": 44.2201756,
+      "limit": 60,
+      "direction": 316,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/712",
+      "lat": 40.216077,
+      "lng": 44.495827,
+      "limit": 60,
+      "direction": 227,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/713",
+      "lat": 40.2074836,
+      "lng": 44.4806164,
+      "limit": 60,
+      "direction": 5,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/714",
+      "lat": 40.1362888,
+      "lng": 44.5381083,
+      "limit": 60,
+      "direction": 155,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/715",
+      "lat": 40.1649117,
+      "lng": 44.4619986,
+      "limit": 60,
+      "direction": 298,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/718",
+      "lat": 40.2015944,
+      "lng": 44.5823029,
+      "limit": 60,
+      "direction": 154,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/720",
+      "lat": 40.1531549,
+      "lng": 44.4914975,
+      "limit": 60,
+      "direction": 314,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/721",
+      "lat": 40.1853887,
+      "lng": 44.5029099,
+      "limit": 60,
+      "direction": 45,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/722",
+      "lat": 40.8768413,
+      "lng": 45.1451719,
+      "limit": 60,
+      "direction": 210,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/723",
+      "lat": 40.1579603,
+      "lng": 44.5407078,
+      "limit": 60,
+      "direction": 355,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/724",
+      "lat": 40.1514137,
+      "lng": 44.5324184,
+      "limit": 60,
+      "direction": 250,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/725",
+      "lat": 40.1301882,
+      "lng": 44.5096694,
+      "limit": 60,
+      "direction": 184,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/726",
+      "lat": 41.019169,
+      "lng": 44.3763933,
+      "limit": 60,
+      "direction": 140,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/727",
+      "lat": 40.955776,
+      "lng": 44.4421899,
+      "limit": 60,
+      "direction": 178,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/728",
+      "lat": 40.2161245,
+      "lng": 44.5549072,
+      "limit": 40,
+      "direction": 278,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/729",
+      "lat": 40.1312781,
+      "lng": 44.5333853,
+      "limit": 60,
+      "direction": 219,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/731",
+      "lat": 40.2087127,
+      "lng": 44.5355498,
+      "limit": 60,
+      "direction": 320,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/732",
+      "lat": 40.1257839,
+      "lng": 44.4924842,
+      "limit": 60,
+      "direction": 267,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/733",
+      "lat": 40.6525571,
+      "lng": 44.8945841,
+      "limit": 50,
+      "direction": 285,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/734",
+      "lat": 40.7063705,
+      "lng": 44.8510158,
+      "limit": 50,
+      "direction": 350,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/735",
+      "lat": 40.1851689,
+      "lng": 43.9126104,
+      "limit": 60,
+      "direction": 290,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/736",
+      "lat": 40.1305767,
+      "lng": 44.0061856,
+      "limit": 60,
+      "direction": 240,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/737",
+      "lat": 40.091249,
+      "lng": 44.04486,
+      "limit": 60,
+      "direction": 350,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/738",
+      "lat": 39.7979624,
+      "lng": 44.7699279,
+      "limit": 60,
+      "direction": 330,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/739",
+      "lat": 40.6785166,
+      "lng": 44.289502,
+      "limit": 60,
+      "direction": 160,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/740",
+      "lat": 40.7208857,
+      "lng": 44.2060301,
+      "limit": 60,
+      "direction": 165,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/741",
+      "lat": 40.8357689,
+      "lng": 44.2812917,
+      "limit": 60,
+      "direction": 260,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/743",
+      "lat": 40.7393121,
+      "lng": 44.690771,
+      "limit": 60,
+      "direction": 320,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/744",
+      "lat": 40.2963751,
+      "lng": 44.2931343,
+      "limit": 60,
+      "direction": 270,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/745",
+      "lat": 40.3202605,
+      "lng": 44.4867791,
+      "limit": 60,
+      "direction": 210,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/746",
+      "lat": 40.2368191,
+      "lng": 44.5099926,
+      "limit": 60,
+      "direction": 150,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/747",
+      "lat": 40.2576518,
+      "lng": 44.4943714,
+      "limit": 60,
+      "direction": 160,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/748",
+      "lat": 40.3216603,
+      "lng": 44.5794819,
+      "limit": 60,
+      "direction": 192,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/749",
+      "lat": 40.6569425,
+      "lng": 44.3007859,
+      "limit": 60,
+      "direction": 170,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/750",
+      "lat": 40.6566444,
+      "lng": 44.0805352,
+      "limit": 60,
+      "direction": 290,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/751",
+      "lat": 40.8470165,
+      "lng": 43.8377624,
+      "limit": 60,
+      "direction": 189,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/753",
+      "lat": 40.8111702,
+      "lng": 43.8759846,
+      "limit": 60,
+      "direction": 230,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/755",
+      "lat": 40.1765061,
+      "lng": 44.5217355,
+      "limit": 60,
+      "direction": 203,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/756",
+      "lat": 40.2200045,
+      "lng": 44.4767413,
+      "limit": 60,
+      "direction": 215,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/757",
+      "lat": 40.2117993,
+      "lng": 44.5385418,
+      "limit": 60,
+      "direction": 315,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/758",
+      "lat": 40.260985,
+      "lng": 44.609636,
+      "limit": 60,
+      "direction": 51,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/759",
+      "lat": 40.2277226,
+      "lng": 44.549442,
+      "limit": 60,
+      "direction": 215,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/760",
+      "lat": 40.8717101,
+      "lng": 45.1424674,
+      "limit": 60,
+      "direction": 205,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/761",
+      "lat": 40.8874801,
+      "lng": 45.1485239,
+      "limit": 60,
+      "direction": 215,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/762",
+      "lat": 41.0338399,
+      "lng": 45.1443486,
+      "limit": 60,
+      "direction": 310,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/763",
+      "lat": 41.1283646,
+      "lng": 45.0036694,
+      "limit": 60,
+      "direction": 270,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/764",
+      "lat": 41.2010687,
+      "lng": 44.9931862,
+      "limit": 60,
+      "direction": 185,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/765",
+      "lat": 39.761846,
+      "lng": 44.805043,
+      "limit": 60,
+      "direction": 124,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/766",
+      "lat": 39.744431,
+      "lng": 44.826313,
+      "limit": 60,
+      "direction": 150,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/767",
+      "lat": 39.7279931,
+      "lng": 45.188162,
+      "limit": 60,
+      "direction": 295,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/768",
+      "lat": 39.7386542,
+      "lng": 45.2652363,
+      "limit": 60,
+      "direction": 292,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/769",
+      "lat": 39.6909123,
+      "lng": 45.4698678,
+      "limit": 60,
+      "direction": 315,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/770",
+      "lat": 39.2034617,
+      "lng": 46.4520836,
+      "limit": 60,
+      "direction": 270,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/771",
+      "lat": 40.205964,
+      "lng": 44.506244,
+      "limit": 60,
+      "direction": 60,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/772",
+      "lat": 40.1828247,
+      "lng": 44.509881,
+      "limit": 60,
+      "direction": 42,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/773",
+      "lat": 40.1817527,
+      "lng": 44.5238633,
+      "limit": 60,
+      "direction": 200,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/774",
+      "lat": 39.2220566,
+      "lng": 46.3529256,
+      "limit": 60,
+      "direction": 291,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/775",
+      "lat": 40.7590268,
+      "lng": 43.8345478,
+      "limit": 60,
+      "direction": 220,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/776",
+      "lat": 39.5096694,
+      "lng": 46.338808,
+      "limit": 60,
+      "direction": 150,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/777",
+      "lat": 40.193171,
+      "lng": 44.4850937,
+      "limit": 60,
+      "direction": 51,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/778",
+      "lat": 40.1434999,
+      "lng": 44.4934263,
+      "limit": 60,
+      "direction": 135,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/779",
+      "lat": 40.5294674,
+      "lng": 44.7806558,
+      "limit": 60,
+      "direction": 319,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/780",
+      "lat": 40.8230683,
+      "lng": 44.2410664,
+      "limit": 60,
+      "direction": 257,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/781",
+      "lat": 40.2049827,
+      "lng": 44.5555767,
+      "limit": 60,
+      "direction": 233,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/782",
+      "lat": 40.4752116,
+      "lng": 44.7412573,
+      "limit": 50,
+      "direction": 220,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/783",
+      "lat": 40.2042179,
+      "lng": 44.528405,
+      "limit": 60,
+      "direction": 126,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/784",
+      "lat": 40.204525,
+      "lng": 44.564222,
+      "limit": 60,
+      "direction": 160,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/785",
+      "lat": 40.1995739,
+      "lng": 44.4936886,
+      "limit": 60,
+      "direction": 25,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/786",
+      "lat": 40.2003232,
+      "lng": 44.4650765,
+      "limit": 60,
+      "direction": 276,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/787",
+      "lat": 40.2091376,
+      "lng": 44.4652837,
+      "limit": 60,
+      "direction": 272,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/788",
+      "lat": 40.2923517,
+      "lng": 44.3679622,
+      "limit": 60,
+      "direction": 240,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/789",
+      "lat": 40.5354113,
+      "lng": 44.7125818,
+      "limit": 60,
+      "direction": 242,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/790",
+      "lat": 40.1349329,
+      "lng": 44.5279563,
+      "limit": 60,
+      "direction": 236,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/791",
+      "lat": 40.1488553,
+      "lng": 44.4541155,
+      "limit": 60,
+      "direction": 290,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/792",
+      "lat": 39.742324,
+      "lng": 44.832969,
+      "limit": 60,
+      "direction": 74,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/793",
+      "lat": 40.1680072,
+      "lng": 44.5467297,
+      "limit": 60,
+      "direction": 220,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/794",
+      "lat": 39.9771304,
+      "lng": 44.5206961,
+      "limit": 60,
+      "direction": 230,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/795",
+      "lat": 40.1417066,
+      "lng": 44.422875,
+      "limit": 60,
+      "direction": 220,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/796",
+      "lat": 40.1265542,
+      "lng": 44.4065665,
+      "limit": 60,
+      "direction": 218,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/797",
+      "lat": 40.7962714,
+      "lng": 43.8356763,
+      "limit": 60,
+      "direction": 350,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/798",
+      "lat": 40.8181744,
+      "lng": 43.8370716,
+      "limit": 60,
+      "direction": 326,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/799",
+      "lat": 40.1519194,
+      "lng": 44.5162341,
+      "limit": 60,
+      "direction": 184,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/800",
+      "lat": 40.8256934,
+      "lng": 44.467543,
+      "limit": 50,
+      "direction": 289,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/801",
+      "lat": 40.1763847,
+      "lng": 45.5634432,
+      "limit": 60,
+      "direction": 262,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/802",
+      "lat": 40.7563471,
+      "lng": 44.8836998,
+      "limit": 60,
+      "direction": 245,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/803",
+      "lat": 40.1028094,
+      "lng": 43.9540714,
+      "limit": 60,
+      "direction": 214,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/804",
+      "lat": 39.9158177,
+      "lng": 44.7255537,
+      "limit": 60,
+      "direction": 60,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/805",
+      "lat": 39.9206257,
+      "lng": 44.7553369,
+      "limit": 60,
+      "direction": 90,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/806",
+      "lat": 40.1247979,
+      "lng": 44.4450956,
+      "limit": 60,
+      "direction": 231,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/807",
+      "lat": 40.1627733,
+      "lng": 44.390082,
+      "limit": 60,
+      "direction": 280,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/809",
+      "lat": 40.203554,
+      "lng": 44.461567,
+      "limit": 60,
+      "direction": 5,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/810",
+      "lat": 40.1538456,
+      "lng": 44.6565265,
+      "limit": 60,
+      "direction": 285,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/811",
+      "lat": 40.838729,
+      "lng": 44.433868,
+      "limit": 50,
+      "direction": 135,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/812",
+      "lat": 39.5126527,
+      "lng": 46.3383147,
+      "limit": 40,
+      "direction": 150,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/814",
+      "lat": 40.1400051,
+      "lng": 44.0494699,
+      "limit": 60,
+      "direction": 296,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/815",
+      "lat": 41.1764683,
+      "lng": 44.9977473,
+      "limit": 60,
+      "direction": 160,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/816",
+      "lat": 40.5290649,
+      "lng": 44.7670517,
+      "limit": 60,
+      "direction": 200,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/817",
+      "lat": 40.2141777,
+      "lng": 44.4892861,
+      "limit": 60,
+      "direction": 145,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/818",
+      "lat": 40.1907512,
+      "lng": 44.5590633,
+      "limit": 60,
+      "direction": 220,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/819",
+      "lat": 40.1385393,
+      "lng": 44.5370457,
+      "limit": 60,
+      "direction": 332,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/820",
+      "lat": 40.1504294,
+      "lng": 44.5206179,
+      "limit": 60,
+      "direction": 274,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/821",
+      "lat": 40.142552,
+      "lng": 44.5395894,
+      "limit": 60,
+      "direction": 84,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/822",
+      "lat": 40.1441669,
+      "lng": 44.5335068,
+      "limit": 60,
+      "direction": 194,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/823",
+      "lat": 40.6624172,
+      "lng": 43.8863174,
+      "limit": 60,
+      "direction": 265,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/824",
+      "lat": 40.1816525,
+      "lng": 45.5965003,
+      "limit": 60,
+      "direction": 266,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/825",
+      "lat": 40.7404984,
+      "lng": 44.8487938,
+      "limit": 60,
+      "direction": 278,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/826",
+      "lat": 40.8239282,
+      "lng": 44.4748571,
+      "limit": 50,
+      "direction": 296,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/827",
+      "lat": 40.1840274,
+      "lng": 44.6273827,
+      "limit": 60,
+      "direction": 113,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/828",
+      "lat": 40.1841262,
+      "lng": 44.6272539,
+      "limit": 60,
+      "direction": 290,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/829",
+      "lat": 41.13987,
+      "lng": 44.7722136,
+      "limit": 60,
+      "direction": 60,
+      "type": "speed",
+      "source": "speedcamonline"
+    },
+    {
+      "id": "sco/830",
+      "lat": 41.1398538,
+      "lng": 44.7720741,
+      "limit": 60,
+      "direction": 236,
+      "type": "speed",
+      "source": "speedcamonline"
+    }
+  ]
+}

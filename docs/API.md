@@ -116,7 +116,12 @@ Returns `audio/mpeg`.
 
 ## `GET /api/speed-cameras`
 
-`[{ "id": 130041119, "lat": 40.1637, "lng": 44.4187, "limit": 60, "direction": 120, "name": "Камера 60 км/ч" }]` — from `data/yerevan-cameras-clean.json`, `Cache-Control: max-age=86400`.
+`[{ "id": "sco/352", "type": "speed", "source": "speedcamonline", "lat": 40.18174, "lng": 44.52404, "limit": 60, "direction": 5 }]` — the `cameras` array of `data/speed-cameras.json` (built by `scripts/update_speed_cameras.mjs`), `Cache-Control: max-age=86400`.
+
+- `type`: `speed` or `red_light` (red-light camera at a junction; `limit` is always `null`).
+- `source`: `osm` (OpenStreetMap, ODbL) or `speedcamonline` (SpeedCamOnLine.ru community base "Armenia"; attribution required, commercial use only with the owner's permission).
+- `limit`: km/h or `null` when unknown. Where the two sources disagree the lower one is kept.
+- `direction`: course in degrees of the traffic the camera enforces, or `null` = both directions. Only SpeedCamOnLine provides it; OSM `direction` tags are ambiguous and are not used.
 
 ## `GET /api/version`
 
