@@ -14,7 +14,7 @@ Production runs on **Google Cloud Run** as a source deploy (Cloud Build + Google
 | Identity | default compute service account |
 | Secrets / env | none (Supabase anon key is public and lives in `js/config.js`) |
 
-_Last inspected 2026-10-23: revision `tesla-navi-00078-hm2`, deployed 2026-10-22, serving the code from before PR #1 (asset version `?v=24`; it still serves `/server.js` and `/package.json`). Merging and deploying PR #1 fixes that._
+_Last deploy 2026-10-23: revision `tesla-navi-00079-h5t` from `main` @ `20e7b75` (PRs #1 and #2), asset versions `?v=37` (car) / `?v=36` (phone). Verified after deploy: private paths (`/server.js`, `/package.json`, `/.git/config`, docs, scripts) return 404, Yandex routing, SSRF guard and TTS work, smoke flow and WSS pairing pass in a browser, no errors in revision logs. Previous revision for rollback: `tesla-navi-00078-hm2`._
 
 HTTPS matters: phone geolocation and the screen wake lock only work on secure origins, which Cloud Run provides.
 
