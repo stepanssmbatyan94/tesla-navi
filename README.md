@@ -35,7 +35,7 @@ Details: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 | Safety | ~500 speed cameras across Armenia (OpenStreetMap + SpeedCamOnLine.ru) and red-light cameras at ~20 junctions, announced only along the active route and in the camera's direction; road limits from OpenStreetMap `maxspeed`, and where a street has no tag the legal default 60 in built-up areas / 90 outside (dashed); camera limit wins near a camera; overspeed chime on camera/OSM limits |
 | Places | Search (Yandex Suggest → Photon → Nominatim), Google/Yandex link and coordinate parsing, Home/Work, favorites, history |
 | Phone remote | GPS sharing with wake lock, address search, link paste, voice dictation, "Send to Tesla" |
-| Extras | Weather at the car's position (Open-Meteo), YouTube search/player, 105 EV charging stations from OpenStreetMap, Yerevan traffic score badge |
+| Extras | Weather at the car's position (Open-Meteo), YouTube player (live search, YouTube's "watch next" for what was played, category searches, touch-sized two-column layout), 105 EV charging stations from OpenStreetMap, Yerevan traffic score badge |
 | GPS | Phone GPS preferred; the car browser's own geolocation takes over automatically when the phone is silent |
 | Dev tools | `?mode=dev` simulator (preset routes, speeds, scrubbing) and diagnostics panel; `npm run verify` |
 

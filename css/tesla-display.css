@@ -1803,27 +1803,85 @@ body.night-mode .nav-progress-traveled-fill {
   pointer-events: none;
 }
 
-/* 8. YouTube Player Modal (Mapsev Architecture - Draggable / Floating) */
+/* 8. YouTube player (floating, draggable by its header).
+   Sized for the car's touchscreen: every control is at least 44 px, the fixed parts never
+   shrink and the result list takes whatever height is left (it scrolls on short screens). */
 .youtube-player-modal {
   position: absolute;
   top: 50px;
   left: 78px;
   z-index: 75;
-  width: 410px;
-  max-width: calc(100vw - 90px);
-  max-height: calc(100vh - 70px);
+  width: clamp(360px, 36vw, 500px);
+  max-width: calc(100vw - 96px);
+  height: calc(100vh - 66px);
+  max-height: 900px;
   background: #ffffff;
   border: 1px solid rgba(0, 0, 0, 0.08);
   border-radius: 24px;
-  padding: 14px 16px;
+  padding: 12px 16px 14px;
   box-shadow: 0 16px 48px rgba(0, 0, 0, 0.16), 0 2px 8px rgba(0, 0, 0, 0.04);
   display: flex;
   flex-direction: column;
   gap: 10px;
   user-select: none;
-  touch-action: none;
+  overflow-x: hidden;
   overflow-y: auto;
+  overscroll-behavior: contain;
+  box-sizing: border-box;
   transition: opacity 0.25s ease, transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.youtube-player-modal > *,
+.yt-player-col > *,
+.yt-browse-col > * {
+  flex-shrink: 0;
+}
+
+/* Narrow screens: one column; the list takes the rest of the height, and on a short screen
+   keeps a usable minimum while the whole card scrolls */
+.yt-player-col,
+.yt-browse-col {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+
+.youtube-player-modal > .yt-browse-col {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+/* The car's landscape screen: player on the left, search and list on the right at full height */
+@media (min-width: 960px) {
+  .youtube-player-modal {
+    width: min(860px, calc(100vw - 110px));
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr);
+    column-gap: 18px;
+    row-gap: 10px;
+  }
+
+  .yt-header-row {
+    grid-column: 1 / -1;
+  }
+
+  .yt-player-col .yt-screen-container {
+    max-height: none;
+  }
+
+  .youtube-player-modal {
+    overflow: hidden;
+  }
+
+  .youtube-player-modal > .yt-browse-col {
+    height: 100%;
+  }
+
+  .yt-browse-col > .yt-results-scroll-list {
+    min-height: 0;
+  }
 }
 
 .youtube-player-modal.hidden {
@@ -1832,40 +1890,45 @@ body.night-mode .nav-progress-traveled-fill {
   transform: translateY(20px) scale(0.96);
 }
 
-.yt-card-header {
-  display: flex;
-  flex-direction: column;
-}
-
-.yt-handle {
-  width: 36px;
-  height: 4px;
-  background: #cbd5e1;
-  border-radius: 2px;
-  margin: 0 auto 6px auto;
-  cursor: grab;
-}
-.yt-handle:active {
-  cursor: grabbing;
-}
-
-.yt-title-row {
+.yt-header-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 2px 4px 2px;
+  cursor: grab;
+  touch-action: none;
 }
 
-.yt-title-row span {
-  font-size: 16px;
+.yt-title-brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 18px;
   font-weight: 700;
   color: #0f172a;
 }
 
-/* Video Screen Box (Screenshot 3: Black Box with 'Nothing playing / Pick something below' when idle) */
+.yt-close-btn {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: none;
+  background: #f1f5f9;
+  color: #334155;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.yt-close-btn:active {
+  background: #e2e8f0;
+}
+
+/* 16:9 video, but never more than a third of a short screen */
 .yt-screen-container {
   width: 100%;
-  height: 185px;
+  aspect-ratio: 16 / 9;
+  max-height: 32vh;
   border-radius: 16px;
   overflow: hidden;
   background: #000000;
@@ -1873,7 +1936,6 @@ body.night-mode .nav-progress-traveled-fill {
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.18);
 }
 
 .yt-idle-screen {
@@ -1881,21 +1943,18 @@ body.night-mode .nav-progress-traveled-fill {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 4px;
+  gap: 8px;
   padding: 16px;
   text-align: center;
-  color: #ffffff;
 }
 
-.yt-idle-title {
-  font-size: 16px;
-  font-weight: 700;
-  color: #ffffff;
+.yt-idle-screen.hidden {
+  display: none;
 }
 
 .yt-idle-sub {
-  font-size: 13px;
-  color: #94a3b8;
+  font-size: 15px;
+  color: #cbd5e1;
 }
 
 .yt-iframe-player {
@@ -1907,38 +1966,74 @@ body.night-mode .nav-progress-traveled-fill {
   border: none;
 }
 
-/* Scrub Bar / Timeline (Screenshot 3) */
+.yt-iframe-player.hidden {
+  display: none;
+}
+
+.yt-now-row {
+  min-width: 0;
+  padding: 0 2px;
+}
+
+.yt-now-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: #0f172a;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.yt-now-artist {
+  font-size: 14px;
+  color: #64748b;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-height: 1em;
+}
+
+/* Timeline: a thin bar with a tall touch area for seeking */
 .yt-timeline-container {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 2px;
   padding: 0 2px;
 }
 
 .yt-timeline-track {
-  height: 4px;
+  height: 6px;
   background: #e2e8f0;
-  border-radius: 2px;
+  border-radius: 3px;
   cursor: pointer;
   position: relative;
+  margin: 9px 0;
+}
+
+.yt-timeline-track::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: -10px;
+  bottom: -10px;
 }
 
 .yt-timeline-fill {
   height: 100%;
   background: #ef4444;
-  border-radius: 2px;
+  border-radius: 3px;
   position: relative;
-  transition: width 0.1s linear;
 }
 
 .yt-timeline-knob {
-  width: 12px;
-  height: 12px;
+  width: 14px;
+  height: 14px;
   background: #ef4444;
   border: 2px solid #ffffff;
   border-radius: 50%;
   position: absolute;
-  right: -6px;
+  right: -7px;
   top: -4px;
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
 }
@@ -1946,44 +2041,48 @@ body.night-mode .nav-progress-traveled-fill {
 .yt-timestamps {
   display: flex;
   justify-content: space-between;
-  font-size: 11px;
+  font-size: 13px;
   font-weight: 500;
   color: #64748b;
   font-variant-numeric: tabular-nums;
+  min-height: 1.2em;
 }
 
-/* Transport Controls (Screenshot 3: Center Red Play/Pause Button) */
 .yt-transport-row {
   display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 28px;
-  margin: 2px 0;
+  justify-content: space-between;
+  padding: 0 4px;
 }
 
-.yt-skip-btn {
+.yt-skip-btn,
+.yt-aux-btn {
+  width: 52px;
+  height: 52px;
   background: none;
   border: none;
-  color: #475569;
+  border-radius: 50%;
+  color: #334155;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 6px;
-  border-radius: 50%;
-  transition: transform 0.15s ease, color 0.15s ease;
 }
-.yt-skip-btn:hover {
-  color: #0f172a;
-  transform: scale(1.15);
+
+.yt-aux-btn {
+  width: 48px;
+  height: 48px;
+  color: #64748b;
 }
-.yt-skip-btn:active {
-  transform: scale(0.92);
+
+.yt-skip-btn:active,
+.yt-aux-btn:active {
+  background: #f1f5f9;
 }
 
 .yt-red-play-btn {
-  width: 56px;
-  height: 56px;
+  width: 64px;
+  height: 64px;
   border-radius: 50%;
   background: #ef4444;
   border: none;
@@ -1991,56 +2090,16 @@ body.night-mode .nav-progress-traveled-fill {
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  box-shadow: 0 6px 20px rgba(239, 68, 68, 0.45);
-  transition: all 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: 0 6px 20px rgba(239, 68, 68, 0.4);
 }
-.yt-red-play-btn:hover {
-  background: #dc2626;
-  transform: scale(1.08);
-  box-shadow: 0 8px 24px rgba(239, 68, 68, 0.6);
-}
+
 .yt-red-play-btn:active {
-  transform: scale(0.94);
+  background: #dc2626;
+  transform: scale(0.95);
 }
 
-/* User Account & Quick Controls Row (Screenshot 3) */
-.yt-user-controls-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0 2px;
-}
-
-.yt-account-identity {
-  font-size: 13px;
-  font-weight: 500;
-  color: #475569;
-}
-
-.yt-aux-buttons {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.yt-aux-btn {
-  background: none;
-  border: none;
-  color: #64748b;
-  cursor: pointer;
-  padding: 4px;
-  border-radius: 6px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: color 0.15s;
-}
-.yt-aux-btn:hover {
-  color: #0f172a;
-}
-
-/* Search Bar with Red Search Button (Screenshot 3) */
 .yt-search-pill-container {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -2048,158 +2107,198 @@ body.night-mode .nav-progress-traveled-fill {
 
 .yt-search-pill-wrap {
   flex: 1;
+  min-width: 0;
   display: flex;
   align-items: center;
   gap: 8px;
   background: #f1f5f9;
-  border-radius: 20px;
-  padding: 8px 12px;
+  border-radius: 24px;
+  padding: 0 6px 0 14px;
+  height: 48px;
+  box-sizing: border-box;
 }
 
 .yt-search-pill-input {
   flex: 1;
+  min-width: 0;
   border: none;
   background: transparent;
   outline: none;
-  font-size: 13.5px;
+  font-size: 16px;
   color: #0f172a;
 }
 
 .yt-search-clear-btn {
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
   background: none;
   border: none;
   color: #94a3b8;
-  font-size: 13px;
+  font-size: 16px;
   cursor: pointer;
-  padding: 0 4px;
+}
+
+.yt-search-clear-btn.hidden {
+  display: none;
 }
 
 .yt-btn-red-search {
+  flex-shrink: 0;
+  height: 48px;
   background: #ef4444;
   color: #ffffff;
   font-weight: 600;
-  font-size: 13px;
+  font-size: 15px;
   border: none;
-  border-radius: 18px;
-  padding: 9px 18px;
+  border-radius: 24px;
+  padding: 0 20px;
   cursor: pointer;
-  transition: background 0.15s ease, transform 0.15s ease;
-}
-.yt-btn-red-search:hover {
-  background: #dc2626;
-  transform: scale(1.02);
-}
-.yt-btn-red-search:active {
-  transform: scale(0.96);
 }
 
-/* Category Filter Tabs (Screenshot 3) */
+.yt-btn-red-search:disabled {
+  opacity: 0.6;
+}
+
+/* One scrollable row of tabs; they keep their size instead of squeezing */
 .yt-category-tabs-row {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
   padding-bottom: 2px;
 }
 
+.yt-category-tabs-row::-webkit-scrollbar {
+  display: none;
+}
+
 .yt-filter-tab {
+  flex-shrink: 0;
+  min-height: 44px;
   background: #f1f5f9;
   border: none;
-  border-radius: 10px;
-  padding: 6px 14px;
-  font-size: 12.5px;
+  border-radius: 22px;
+  padding: 0 18px;
+  font-size: 15px;
   font-weight: 600;
   color: #334155;
   cursor: pointer;
   white-space: nowrap;
-  transition: all 0.15s ease;
 }
-.yt-filter-tab:hover {
-  background: #e2e8f0;
-  color: #0f172a;
-}
+
 .yt-filter-tab.active {
   background: #0f172a;
   color: #ffffff;
-  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.2);
 }
 
-/* Recommendations / Search Results Scroll List (Screenshots 3, 4, 5) */
-.yt-results-scroll-list {
-  max-height: 260px;
+/* The list takes the rest of the height */
+.yt-browse-col > .yt-results-scroll-list {
+  flex: 1 1 auto;
+  min-height: 260px;
   overflow-y: auto;
+  overscroll-behavior: contain;
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  padding-right: 2px;
+  gap: 4px;
+  margin: 0 -6px;
+  padding: 0 6px;
 }
 
 .yt-section-header {
-  font-size: 11.5px;
+  font-size: 13px;
   font-weight: 700;
   color: #64748b;
   text-transform: uppercase;
-  letter-spacing: 0.6px;
-  padding: 4px 6px 0 6px;
+  letter-spacing: 0.5px;
+  padding: 8px 4px 2px;
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 8px;
+}
+
+.yt-section-header span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .yt-clear-history-btn {
+  flex-shrink: 0;
+  min-height: 36px;
   background: transparent;
   border: none;
-  color: #94a3b8;
-  font-size: 11px;
+  color: #64748b;
+  font-size: 13px;
+  font-weight: 600;
   cursor: pointer;
-  padding: 0;
+  padding: 0 4px;
 }
-.yt-clear-history-btn:hover {
-  color: #ef4444;
+
+.yt-list-message,
+.yt-notice {
+  text-align: center;
+  color: #64748b;
+  padding: 24px 12px;
+  font-size: 15px;
+  line-height: 1.4;
+}
+
+.yt-notice {
+  padding: 10px 12px;
+  background: #fef2f2;
+  color: #b91c1c;
+  border-radius: 12px;
 }
 
 .yt-result-item {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 6px 8px;
-  border-radius: 12px;
+  padding: 6px;
+  min-height: 76px;
+  border-radius: 14px;
   cursor: pointer;
-  transition: background 0.15s ease, transform 0.1s ease;
+  flex-shrink: 0;
 }
-.yt-result-item:hover {
-  background: #f8fafc;
-  transform: translateX(2px);
+
+.yt-result-item:active {
+  background: #f1f5f9;
 }
+
 .yt-result-item.playing {
   background: #fef2f2;
 }
 
 .yt-thumb-wrap {
   position: relative;
-  width: 88px;
-  height: 50px;
-  border-radius: 8px;
+  width: 120px;
+  height: 68px;
+  border-radius: 10px;
   overflow: hidden;
-  background: #0f172a;
+  background: #e2e8f0;
   flex-shrink: 0;
 }
+
 .yt-thumb-img {
   width: 100%;
   height: 100%;
   object-fit: cover;
 }
+
 .yt-duration-badge {
   position: absolute;
-  bottom: 3px;
+  bottom: 4px;
   right: 4px;
   background: rgba(0, 0, 0, 0.82);
   color: #ffffff;
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 700;
-  padding: 1px 4px;
+  padding: 1px 5px;
   border-radius: 4px;
-  letter-spacing: 0.2px;
 }
 
 .yt-info-wrap {
@@ -2207,51 +2306,27 @@ body.night-mode .nav-progress-traveled-fill {
   min-width: 0;
   display: flex;
   flex-direction: column;
+  gap: 3px;
 }
 
+/* Two lines of title: one line cut most Armenian and Russian titles to a few words */
 .yt-item-title {
-  font-size: 13px;
+  font-size: 15px;
   font-weight: 600;
   color: #0f172a;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
   line-height: 1.3;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
 .yt-item-meta {
-  font-size: 11.5px;
+  font-size: 13px;
   color: #64748b;
-  margin-top: 2px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-}
-
-/* Bottom Account Disconnect Button (Screenshot 5) */
-.yt-disconnect-footer {
-  margin-top: 4px;
-  padding-top: 4px;
-  border-top: 1px solid #f1f5f9;
-}
-
-.btn-yt-disconnect-pill {
-  width: 100%;
-  background: #f8fafc;
-  border: 1px solid #e2e8f0;
-  color: #64748b;
-  font-size: 12.5px;
-  font-weight: 500;
-  padding: 9px 14px;
-  border-radius: 14px;
-  cursor: pointer;
-  text-align: center;
-  transition: all 0.15s ease;
-}
-.btn-yt-disconnect-pill:hover {
-  background: #fee2e2;
-  border-color: #fca5a5;
-  color: #b91c1c;
 }
 
 /* ==========================================================================
@@ -3145,7 +3220,7 @@ body.night-mode .nav-progress-traveled-fill {
   border: 1px solid #e2e8f0;
   box-shadow: 0 12px 32px rgba(0, 0, 0, 0.12), 0 2px 6px rgba(0, 0, 0, 0.04);
   z-index: 100;
-  max-height: 240px;
+  max-height: 320px;
   overflow-y: auto;
   margin-top: 6px;
 }
@@ -3155,12 +3230,14 @@ body.night-mode .nav-progress-traveled-fill {
 }
 
 .yt-suggestion-item {
+  min-height: 48px;
+  box-sizing: border-box;
   padding: 10px 14px;
   display: flex;
   align-items: center;
   gap: 12px;
   cursor: pointer;
-  font-size: 14px;
+  font-size: 16px;
   color: #1e293b;
   border-bottom: 1px solid #f8fafc;
   transition: background 0.15s ease, color 0.15s ease;

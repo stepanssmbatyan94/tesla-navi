@@ -280,6 +280,72 @@ function fetchUpstream(url, options = {}, timeoutMs = UPSTREAM_TIMEOUT_MS) {
   return fetch(url, { ...options, signal: options.signal || AbortSignal.timeout(timeoutMs) });
 }
 
+// YouTube (scraped like Yandex): search results come as videoRenderer, "watch next" as
+// lockupViewModel. Both become { id, title, channel, duration, thumbnail }; a missing duration
+// stays '' (live streams, premieres) instead of a made-up one.
+const YT_VIDEO_ID = /^[A-Za-z0-9_-]{11}$/;
+const YT_USER_AGENT = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
+const YT_CLIENT = { clientName: 'WEB', clientVersion: '2.20240101.00.00', gl: 'AM' };
+const YT_HL = { ru: 'ru', hy: 'hy', en: 'en' };
+
+function parseYtVideoRenderer(v) {
+  if (!v || !YT_VIDEO_ID.test(v.videoId || '')) return null;
+  const title = v.title?.runs?.map(r => r.text).join('') || v.title?.simpleText || '';
+  if (!title) return null;
+  const thumbs = v.thumbnail?.thumbnails || [];
+  return {
+    id: v.videoId,
+    title,
+    channel: v.ownerText?.runs?.[0]?.text || v.shortBylineText?.runs?.[0]?.text || '',
+    duration: v.lengthText?.simpleText || '',
+    thumbnail: thumbs.length ? thumbs[thumbs.length - 1].url : `https://i.ytimg.com/vi/${v.videoId}/hqdefault.jpg`
+  };
+}
+
+function parseYtLockup(l) {
+  if (!l || l.contentType !== 'LOCKUP_CONTENT_TYPE_VIDEO' || !YT_VIDEO_ID.test(l.contentId || '')) return null;
+  const meta = l.metadata?.lockupMetadataViewModel;
+  const title = meta?.title?.content || '';
+  if (!title) return null;
+  const rows = meta?.metadata?.contentMetadataViewModel?.metadataRows || [];
+  // the duration is the time-shaped text of a thumbnail badge somewhere under the overlays
+  let duration = '';
+  (function findBadge(node, depth) {
+    if (duration || !node || typeof node !== 'object' || depth > 10) return;
+    const badge = node.thumbnailBadgeViewModel;
+    if (badge && /^\d{1,2}(:\d{2}){1,2}$/.test(badge.text || '')) { duration = badge.text; return; }
+    for (const value of Object.values(node)) findBadge(value, depth + 1);
+  })(l.contentImage, 0);
+  const sources = l.contentImage?.thumbnailViewModel?.image?.sources || [];
+  return {
+    id: l.contentId,
+    title,
+    channel: rows[0]?.metadataParts?.[0]?.text?.content || '',
+    duration,
+    thumbnail: sources.length ? sources[sources.length - 1].url : `https://i.ytimg.com/vi/${l.contentId}/hqdefault.jpg`
+  };
+}
+
+// "Watch next" of a video: YouTube's own related videos, without the video itself
+function parseYtWatchNext(data, videoId) {
+  const items = data?.contents?.twoColumnWatchNextResults?.secondaryResults?.secondaryResults?.results || [];
+  const seen = new Set([videoId]);
+  const results = [];
+  for (const item of items) {
+    const video = parseYtLockup(item.lockupViewModel) || parseYtVideoRenderer(item.compactVideoRenderer);
+    if (video && !seen.has(video.id)) {
+      seen.add(video.id);
+      results.push(video);
+    }
+  }
+  return results;
+}
+
+// /api/yt-related answers, per video and language; bounded like the other caches
+const ytRelatedCache = new Map();
+const YT_RELATED_CACHE_MAX = 200;
+const YT_RELATED_TTL_MS = 30 * 60 * 1000;
+
 // Per-client token bucket for /api/*: the scraping endpoints are expensive and can get the
 // server's IP blocked upstream. Generous enough for typing-as-you-search plus navigation.
 const RATE_LIMIT_CAPACITY = 60;           // burst
@@ -1527,17 +1593,8 @@ const server = http.createServer(async (req, res) => {
         for (const act of actions) {
           if (act.itemSectionRenderer?.contents) {
             for (const item of act.itemSectionRenderer.contents) {
-              const v = item.videoRenderer;
-              if (v && v.videoId) {
-                const title = v.title?.runs?.[0]?.text || '';
-                const duration = v.lengthText?.simpleText || '';
-                const channel = v.ownerText?.runs?.[0]?.text || v.shortBylineText?.runs?.[0]?.text || '';
-                const thumbObj = v.thumbnail?.thumbnails?.[v.thumbnail.thumbnails.length - 1] || v.thumbnail?.thumbnails?.[0];
-                const thumbnail = thumbObj ? thumbObj.url : `https://i.ytimg.com/vi/${v.videoId}/hqdefault.jpg`;
-                if (title) {
-                  results.push({ id: v.videoId, title, duration, channel, thumbnail });
-                }
-              }
+              const video = parseYtVideoRenderer(item.videoRenderer);
+              if (video) results.push(video);
             }
           }
           if (act.continuationItemRenderer) {
@@ -1562,17 +1619,8 @@ const server = http.createServer(async (req, res) => {
           for (const section of sectionList) {
             const contents = section.itemSectionRenderer?.contents || [];
             for (const item of contents) {
-              const v = item.videoRenderer;
-              if (v && v.videoId) {
-                const title = v.title?.runs?.[0]?.text || '';
-                const duration = v.lengthText?.simpleText || '';
-                const channel = v.ownerText?.runs?.[0]?.text || v.shortBylineText?.runs?.[0]?.text || '';
-                const thumbObj = v.thumbnail?.thumbnails?.[v.thumbnail.thumbnails.length - 1] || v.thumbnail?.thumbnails?.[0];
-                const thumbnail = thumbObj ? thumbObj.url : `https://i.ytimg.com/vi/${v.videoId}/hqdefault.jpg`;
-                if (title) {
-                  results.push({ id: v.videoId, title, duration, channel, thumbnail });
-                }
-              }
+              const video = parseYtVideoRenderer(item.videoRenderer);
+              if (video) results.push(video);
             }
             if (section.continuationItemRenderer) {
               nextContinuationToken = section.continuationItemRenderer.continuationEndpoint?.continuationCommand?.token || null;
@@ -1591,6 +1639,45 @@ const server = http.createServer(async (req, res) => {
       console.warn('YouTube search fetch warning:', e.message);
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ success: false, error: e.message, results: [], continuationToken: null }));
+    }
+    return;
+  }
+
+  // API 4.2: /api/yt-related?id=VIDEO_ID&lang=ru (YouTube's own "watch next" list for a video:
+  // the recommendations of the player, from what the driver played, not a curated list)
+  if (pathname === '/api/yt-related') {
+    const id = (parsedUrl.searchParams.get('id') || '').trim();
+    const hl = YT_HL[parsedUrl.searchParams.get('lang')] || 'ru';
+    if (!YT_VIDEO_ID.test(id)) {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ success: false, error: 'Invalid video id', results: [] }));
+      return;
+    }
+    const key = `${id}:${hl}`;
+    const cached = ytRelatedCache.get(key);
+    if (cached && Date.now() - cached.at < YT_RELATED_TTL_MS) {
+      sendCompressed(req, res, 200, { 'Content-Type': 'application/json' }, cached.body);
+      return;
+    }
+    try {
+      const ytRes = await fetchUpstream('https://www.youtube.com/youtubei/v1/next?prettyPrint=false', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'User-Agent': YT_USER_AGENT },
+        body: JSON.stringify({ context: { client: { ...YT_CLIENT, hl } }, videoId: id })
+      });
+      if (!ytRes.ok) throw new Error(`YouTube HTTP ${ytRes.status}`);
+      const results = parseYtWatchNext(await ytRes.json(), id);
+      const body = JSON.stringify({ success: true, results });
+      if (results.length) {
+        ytRelatedCache.delete(key);
+        ytRelatedCache.set(key, { at: Date.now(), body });
+        while (ytRelatedCache.size > YT_RELATED_CACHE_MAX) ytRelatedCache.delete(ytRelatedCache.keys().next().value);
+      }
+      sendCompressed(req, res, 200, { 'Content-Type': 'application/json' }, body);
+    } catch (e) {
+      console.warn('YouTube related fetch warning:', e.message);
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ success: false, error: e.message, results: [] }));
     }
     return;
   }
@@ -1785,6 +1872,9 @@ if (require.main === module) {
 
 module.exports = {
   server,
+  parseYtVideoRenderer,
+  parseYtLockup,
+  parseYtWatchNext,
   extractCoords,
   parseYandexGeoUri,
   parseYandexRoutes,
