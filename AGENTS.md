@@ -30,6 +30,7 @@ Manual URLs: car screen `/?code=TEST01`, simulator/diagnostics `/?mode=dev`, pho
 ```
 server.js                 HTTP server: static allowlist, /api/*, /ws room relay
 index.html, phone.html    The two pages (car screen, phone remote)
+js/client-log.js          Uncaught errors of both pages → /api/client-log → Cloud Run log
 js/config.js              CONFIG + I18N (ru default, hy, en)
 js/realtime.js            TeslaRealtime: Supabase + local WS, dedup, reconnect, heartbeat
 js/maps/map-engine.js     TeslaMapEngine: map, GPS snapping, navigation loop, route render, voice

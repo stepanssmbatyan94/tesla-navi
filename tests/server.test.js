@@ -420,3 +420,51 @@ test('/api/route?mode=traffic asks only Yandex: no OSRM lanes, no OSRM fallback'
     await new Promise(resolve => server.close(resolve));
   }
 });
+
+test('client-log: entries are cut to a known shape, pairing codes masked, a server-wide budget per minute', () => {
+  const { clientLogEntry, takeClientLogSlot, CLIENT_LOG_MAX_PER_MIN } = require('../server.js');
+  assert.equal(clientLogEntry(null), null);
+  assert.equal(clientLogEntry({ message: '' }), null, 'nothing to log without a message');
+  const e = clientLogEntry({
+    kind: 'whatever', page: 'phone', message: 'x'.repeat(900), line: 12.4, col: -3,
+    source: 'https://host/?code=AB12CD&mode=dev', stack: 'at f (https://host/js/a.js?v=1:1:2)\u0000', provider: '<b>', extra: 'dropped'
+  });
+  assert.equal(e.kind, 'error');
+  assert.equal(e.page, 'phone');
+  assert.equal(e.message.length, 500);
+  assert.equal(e.line, 12);
+  assert.equal(e.col, undefined, 'negative numbers are dropped');
+  assert.equal(e.source, 'https://host/?code=…&mode=dev', 'the pairing code never reaches the log');
+  assert.ok(!e.stack.includes('\u0000'));
+  assert.equal(e.provider, undefined);
+  assert.equal(e.extra, undefined);
+
+  const t = 1_700_000_040_000;
+  let accepted = 0;
+  for (let i = 0; i < CLIENT_LOG_MAX_PER_MIN + 10; i++) if (takeClientLogSlot(t)) accepted++;
+  assert.equal(accepted, CLIENT_LOG_MAX_PER_MIN);
+  assert.equal(takeClientLogSlot(t + 60000), true, 'a new minute, a new budget');
+});
+
+test('POST /api/client-log: 204 for a report, 400 for garbage, oversized bodies cut off', async () => {
+  const { server } = require('../server.js');
+  const realError = console.error;
+  const logged = [];
+  console.error = line => logged.push(line);
+  await new Promise(resolve => server.listen(0, resolve));
+  const url = `http://127.0.0.1:${server.address().port}/api/client-log`;
+  const post = body => fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body });
+  try {
+    assert.equal((await post(JSON.stringify({ kind: 'error', message: 'boom', line: 3 }))).status, 204);
+    const entry = JSON.parse(logged[logged.length - 1]);
+    assert.equal(entry.severity, 'ERROR');
+    assert.equal(entry.message, '[client:car] boom');
+    assert.equal(entry.client.line, 3);
+    assert.equal((await post('not json')).status, 400);
+    await assert.rejects(post(JSON.stringify({ message: 'y'.repeat(20000) })).then(r => r.text()));
+  } finally {
+    console.error = realError;
+    server.closeAllConnections();
+    await new Promise(resolve => server.close(resolve));
+  }
+});

@@ -139,6 +139,45 @@ const PORT = process.env.PORT || 8085;
 // Cloud Run names every deploy (K_REVISION); locally each server start is a new version
 const APP_VERSION = process.env.K_REVISION || `local-${Date.now()}`;
 
+// Uncaught errors from the car screen and the phone page (js/client-log.js) end up in the
+// server log, the only place a failure inside the Tesla browser can be seen. Anyone can post
+// here, so the body is size-capped, every field is cut to a known shape and the whole server
+// logs at most CLIENT_LOG_MAX_PER_MIN reports a minute (the rest are dropped silently).
+const CLIENT_LOG_MAX_BODY = 8192;
+const CLIENT_LOG_MAX_PER_MIN = 60;
+const clientLogBudget = { minute: 0, count: 0 };
+
+function clientLogText(value, max) {
+  return typeof value === 'string'
+    // the pairing code in a URL would let anyone reading the log join the car's channel
+    ? value.replace(/[\u0000-\u0008\u000b-\u001f\u007f]/g, ' ').replace(/([?&]code=)[^&\s]+/gi, '$1…').slice(0, max)
+    : '';
+}
+
+function clientLogEntry(body) {
+  if (!body || typeof body !== 'object') return null;
+  const message = clientLogText(body.message, 500);
+  if (!message) return null;
+  const num = v => (Number.isFinite(v) && v >= 0 ? Math.round(v) : undefined);
+  return {
+    kind: body.kind === 'rejection' ? 'rejection' : 'error',
+    page: body.page === 'phone' ? 'phone' : 'car',
+    message,
+    source: clientLogText(body.source, 200) || undefined,
+    line: num(body.line),
+    col: num(body.col),
+    stack: clientLogText(body.stack, 2000) || undefined,
+    provider: ['maplibre', 'yandex', 'osm'].includes(body.provider) ? body.provider : undefined,
+    userAgent: clientLogText(body.userAgent, 200) || undefined
+  };
+}
+
+function takeClientLogSlot(now = Date.now()) {
+  const minute = Math.floor(now / 60000);
+  if (clientLogBudget.minute !== minute) { clientLogBudget.minute = minute; clientLogBudget.count = 0; }
+  return ++clientLogBudget.count <= CLIENT_LOG_MAX_PER_MIN;
+}
+
 const MIME_TYPES = {
   '.html': 'text/html; charset=utf-8',
   '.css': 'text/css; charset=utf-8',
@@ -1330,6 +1369,31 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  if (pathname === '/api/client-log' && req.method === 'POST') {
+    let size = 0;
+    const chunks = [];
+    req.on('data', chunk => {
+      size += chunk.length;
+      if (size > CLIENT_LOG_MAX_BODY) { req.destroy(); return; }
+      chunks.push(chunk);
+    });
+    req.on('end', () => {
+      let entry = null;
+      try {
+        entry = clientLogEntry(JSON.parse(Buffer.concat(chunks).toString('utf8')));
+      } catch (e) {
+        entry = null; // not JSON: nothing to log
+      }
+      // structured log: Cloud Run takes severity/message from the JSON line
+      if (entry && takeClientLogSlot()) {
+        console.error(JSON.stringify({ severity: 'ERROR', message: `[client:${entry.page}] ${entry.message}`, appVersion: APP_VERSION, client: entry }));
+      }
+      res.writeHead(entry ? 204 : 400);
+      res.end();
+    });
+    return;
+  }
+
   // API: /api/speed-limit (OSM maxspeed of the nearest road, for free driving without a route)
   if (pathname === '/api/speed-limit') {
     const lat = Number(parsedUrl.searchParams.get('lat'));
@@ -1731,6 +1795,9 @@ module.exports = {
   getArmenianAudio,
   isAllowedMapLink,
   fetchUpstream,
+  clientLogEntry,
+  takeClientLogSlot,
+  CLIENT_LOG_MAX_PER_MIN,
   takeRateToken,
   clientIp,
   RATE_LIMIT_CAPACITY
