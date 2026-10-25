@@ -1210,9 +1210,14 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
+    // mode=traffic: the car's periodic traffic refresh while navigating. It only takes Yandex's
+    // traffic colors and remaining time for the route it already drives, so lanes (one OSRM
+    // request per route), speed limits and the OSRM fallback would be work thrown away.
+    const trafficOnly = parsedUrl.searchParams.get('mode') === 'traffic';
+
     // 1. Fetch OSRM route in parallel to extract exact OpenStreetMap intersection lane data
     const osrmUrl = `https://router.project-osrm.org/route/v1/driving/${startLng},${startLat};${destLng},${destLat}?overview=full&geometries=geojson&steps=true&annotations=true`;
-    const osrmPromise = fetchUpstream(osrmUrl)
+    const osrmPromise = trafficOnly ? null : fetchUpstream(osrmUrl)
       .then(r => r.json())
       .catch(err => {
         console.warn('OSRM parallel route fetch warning:', err.message);
@@ -1234,6 +1239,15 @@ const server = http.createServer(async (req, res) => {
       if (match) {
         const stateData = JSON.parse(match[1]);
         const yRoutes = stateData.config?.routerResponse?.routes;
+
+        if (yRoutes && yRoutes.length > 0 && trafficOnly) {
+          sendCompressed(req, res, 200, { 'Content-Type': 'application/json' }, JSON.stringify({
+            success: true,
+            source: 'yandex',
+            routes: parseYandexRoutes(yRoutes)
+          }));
+          return;
+        }
 
         if (yRoutes && yRoutes.length > 0) {
           const osrmData = await osrmPromise;
@@ -1259,6 +1273,13 @@ const server = http.createServer(async (req, res) => {
       }
     } catch (err) {
       console.warn('Yandex route fetch warning:', err.message);
+    }
+
+    // A traffic refresh keeps the current colors when Yandex fails: OSRM has no traffic
+    if (trafficOnly) {
+      res.writeHead(502, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ success: false, error: 'Yandex traffic unavailable' }));
+      return;
     }
 
     // 2. Fallback to OSRM if Yandex fails

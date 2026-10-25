@@ -378,3 +378,45 @@ test('map sprites: each PNG is the size its JSON index was made for (1x half of 
     }
   }
 });
+
+test('/api/route?mode=traffic asks only Yandex: no OSRM lanes, no OSRM fallback', async () => {
+  const { server } = require('../server.js');
+  const realFetch = globalThis.fetch;
+  const upstream = [];
+  let yandexState = {
+    config: { routerResponse: { routes: [yandexRoute({
+      duration: 600,
+      durationWithoutTraffic: 500,
+      sections: [{ action: { value: 'straight' }, street: 'Sarmen Street', distance: { value: 500 }, edgePoints: [[44.50, 40.18], [44.505, 40.18]] }]
+    })] } }
+  };
+  globalThis.fetch = async url => {
+    upstream.push(String(url));
+    if (/yandex\.com\/maps/.test(url)) {
+      const html = yandexState ? `<script type="application/json" class="state-view">${JSON.stringify(yandexState)}</script>` : '<html>captcha</html>';
+      return { ok: true, status: 200, text: async () => html };
+    }
+    return { ok: true, status: 200, json: async () => ({ code: 'Ok', routes: [] }) };
+  };
+  await new Promise(resolve => server.listen(0, resolve));
+  const url = `http://127.0.0.1:${server.address().port}/api/route?startLat=40.18&startLng=44.50&destLat=40.185&destLng=44.505&mode=traffic`;
+  try {
+    const res = await realFetch(url);
+    const data = await res.json();
+    assert.equal(data.source, 'yandex');
+    assert.equal(data.routes.length, 1);
+    assert.equal(data.routes[0].duration, 600);
+    assert.deepEqual(upstream.filter(u => /osrm/.test(u)), [], 'no OSRM request for a traffic refresh');
+
+    yandexState = null; // Yandex answers without route data (e.g. a captcha page)
+    upstream.length = 0;
+    const failed = await realFetch(url);
+    assert.equal(failed.status, 502);
+    assert.equal((await failed.json()).success, false);
+    assert.deepEqual(upstream.filter(u => /osrm/.test(u)), [], 'no OSRM fallback: it has no traffic');
+  } finally {
+    globalThis.fetch = realFetch;
+    server.closeAllConnections();
+    await new Promise(resolve => server.close(resolve));
+  }
+});
