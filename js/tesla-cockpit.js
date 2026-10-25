@@ -219,7 +219,7 @@ function applyLanguage(lang) {
   const trafficBadgeEl = document.getElementById('traffic-score-badge');
   if (trafficBadgeEl) trafficBadgeEl.title = liveTrafficData ? trafficBadgeTitle(liveTrafficData, lang) : (trafficBadgeEl.textContent === '—' ? dict.trafficUnavailable : trafficBadgeEl.title);
   // camera markers already on the map (MapLibre) carry their limit for the same reason
-  document.querySelectorAll('.camera-map-badge[data-limit]').forEach(el => { el.title = speedCameraTitle(el.dataset.limit); });
+  document.querySelectorAll('.camera-map-badge[data-limit]').forEach(el => { el.title = speedCameraTitle(el.dataset.limit, el.dataset.kind); });
 
   // 4. Input placeholders [data-i18n-placeholder]
   document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
@@ -768,6 +768,8 @@ async function initMap() {
       if (!badge) return;
       if (alert && alert.visible) {
         if (distEl) distEl.textContent = alert.distance;
+        const iconEl = badge.querySelector('.camera-alert-icon');
+        if (iconEl) iconEl.textContent = alert.kind === 'red_light' ? '🚦' : '📷';
         badge.classList.remove('hidden');
       } else {
         badge.classList.add('hidden');

@@ -32,7 +32,7 @@ Details: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 | Routing | Yandex live router with up to 3 alternatives and traffic-colored polylines, OSRM fallback, off-route rerouting that drives on with the fastest new route (no choice offered mid-drive) |
 | Guidance | Maneuver HUD with countdown, lane arrows (OSRM lanes matched onto the Yandex route), progress bar with ETA, real traffic delay per route |
 | Voice | ru/en Google Cloud TTS neural voices (female/male), Armenian prerecorded Gor/Suzie, chime, mute |
-| Safety | ~185 speed cameras (Yerevan DB) announced only along the active route; road limits from OpenStreetMap `maxspeed`, and where a street has no tag the legal default 60 in built-up areas / 90 outside (dashed); camera limit wins near a camera; overspeed chime on camera/OSM limits |
+| Safety | ~500 speed cameras across Armenia (OpenStreetMap + SpeedCamOnLine.ru) and red-light cameras at ~20 junctions, announced only along the active route and in the camera's direction; road limits from OpenStreetMap `maxspeed`, and where a street has no tag the legal default 60 in built-up areas / 90 outside (dashed); camera limit wins near a camera; overspeed chime on camera/OSM limits |
 | Places | Search (Yandex Suggest → Photon → Nominatim), Google/Yandex link and coordinate parsing, Home/Work, favorites, history |
 | Phone remote | GPS sharing with wake lock, address search, link paste, voice dictation, "Send to Tesla" |
 | Extras | Weather at the car's position (Open-Meteo), YouTube search/player, 105 EV charging stations from OpenStreetMap, Yerevan traffic score badge |
@@ -68,7 +68,7 @@ server.js                 HTTP server, /api/*, /ws relay, static allowlist
 index.html, phone.html    Car screen and phone remote pages
 js/                       config + i18n, realtime, map engine, car UI, phone UI
 css/  styles/  sounds/    Styles, MapLibre map styles + sprites, audio
-data/                     Speed-camera database, OSM charging stations and speed limits
+data/                     Camera database (speed + red-light), OSM charging stations and speed limits
 scripts/                  verify runner + checks, Armenian voice generators
 docs/                     Architecture, API, deployment, development, ADRs, playbooks
 AGENTS.md                 Instructions for AI coding agents (CLAUDE.md / GEMINI.md import it)

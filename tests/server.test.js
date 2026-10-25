@@ -505,3 +505,13 @@ test('/api/speed-cameras serves the cameras array of the database', async () => 
   }
 });
 
+test('Armenian camera warnings of every kind play the "camera ahead" clip', () => {
+  const ctx = require('./helpers/browser-context');
+  const browser = ctx.loadScripts(ctx.createBrowserContext(), ['js/config.js']);
+  const hy = ctx.get(browser, 'I18N').hy;
+  const clip = fs.readFileSync(path.join(ROOT, 'sounds/hy/gor/camera_ahead.mp3'));
+  for (const phrase of [hy.voiceSpeedCamera.replace('{limit}', 60), hy.voiceSpeedCameraNoLimit, hy.voiceRedLightCamera]) {
+    const audio = getArmenianAudio(phrase, 'gor');
+    assert.ok(audio && audio.equals(clip), phrase);
+  }
+});

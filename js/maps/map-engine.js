@@ -175,6 +175,14 @@ const NO_TRAFFIC_COLOR = '#3b82f6';
 // Kept short: before the zone the road may allow more, and the voice alert already fires at 350 m.
 const CAMERA_LIMIT_AHEAD_M = 200;
 const CAMERA_LIMIT_BEHIND_M = 50;
+// A camera on the route is within this distance of the route line
+const ROUTE_CAMERA_MAX_M = 28;
+// A camera with a known course (from SpeedCamOnLine) only counts for traffic heading within this
+// many degrees of it; the opposite carriageway's camera stays silent. Cameras without a course
+// (OSM, red-light) count for both directions: an extra warning beats a missed camera.
+const CAMERA_DIRECTION_TOLERANCE_DEG = 60;
+// A free-driving camera alert re-arms once the car is this far from it again
+const CAMERA_REARM_M = 600;
 
 // How far past a junction (along the route) the HUD switches to the next maneuver
 const STEP_ADVANCE_PAST_JUNCTION_M = 8;
@@ -210,10 +218,43 @@ function loadExternalStylesheet(href) {
   document.head.appendChild(link);
 }
 
-// Tooltip of a speed-camera marker in the UI language; no limit in the DB -> no number.
-function speedCameraTitle(limit) {
+// Tooltip of a camera marker in the UI language; no limit in the DB -> no number.
+// kind: 'speed' (default) or 'red_light' (no speed limit).
+function speedCameraTitle(limit, kind) {
   const dict = I18N[(typeof window !== 'undefined' && window.CURRENT_LANG) || 'ru'] || I18N.ru;
+  if (kind === 'red_light') return dict.redLightCameraMarker;
   return limit ? `${dict.speedCameraMarker} ${limit} ${dict.kmh}` : dict.speedCameraMarker;
+}
+
+// Marker icon: a camera for speed cameras, a traffic light for red-light cameras
+function cameraBadgeIcon(kind) {
+  if (kind === 'red_light') {
+    return `<svg viewBox="0 0 24 24" width="16" height="16" fill="#1e293b">
+              <path d="M9 1h6a3 3 0 0 1 3 3v16a3 3 0 0 1-3 3H9a3 3 0 0 1-3-3V4a3 3 0 0 1 3-3zm3 2.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5zm0 6a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5zm0 6a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5z"/>
+            </svg>`;
+  }
+  return `<svg viewBox="0 0 24 24" width="16" height="16" fill="#1e293b">
+              <path d="M4 4h3l2-2h6l2 2h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2zm8 3a5 5 0 1 0 0 10 5 5 0 0 0 0-10zm0 2a3 3 0 1 1 0 6 3 3 0 0 1 0-6z"/>
+            </svg>`;
+}
+
+// Spoken camera warning in the UI language. Armenian has no number clips: the server maps any
+// phrase with "տեսախցիկ"/"արագաչափ" to the prerecorded "camera ahead" clip.
+function cameraVoicePhrase(kind, limit) {
+  const dict = I18N[(typeof window !== 'undefined' && window.CURRENT_LANG) || 'ru'] || I18N.ru;
+  if (kind === 'red_light') return dict.voiceRedLightCamera;
+  return limit ? dict.voiceSpeedCamera.replace('{limit}', limit) : dict.voiceSpeedCameraNoLimit;
+}
+
+// Degrees between two bearings, 0..180
+function bearingDifference(a, b) {
+  return Math.abs(((a - b) % 360 + 540) % 360 - 180);
+}
+
+// Does a camera enforce traffic travelling on this bearing? Unknown course: yes.
+function cameraFacesTravel(cam, travelBearing) {
+  if (cam.direction == null || travelBearing == null || !Number.isFinite(travelBearing)) return true;
+  return bearingDifference(cam.direction, travelBearing) <= CAMERA_DIRECTION_TOLERANCE_DEG;
 }
 
 class TeslaMapEngine {
@@ -265,14 +306,8 @@ class TeslaMapEngine {
     this.totalDistance = 0;
     this.spokenDistanceThresholds = {};
 
-    // Key Speed Cameras in Yerevan (Alert only, no ugly blocking sprites on map)
-    this.trafficPoints = [
-      { type: 'camera', lat: 40.1915, lng: 44.4735, name: 'Speed Cam 60', limit: 60 },
-      { type: 'camera', lat: 40.1955, lng: 44.4880, name: 'Speed Cam 60', limit: 60 },
-      { type: 'camera', lat: 40.1830, lng: 44.4780, name: 'Monte Melkonyan Cam', limit: 60 }
-    ];
-
-    // Load full verified speed camera database for Yerevan (185 real speed cameras)
+    // Speed and red-light cameras from /api/speed-cameras; none until it answers
+    this.trafficPoints = [];
     this.loadRealSpeedCameras();
   }
 
@@ -589,25 +624,28 @@ class TeslaMapEngine {
     });
   }
 
-  // Load full verified speed camera database for Yerevan (185 real speed cameras)
+  // Camera database (OSM + SpeedCamOnLine.ru, see scripts/update_speed_cameras.mjs).
+  // A camera without a limit stays without one: no number is invented.
   async loadRealSpeedCameras() {
     try {
       const res = await fetch('/api/speed-cameras');
       if (res.ok) {
         const cams = await res.json();
         if (Array.isArray(cams) && cams.length > 0) {
-          const lights = this.trafficPoints.filter(p => p.type === 'light');
-          const realCamPoints = cams.map(c => ({
-            type: 'camera',
-            lat: c.lat,
-            lng: c.lng,
-            limit: c.limit || 60,
-            direction: c.direction,
-            name: c.name || `Камера ${c.limit || 60} км/ч`
-          }));
-          this.trafficPoints = [...lights, ...realCamPoints];
-          if (this.map && this.activeRoute) {
-            this.renderTrafficPoints();
+          this.trafficPoints = cams
+            .filter(c => Number.isFinite(c.lat) && Number.isFinite(c.lng))
+            .map(c => ({
+              type: 'camera',
+              kind: c.type === 'red_light' ? 'red_light' : 'speed',
+              lat: c.lat,
+              lng: c.lng,
+              limit: c.type === 'red_light' ? null : (Number(c.limit) || null),
+              direction: Number.isFinite(c.direction) ? c.direction : null
+            }));
+          // the route may have been built before the database arrived
+          if (this.activeRoute && this.routeCoordinates && this.routeCoordinates.length >= 2) {
+            this.projectRouteCameras();
+            if (this.map) this.renderTrafficPoints();
           }
         }
       }
@@ -641,26 +679,8 @@ class TeslaMapEngine {
       return;
     }
 
-    // Filter cameras strictly to those located on the active route polyline (within 24m corridor)
-    const routeCameras = [];
-    const allCameras = (this.trafficPoints || []).filter(p => p.type === 'camera');
-
-    for (const cam of allCameras) {
-      let isOnRoute = false;
-      for (let i = 0; i < this.routeCoordinates.length - 1; i++) {
-        const p1 = this.routeCoordinates[i];
-        const p2 = this.routeCoordinates[i + 1];
-        const proj = this.projectPointToSegment(cam.lng, cam.lat, p1[0], p1[1], p2[0], p2[1]);
-        const d = this.calculateDistance(cam.lat, cam.lng, proj.y, proj.x);
-        if (d <= 24.0) {
-          isOnRoute = true;
-          break;
-        }
-      }
-      if (isOnRoute) {
-        routeCameras.push(cam);
-      }
-    }
+    // Cameras on the route in the travel direction, projected once per route (projectRouteCameras)
+    const routeCameras = this.routeCameras || [];
 
     if (this.provider === 'maplibre' && window.maplibregl) {
       routeCameras.forEach(point => {
@@ -668,10 +688,8 @@ class TeslaMapEngine {
         el.className = 'map-speed-camera-pin';
         const limit = Number(point.limit) || '';
         el.innerHTML = `
-          <div class="camera-map-badge" data-limit="${limit}" title="${speedCameraTitle(limit)}">
-            <svg viewBox="0 0 24 24" width="16" height="16" fill="#1e293b">
-              <path d="M4 4h3l2-2h6l2 2h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2zm8 3a5 5 0 1 0 0 10 5 5 0 0 0 0-10zm0 2a3 3 0 1 1 0 6 3 3 0 0 1 0-6z"/>
-            </svg>
+          <div class="camera-map-badge${point.kind === 'red_light' ? ' red-light' : ''}" data-limit="${limit}" data-kind="${point.kind === 'red_light' ? 'red_light' : 'speed'}" title="${speedCameraTitle(limit, point.kind)}">
+            ${cameraBadgeIcon(point.kind)}
           </div>
         `;
         const marker = new window.maplibregl.Marker({ element: el, anchor: 'center' })
@@ -680,21 +698,21 @@ class TeslaMapEngine {
         this.cameraMarkers.push(marker);
       });
     } else if (this.provider === 'yandex' && window.ymaps && this.map.geoObjects) {
-      const CamLayout = window.ymaps.templateLayoutFactory.createClass(
+      const layoutFor = kind => window.ymaps.templateLayoutFactory.createClass(
         `<div class="map-speed-camera-pin" style="transform: translate(-50%, -50%);">
-          <div class="camera-map-badge yandex-upright">
-            <svg viewBox="0 0 24 24" width="16" height="16" fill="#1e293b">
-              <path d="M4 4h3l2-2h6l2 2h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2zm8 3a5 5 0 1 0 0 10 5 5 0 0 0 0-10zm0 2a3 3 0 1 1 0 6 3 3 0 0 1 0-6z"/>
-            </svg>
+          <div class="camera-map-badge yandex-upright${kind === 'red_light' ? ' red-light' : ''}">
+            ${cameraBadgeIcon(kind)}
           </div>
         </div>`
       );
+      const layouts = { speed: layoutFor('speed'), red_light: layoutFor('red_light') };
 
       routeCameras.forEach(point => {
+        const kind = point.kind === 'red_light' ? 'red_light' : 'speed';
         const placemark = new window.ymaps.Placemark([point.lat, point.lng], {
-          hintContent: speedCameraTitle(Number(point.limit) || '')
+          hintContent: speedCameraTitle(Number(point.limit) || '', kind)
         }, {
-          iconLayout: CamLayout,
+          iconLayout: layouts[kind],
           iconImageSize: [28, 28],
           iconImageOffset: [0, 0]
         });
@@ -2151,7 +2169,7 @@ class TeslaMapEngine {
         const distAlongRoute = cam.routeDist - vehicleRouteDist;
         if (distAlongRoute > -15 && distAlongRoute < 600) {
           nearestCameraDist = Math.round(distAlongRoute);
-          upcomingCameraLimit = cam.limit || 60;
+          upcomingCameraLimit = cam.limit || null;
           upcomingCameraObj = cam;
           break;
         }
@@ -2159,25 +2177,16 @@ class TeslaMapEngine {
     }
 
     if (upcomingCameraObj && nearestCameraDist < 600) {
-      // Audio chime and voice prompt when approaching speed camera
+      // Audio chime and voice prompt when approaching the camera
       if (!upcomingCameraObj.alerted && nearestCameraDist <= 350 && nearestCameraDist >= 80) {
         upcomingCameraObj.alerted = true;
         this.playNavChime();
-        const limit = upcomingCameraLimit || 60;
-        const lang = window.CURRENT_LANG || 'ru';
-        let phrase = '';
-        if (lang === 'en') {
-          phrase = `Speed camera ahead, limit ${limit}`;
-        } else if (lang === 'hy') {
-          phrase = `Ուշադրություն, արագաչափ ${limit}`;
-        } else {
-          phrase = `Внимание, камера на ${limit}`;
-        }
-        this.speakVoice(phrase);
+        this.speakVoice(cameraVoicePhrase(upcomingCameraObj.kind, upcomingCameraLimit));
       }
 
       this.onCameraAlert({
         visible: true,
+        kind: upcomingCameraObj.kind || 'speed',
         distance: this.formatNavDistance(nearestCameraDist),
         distanceMeters: nearestCameraDist,
         limit: upcomingCameraLimit
@@ -2232,16 +2241,25 @@ class TeslaMapEngine {
     let upcomingCameraLimit = null;
     let upcomingCamObj = null;
 
-    for (const cam of this.trafficPoints.filter(p => p.type === 'camera')) {
+    // ~0.007° is ~780 m north-south and ~600 m east-west here: anything outside is far away
+    // (and re-armed) without a trigonometric distance per camera on every fix
+    for (const cam of this.trafficPoints) {
+      if (cam.type !== 'camera') continue;
+      if (Math.abs(cam.lat - currentLat) > 0.007 || Math.abs(cam.lng - currentLng) > 0.007) {
+        if (cam.alerted) cam.alerted = false;
+        continue;
+      }
       const d = this.calculateDistance(currentLat, currentLng, cam.lat, cam.lng);
-      if (d > 15 && d < 450) {
+      // passed and left behind: the same camera warns again on the next pass (drive home)
+      if (cam.alerted && d > CAMERA_REARM_M) cam.alerted = false;
+      if (d > 15 && d < 450 && cameraFacesTravel(cam, this.currentHeading)) {
         const bearingToCam = this.calculateBearing(currentLat, currentLng, cam.lat, cam.lng);
-        const angleDiff = Math.abs(((bearingToCam - this.currentHeading) % 360 + 540) % 360 - 180);
+        const angleDiff = bearingDifference(bearingToCam, this.currentHeading);
         if (angleDiff <= 28) {
           const perp = d * Math.sin((angleDiff * Math.PI) / 180);
           if (perp <= 24 && d < nearestCameraDist) {
             nearestCameraDist = Math.round(d);
-            upcomingCameraLimit = cam.limit || 60;
+            upcomingCameraLimit = cam.limit || null;
             upcomingCamObj = cam;
           }
         }
@@ -2252,17 +2270,12 @@ class TeslaMapEngine {
       if (!upcomingCamObj.alerted && nearestCameraDist <= 350 && nearestCameraDist >= 80) {
         upcomingCamObj.alerted = true;
         this.playNavChime();
-        const limit = upcomingCameraLimit || 60;
-        const lang = window.CURRENT_LANG || 'ru';
-        let phrase = '';
-        if (lang === 'en') phrase = `Speed camera ahead, limit ${limit}`;
-        else if (lang === 'hy') phrase = `Ուշադրություն, արագաչափ ${limit}`;
-        else phrase = `Внимание, камера на ${limit}`;
-        this.speakVoice(phrase);
+        this.speakVoice(cameraVoicePhrase(upcomingCamObj.kind, upcomingCameraLimit));
       }
 
       this.onCameraAlert({
         visible: true,
+        kind: upcomingCamObj.kind || 'speed',
         distance: this.formatNavDistance(nearestCameraDist),
         distanceMeters: nearestCameraDist,
         limit: upcomingCameraLimit
@@ -2647,30 +2660,7 @@ class TeslaMapEngine {
       step.endRouteDist = (idx === this.routeSteps.length - 1) ? this.totalRouteMeters : runningStepDist;
     });
 
-    // Pre-calculate route positions for speed cameras strictly along this route
-    this.routeCameras = [];
-    if (this.trafficPoints && this.routeCoordinates && this.routeCumulativeDistances) {
-      for (const cam of this.trafficPoints.filter(p => p.type === 'camera')) {
-        let bestDist = 0;
-        let minD = Infinity;
-        for (let i = 0; i < this.routeCoordinates.length - 1; i++) {
-          const p1 = this.routeCoordinates[i];
-          const p2 = this.routeCoordinates[i + 1];
-          const proj = this.projectPointToSegment(cam.lng, cam.lat, p1[0], p1[1], p2[0], p2[1]);
-          const d = this.calculateDistance(cam.lat, cam.lng, proj.y, proj.x);
-          if (d < minD) {
-            minD = d;
-            const segStartDist = this.routeCumulativeDistances[i] || 0;
-            const segLen = (this.routeCumulativeDistances[i + 1] || segStartDist) - segStartDist;
-            bestDist = segStartDist + proj.t * segLen;
-          }
-        }
-        if (minD <= 28) {
-          this.routeCameras.push({ ...cam, routeDist: bestDist });
-        }
-      }
-      this.routeCameras.sort((a, b) => a.routeDist - b.routeDist);
-    }
+    this.projectRouteCameras();
 
     // Prepare list of all routes for cards (up to 3 routes)
     const fastestDurationSec = data.routes[0]?.duration || durationSec;
@@ -2746,6 +2736,49 @@ class TeslaMapEngine {
     this.onProgressUpdate(0);
 
     return routeInfo;
+  }
+
+  // Cameras on the active route, once per route: each gets its distance along the route
+  // (routeDist) at the closest pass that runs in the camera's direction. A camera of the opposite
+  // carriageway or of a crossing street with its own course is left out.
+  projectRouteCameras() {
+    this.routeCameras = [];
+    const coords = this.routeCoordinates;
+    if (!this.trafficPoints || !coords || coords.length < 2 || !this.routeCumulativeDistances) return;
+
+    // Cheap bounding-box test first: the database covers the whole country
+    let minLat = Infinity, maxLat = -Infinity, minLng = Infinity, maxLng = -Infinity;
+    for (const [lng, lat] of coords) {
+      if (lat < minLat) minLat = lat;
+      if (lat > maxLat) maxLat = lat;
+      if (lng < minLng) minLng = lng;
+      if (lng > maxLng) maxLng = lng;
+    }
+    const marginLat = ROUTE_CAMERA_MAX_M / 111320;
+    const marginLng = marginLat / Math.cos(((minLat + maxLat) / 2) * Math.PI / 180);
+
+    for (const cam of this.trafficPoints) {
+      if (cam.type !== 'camera') continue;
+      if (cam.lat < minLat - marginLat || cam.lat > maxLat + marginLat || cam.lng < minLng - marginLng || cam.lng > maxLng + marginLng) continue;
+      let bestDist = 0;
+      let minD = Infinity;
+      for (let i = 0; i < coords.length - 1; i++) {
+        const p1 = coords[i];
+        const p2 = coords[i + 1];
+        const proj = this.projectPointToSegment(cam.lng, cam.lat, p1[0], p1[1], p2[0], p2[1]);
+        const d = this.calculateDistance(cam.lat, cam.lng, proj.y, proj.x);
+        if (d > ROUTE_CAMERA_MAX_M || d >= minD) continue;
+        if (!cameraFacesTravel(cam, this.calculateBearing(p1[1], p1[0], p2[1], p2[0]))) continue;
+        minD = d;
+        const segStartDist = this.routeCumulativeDistances[i] || 0;
+        const segLen = (this.routeCumulativeDistances[i + 1] || segStartDist) - segStartDist;
+        bestDist = segStartDist + proj.t * segLen;
+      }
+      if (minD <= ROUTE_CAMERA_MAX_M) {
+        this.routeCameras.push({ ...cam, routeDist: bestDist });
+      }
+    }
+    this.routeCameras.sort((a, b) => a.routeDist - b.routeDist);
   }
 
   // Route calculation using 100% Yandex live traffic router (/api/route)
