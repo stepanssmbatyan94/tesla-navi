@@ -22,7 +22,7 @@
   <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.118.0"></script>
 
   <!-- Tesla Cockpit CSS -->
-  <link rel="stylesheet" href="css/tesla-display.css?v=87">
+  <link rel="stylesheet" href="css/tesla-display.css?v=90">
 </head>
 <body>
 
@@ -661,29 +661,32 @@
     </div>
   </div>
 
-  <!-- YouTube Music & Video Modal matching Mapsev (Screenshots 3, 4, 5) -->
+  <!-- YouTube player: live search, YouTube's own "watch next" and the car's play history -->
   <div id="youtube-player-modal" class="youtube-player-modal hidden">
-    <div class="yt-drag-handle-bar"></div>
     <div id="yt-modal-header" class="yt-header-row">
       <div class="yt-title-brand">
-        <svg viewBox="0 0 24 24" width="22" height="22" fill="#ff0000"><path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg>
+        <svg viewBox="0 0 24 24" width="26" height="26" fill="#ff0000"><path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg>
         <span>YouTube</span>
       </div>
-      <button id="btn-close-music" class="card-close-btn" data-i18n-title="dismiss" title="Закрыть">
-        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      <button id="btn-close-music" class="yt-close-btn" data-i18n-title="dismiss" title="Закрыть">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
       </button>
     </div>
 
-    <!-- Video Screen Box (Screenshot 3: Black Box with 'Nothing playing / Pick something below' when idle) -->
+    <div class="yt-player-col">
     <div class="yt-screen-container">
       <div id="yt-idle-screen" class="yt-idle-screen">
-        <div class="yt-idle-title" id="yt-now-title">Nothing playing</div>
-        <div class="yt-idle-sub" id="yt-now-artist">Pick something below</div>
+        <svg viewBox="0 0 24 24" width="40" height="40" fill="#ffffff" opacity="0.85"><polygon points="7 4 20 12 7 20 7 4"/></svg>
+        <div class="yt-idle-sub" data-i18n="ytPickBelow">Выберите видео ниже</div>
       </div>
-      <iframe id="yt-player-iframe" class="yt-iframe-player hidden" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
+      <iframe id="yt-player-iframe" class="yt-iframe-player hidden" frameborder="0" allow="autoplay; encrypted-media; fullscreen; picture-in-picture" referrerpolicy="strict-origin-when-cross-origin"></iframe>
     </div>
 
-    <!-- Scrub Bar / Timeline (Screenshot 3) -->
+    <div class="yt-now-row">
+      <div class="yt-now-title" id="yt-now-title"></div>
+      <div class="yt-now-artist" id="yt-now-artist"></div>
+    </div>
+
     <div class="yt-timeline-container">
       <div id="yt-timeline-track" class="yt-timeline-track">
         <div id="yt-timeline-fill" class="yt-timeline-fill" style="width: 0%;">
@@ -691,72 +694,52 @@
         </div>
       </div>
       <div class="yt-timestamps">
-        <span id="yt-time-cur">0:00</span>
-        <span id="yt-time-dur">0:00</span>
+        <span id="yt-time-cur"></span>
+        <span id="yt-time-dur"></span>
       </div>
     </div>
 
-    <!-- Transport Controls (Screenshot 3: Center Red Play/Pause Button) -->
     <div class="yt-transport-row">
+      <button id="btn-yt-shuffle" class="yt-aux-btn" data-i18n-title="shuffle" title="Перемешать">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M16 3h5v5M4 20L21 3M21 16v5h-5M15 15l6 6M4 4l5 5"/></svg>
+      </button>
       <button id="btn-music-prev" class="yt-skip-btn" data-i18n-title="prevTrack" title="Предыдущий">
-        <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><polygon points="11 19 2 12 11 5 11 19"/><polygon points="22 19 13 12 22 5 22 19"/></svg>
+        <svg viewBox="0 0 24 24" width="26" height="26" fill="currentColor"><polygon points="11 19 2 12 11 5 11 19"/><polygon points="22 19 13 12 22 5 22 19"/></svg>
       </button>
       <button id="btn-music-play" class="yt-red-play-btn" data-i18n-title="playPause" title="Воспроизведение / Пауза">
-        <svg id="yt-play-icon" viewBox="0 0 24 24" width="24" height="24" fill="#ffffff"><polygon points="6 4 20 12 6 20 6 4"/></svg>
+        <svg id="yt-play-icon" viewBox="0 0 24 24" width="28" height="28" fill="#ffffff"><polygon points="6 4 20 12 6 20 6 4"/></svg>
       </button>
       <button id="btn-music-next" class="yt-skip-btn" data-i18n-title="nextTrack" title="Следующий">
-        <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><polygon points="5 5 14 12 5 19 5 5"/><polygon points="13 5 22 12 13 19 13 5"/></svg>
+        <svg viewBox="0 0 24 24" width="26" height="26" fill="currentColor"><polygon points="5 5 14 12 5 19 5 5"/><polygon points="13 5 22 12 13 19 13 5"/></svg>
+      </button>
+      <button id="btn-yt-fullscreen" class="yt-aux-btn" data-i18n-title="fullscreen" title="Во весь экран">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>
       </button>
     </div>
-
-    <!-- User Account & Quick Controls Row (Screenshot 3) -->
-    <div class="yt-user-controls-row">
-      <div class="yt-account-identity" id="yt-account-badge" data-i18n-title="ytAccount" title="Аккаунт YouTube">
-        <span id="yt-user-name-text"></span>
-      </div>
-      <div class="yt-aux-buttons">
-        <button id="btn-yt-shuffle" class="yt-aux-btn" data-i18n-title="shuffle" title="Перемешать">
-          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M16 3h5v5M4 20L21 3M21 16v5h-5M15 15l6 6M4 4l5 5"/></svg>
-        </button>
-        <button id="btn-yt-fullscreen" class="yt-aux-btn" data-i18n-title="fullscreen" title="Во весь экран">
-          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>
-        </button>
-      </div>
     </div>
 
-    <!-- Search Bar with Red Search Button & Suggestions Dropdown -->
-    <div class="yt-search-pill-container" style="position: relative;">
+    <div class="yt-browse-col">
+    <div class="yt-search-pill-container">
       <div class="yt-search-pill-wrap">
-        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#64748b" stroke-width="2.4"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#64748b" stroke-width="2.4"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
         <input id="yt-search-input" class="yt-search-pill-input" type="text" data-i18n-placeholder="ytSearchPlaceholder" placeholder="Поиск в YouTube..." autocomplete="off" />
-        <button id="btn-yt-search-clear" class="yt-search-clear-btn hidden" title="Очистить">✕</button>
+        <button id="btn-yt-search-clear" class="yt-search-clear-btn hidden" data-i18n-title="clear" title="Очистить">✕</button>
       </div>
-      <button id="btn-yt-search-go" class="yt-btn-red-search" type="button">Search</button>
-
-      <!-- Autocomplete Suggestions Dropdown -->
+      <button id="btn-yt-search-go" class="yt-btn-red-search" type="button" data-i18n="search">Поиск</button>
       <div id="yt-suggestions-box" class="yt-suggestions-box hidden"></div>
     </div>
 
-    <!-- Category Filter Tabs matching YouTube Home Feed (Screenshots 2 & 3) -->
     <div class="yt-category-tabs-row">
-      <button class="yt-filter-tab active" data-tab="all" data-i18n="ytTabAll">Все</button>
+      <button class="yt-filter-tab active" data-tab="all" data-i18n="ytTabAll">Для вас</button>
       <button class="yt-filter-tab" data-tab="music" data-i18n="ytTabMusic">Музыка</button>
-      <button class="yt-filter-tab" data-tab="jams" data-i18n="ytTabJams">Джемы</button>
       <button class="yt-filter-tab" data-tab="armcomedy">ArmComedy</button>
-      <button class="yt-filter-tab" data-tab="auto" data-i18n="ytTabAuto">Авто & Игры</button>
+      <button class="yt-filter-tab" data-tab="auto" data-i18n="ytTabAuto">Авто</button>
       <button class="yt-filter-tab" data-tab="football" data-i18n="ytTabFootball">Футбол</button>
       <button class="yt-filter-tab" data-tab="news" data-i18n="ytTabNews">Новости</button>
       <button class="yt-filter-tab" data-tab="history" data-i18n="history">История</button>
     </div>
 
-    <!-- Dynamic Recommendations / Search Results List (Screenshots 3, 4, 5) -->
-    <div id="yt-results-list" class="yt-results-scroll-list">
-      <!-- 15-20 video cards rendered dynamically with thumbnail, title, channel & duration -->
-    </div>
-
-    <!-- Bottom Account Action (Screenshot 5) -->
-    <div class="yt-disconnect-footer">
-      <button id="btn-yt-account-toggle" class="btn-yt-disconnect-pill"></button>
+    <div id="yt-results-list" class="yt-results-scroll-list"></div>
     </div>
   </div>
 
@@ -908,10 +891,10 @@
   </div>
 
   <!-- Scripts -->
-  <script src="js/client-log.js?v=87"></script>
-  <script src="js/config.js?v=87"></script>
-  <script src="js/realtime.js?v=87"></script>
-  <script src="js/maps/map-engine.js?v=87"></script>
-  <script src="js/tesla-cockpit.js?v=87"></script>
+  <script src="js/client-log.js?v=90"></script>
+  <script src="js/config.js?v=90"></script>
+  <script src="js/realtime.js?v=90"></script>
+  <script src="js/maps/map-engine.js?v=90"></script>
+  <script src="js/tesla-cockpit.js?v=90"></script>
 </body>
 </html>

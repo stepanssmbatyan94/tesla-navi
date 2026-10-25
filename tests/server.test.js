@@ -15,7 +15,10 @@ const {
   RATE_LIMIT_CAPACITY,
   parseYandexTrafficXml,
   laneViaPoints,
-  extractLaneIntersections
+  extractLaneIntersections,
+  parseYtVideoRenderer,
+  parseYtLockup,
+  parseYtWatchNext
 } = require('../server.js');
 
 const ROOT = path.resolve(__dirname, '..');
@@ -513,5 +516,74 @@ test('Armenian camera warnings of every kind play the "camera ahead" clip', () =
   for (const phrase of [hy.voiceSpeedCamera.replace('{limit}', 60), hy.voiceSpeedCameraNoLimit, hy.voiceRedLightCamera]) {
     const audio = getArmenianAudio(phrase, 'gor');
     assert.ok(audio && audio.equals(clip), phrase);
+  }
+});
+
+// A "watch next" lockup as YouTube sends it (trimmed to the fields the parser reads)
+function ytLockup(id, title, channel, duration, type = 'LOCKUP_CONTENT_TYPE_VIDEO') {
+  return {
+    lockupViewModel: {
+      contentType: type,
+      contentId: id,
+      contentImage: {
+        thumbnailViewModel: {
+          image: { sources: [{ url: `https://i.ytimg.com/vi/${id}/s.jpg` }, { url: `https://i.ytimg.com/vi/${id}/l.jpg` }] },
+          overlays: duration ? [{ thumbnailBottomOverlayViewModel: { badges: [{ thumbnailBadgeViewModel: { icon: {}, text: duration } }] } }] : []
+        }
+      },
+      metadata: {
+        lockupMetadataViewModel: {
+          title: { content: title },
+          metadata: { contentMetadataViewModel: { metadataRows: [{ metadataParts: [{ text: { content: channel } }] }, { metadataParts: [{ text: { content: '1M views' } }] }] } }
+        }
+      }
+    }
+  };
+}
+
+test('YouTube watch-next: videos only, without the current one or repeats, real durations', () => {
+  const data = {
+    contents: { twoColumnWatchNextResults: { secondaryResults: { secondaryResults: { results: [
+      ytLockup('TPjN6N8TgNI', 'Current video', 'Super Sako', '3:22'),
+      ytLockup('eJ4UdE_Njfk', 'Super Sako - Na Na Na', 'Super Sako', '4:18'),
+      ytLockup('PLxxxxxxxxx', 'A playlist', 'Someone', '', 'LOCKUP_CONTENT_TYPE_PLAYLIST'),
+      ytLockup('eJ4UdE_Njfk', 'Super Sako - Na Na Na', 'Super Sako', '4:18'),
+      ytLockup('R4P7mTGrl-g', 'Live now', 'Norayr Vardanyan', ''),
+      ytLockup('bad id!', 'Broken', 'X', '1:00'),
+      { continuationItemRenderer: {} }
+    ] } } } }
+  };
+  assert.deepEqual(parseYtWatchNext(data, 'TPjN6N8TgNI'), [
+    { id: 'eJ4UdE_Njfk', title: 'Super Sako - Na Na Na', channel: 'Super Sako', duration: '4:18', thumbnail: 'https://i.ytimg.com/vi/eJ4UdE_Njfk/l.jpg' },
+    { id: 'R4P7mTGrl-g', title: 'Live now', channel: 'Norayr Vardanyan', duration: '', thumbnail: 'https://i.ytimg.com/vi/R4P7mTGrl-g/l.jpg' }
+  ]);
+  assert.deepEqual(parseYtWatchNext({}, 'x'), []);
+  assert.equal(parseYtLockup(null), null);
+});
+
+test('YouTube search result: full title from all runs, no invented duration', () => {
+  const v = parseYtVideoRenderer({
+    videoId: 'pLE0aQCjcO8',
+    title: { runs: [{ text: 'Super Sako & Iveta ' }, { text: '"Million $"' }] },
+    ownerText: { runs: [{ text: 'Super Sako' }] },
+    thumbnail: { thumbnails: [{ url: 'a.jpg' }, { url: 'b.jpg' }] }
+  });
+  assert.deepEqual(v, { id: 'pLE0aQCjcO8', title: 'Super Sako & Iveta "Million $"', channel: 'Super Sako', duration: '', thumbnail: 'b.jpg' });
+  assert.equal(parseYtVideoRenderer({ videoId: '../../etc', title: { simpleText: 'x' } }), null);
+});
+
+test('/api/yt-related rejects anything but an 11-character video id before calling YouTube', async () => {
+  const { server } = require('../server.js');
+  await new Promise(resolve => server.listen(0, resolve));
+  const base = `http://127.0.0.1:${server.address().port}/api/yt-related`;
+  try {
+    for (const query of ['', '?id=', '?id=abc', '?id=../../../x1', '?id=TPjN6N8TgNI1']) {
+      const res = await fetch(base + query);
+      assert.equal(res.status, 400, query);
+      assert.equal((await res.json()).success, false);
+    }
+  } finally {
+    server.closeAllConnections();
+    await new Promise(resolve => server.close(resolve));
   }
 });

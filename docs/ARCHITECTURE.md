@@ -59,7 +59,7 @@ Single `http.createServer` handler plus a `ws` WebSocketServer on `/ws`. No fram
 | `/api/speed-cameras` | Serves the `cameras` of `data/speed-cameras.json`: ~500 speed cameras (OSM + SpeedCamOnLine.ru, merged by `scripts/update_speed_cameras.mjs`) and red-light cameras at ~20 junctions (OSM `enforcement=traffic_signals`). |
 | `/api/speed-limit` | Limit at a point (free driving): nearest OSM-tagged road, else the legal default (60 built-up / 90 outside). Both this and `/api/route` use `data/speed-limits.json` (~37 000 tagged ways in a 0.01° grid, plus a ~100 m built-up grid from OSM residential and settlement outlines; refreshed by `scripts/update_speed_limits.mjs`). Only ~2 % of Yerevan's residential streets carry a maxspeed tag, hence the legal default. |
 | `/api/chargers` | Serves `data/ev-chargers.json`: the 105 car charging stations OpenStreetMap has in Armenia (snapshot refreshed by `scripts/update_chargers.mjs`; Overpass is too slow to query per request). No availability data exists. |
-| `/api/yt-search`, `/api/yt-suggestions` | YouTube HTML/InnerTube scraping and Google suggest. |
+| `/api/yt-search`, `/api/yt-related`, `/api/yt-suggestions` | YouTube HTML/InnerTube scraping (search, "watch next") and Google suggest. |
 | Cross-cutting | Every upstream fetch has a 12 s deadline (`fetchUpstream`); `/api/*` is rate-limited per client IP (last `X-Forwarded-For` entry; token bucket: burst 60, ~120/min, 429 + `Retry-After`; at most 10 000 tracked clients). |
 | `/ws?room=<code>` | Rooms in a process-local `Map`; every frame is relayed to the other members of the room, preserving text/binary type. |
 
@@ -217,7 +217,7 @@ Details and commands: [DEPLOYMENT.md](DEPLOYMENT.md).
 | OpenStreetMap / Overpass | Charging-station and speed-limit snapshots (offline refresh) | Nothing at runtime; the snapshot just ages. |
 | Open-Meteo, YouTube, api.qrserver.com | Weather, music, QR | Feature unavailable. |
 
-Heuristic data that remains, and how it is presented: speed limits where OSM has no tag use the legal default of the zone (dashed, no chime), the street-name estimate only outside the snapshot; the YouTube home feed is a curated list of existing videos. Battery levels, charger availability, traffic guesses, ping/satellite labels and fixed POIs were removed.
+Heuristic data that remains, and how it is presented: speed limits where OSM has no tag use the legal default of the zone (dashed, no chime), the street-name estimate only outside the snapshot; the YouTube "For you" tab is YouTube's own "watch next" for the last video played in the car (a music search before anything was played), the category tabs are live searches, and the player's time, duration and end come from the embedded player itself. Battery levels, charger availability, traffic guesses, ping/satellite labels and fixed POIs were removed.
 
 ## 10. Testing strategy
 

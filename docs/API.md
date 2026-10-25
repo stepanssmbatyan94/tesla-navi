@@ -167,9 +167,11 @@ Any field except `id`, `lat`, `lng`, `sockets` may be `null` (OSM data is incomp
 
 Yerevan: `{ "success": true, "city": "Ереван", "score": 4, "icon": "yellow", "color": "#eab308", "hint": "Местами затруднения", "hints": { "ru": "Местами затруднения", "en": "Congested in places" }, "time": "12:21", "source": "yandex" }` (Yandex XML, cached 60 s; `hint` = `hints.ru`, kept for old clients). Yandex has no Armenian hint: the client translates the known Russian phrases (`YANDEX_TRAFFIC_HINTS_HY` in `js/config.js`) and shows only the score for an unknown one. An XML without a level is an upstream failure, not a guessed score. Anywhere else there is no traffic data: `{ "success": true, "available": false, "city": "Гюмри" | null, "source": "none" }`. Upstream failure → `{ "success": false, "fallback": true }`. The client shows a dash in both no-data cases.
 
-## `GET /api/yt-search`, `GET /api/yt-suggestions`
+## `GET /api/yt-search`, `GET /api/yt-related`, `GET /api/yt-suggestions`
 
 - `yt-search?q=…` or `?continuation=<token>` → `{ success, results: [{ id, title, duration, channel, thumbnail }], continuationToken }` (scraped YouTube).
+- `yt-related?id=<11-char video id>&lang=ru|hy|en` → `{ success, results: [...] }` in the same shape: YouTube's own "watch next" list for that video (InnerTube `/next`, region AM), without the video itself. `400` for any other id. Answers cached per video and language for 30 min (200 entries).
+- A `duration` YouTube does not give (live streams, premieres) is `""`, never a guess.
 - `yt-suggestions?q=…` → `{ success, suggestions: ["…"] }`.
 
 ## Realtime messages
